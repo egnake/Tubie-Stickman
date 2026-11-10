@@ -243,18 +243,14 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 	descFile := filepath.Join(videoFolder, "aciklama.txt")
 	_ = os.WriteFile(descFile, []byte(viralText), 0644)
 
-	// 3. Generate high-resolution thumbnail.jpg
+	// 3. Generate high-impact dedicated thumbnail.jpg
 	thumbJpg := filepath.Join(videoFolder, "thumbnail.jpg")
-	ffmpegExe := BinaryPath("ffmpeg")
-	cmd := exec.Command(ffmpegExe, "-y", "-ss", "00:00:01.200", "-i", filmMp4, "-frames:v", "1", "-q:v", "2", thumbJpg)
-	if err := cmd.Run(); err != nil || !isFile(thumbJpg) {
-		previewPng := filepath.Join(projectDir, "output", "preview.png")
-		filmSheet := filepath.Join(projectDir, "output", "film-sheet.png")
-		if isFile(previewPng) {
-			_ = copyFile(previewPng, thumbJpg)
-		} else if isFile(filmSheet) {
-			_ = copyFile(filmSheet, thumbJpg)
-		}
+	propAsset := ""
+	if len(preset.Scenes) > 0 && preset.Scenes[0].Prop != nil {
+		propAsset = preset.Scenes[0].Prop.Path
+	}
+	if err := GenerateDedicatedThumbnail(p.Root, preset.Title, preset.Narration, propAsset, 2, thumbJpg, filmMp4); err != nil {
+		fmt.Printf("⚠️ Thumbnail oluşturulamadı: %v\n", err)
 	}
 
 	fmt.Printf("\n✨ Başarıyla tamamlandı! Video paketi klasörü: %s\n", videoFolder)
