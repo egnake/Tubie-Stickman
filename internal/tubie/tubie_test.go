@@ -142,3 +142,34 @@ func TestGenerateScript(t *testing.T) {
 	}
 }
 
+func TestViralMetadata(t *testing.T) {
+	title := "İnstagram Hesabınız Nasıl Çalınır?"
+	narration := "Instagram hesabın bir gecede elinden gidebilir! Hackerlar şifreni kırmakla uğraşmaz."
+	vm := tubie.GenerateViralMetadata(title, narration)
+
+	if vm.TitleA == "" || vm.TitleB == "" || vm.TitleC == "" {
+		t.Fatalf("missing A/B/C titles: %+v", vm)
+	}
+	if vm.Description == "" {
+		t.Fatal("missing viral description")
+	}
+	if len(vm.Hashtags) < 5 {
+		t.Fatalf("expected at least 5 hashtags, got %d", len(vm.Hashtags))
+	}
+
+	text := tubie.FormatViralText(title, narration, vm)
+	if !strings.Contains(text, "[BAŞLIK A") || !strings.Contains(text, "[BAŞLIK B") || !strings.Contains(text, "[BAŞLIK C") {
+		t.Fatalf("formatted text missing A/B/C headers: %s", text)
+	}
+	if !strings.Contains(text, "VİRAL REELS & POST AÇIKLAMASI") {
+		t.Fatalf("formatted text missing post description: %s", text)
+	}
+	if !strings.Contains(text, "VİRAL KEŞFET HASHTAGLERİ") {
+		t.Fatalf("formatted text missing hashtags: %s", text)
+	}
+	// Verify Instagram 2200 character limit
+	if len([]rune(text)) > 2200 {
+		t.Fatalf("formatted text exceeds 2200 character limit: %d characters", len([]rune(text)))
+	}
+}
+

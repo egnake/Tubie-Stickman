@@ -20,3 +20,12 @@
 .scenes-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .scene-badge{font-size:10px;padding:3px 8px;border-radius:3px;border:1px solid #324034;background:#19221b;color:#c0d0c3;font-weight:500}
 .preset-header{margin-bottom:10px;display:flex;justify-content:flex-end}
+.output-card{border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:16px 20px;margin-bottom:14px}
+.output-top-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.output-thumb{width:46px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #303a31;background:#0c0e0d}
+.output-info{flex:1;min-width:180px}
+.output-desc-details{margin-top:12px;border-top:1px solid #232a24;padding-top:10px}
+.output-desc-details summary{font-size:11px;color:var(--accent);cursor:pointer;user-select:none}
+.output-desc-details pre{margin:10px 0 0;padding:12px 14px;background:#0e110f;border:1px solid #242c25;border-radius:4px;color:#cbd6cd;font-size:11px;line-height:1.7;white-space:pre-wrap;max-height:260px;overflow:auto}
+.completed-item{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0}
+.completed-item a{font-size:11px;color:var(--accent);border-bottom:1px solid #5a6e50;padding-bottom:2px}

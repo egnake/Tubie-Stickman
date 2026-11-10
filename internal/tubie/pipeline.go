@@ -234,30 +234,47 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 
 	// Export step
 	if p.Reporter != nil {
-		p.Reporter(map[string]any{"stage": "export", "label": "Video ve altyazılar kaydediliyor", "slug": preset.Slug})
+		p.Reporter(map[string]any{"stage": "export", "label": "Video paketi, altyazı ve sosyal medya açıklaması kaydediliyor", "slug": preset.Slug})
+	}
+
+	// Create organized folder: output/<slug>/
+	videoFolder := filepath.Join(outDir, preset.Slug)
+	if err := os.MkdirAll(videoFolder, 0755); err != nil {
+		return "", err
 	}
 
 	filmMp4 := filepath.Join(projectDir, "output", "film.mp4")
-	finalMp4 := filepath.Join(outDir, preset.Slug+".mp4")
+	finalMp4 := filepath.Join(videoFolder, preset.Slug+".mp4")
 	if err := copyFile(filmMp4, finalMp4); err != nil {
 		return "", fmt.Errorf("film.mp4 export failed: %w", err)
 	}
 
-	// Format and write guaranteed 100% accurate SubRip (.srt) subtitle file
+	// 1. Format and write guaranteed 100% accurate SubRip (.srt) subtitle file
 	cleanSrt := FormatSRT(captions)
-	finalSrt := filepath.Join(outDir, preset.Slug+".srt")
+	finalSrt := filepath.Join(videoFolder, preset.Slug+".srt")
 	_ = os.WriteFile(finalSrt, []byte(cleanSrt), 0644)
 	_ = os.WriteFile(filepath.Join(projectDir, "output", "film.srt"), []byte(cleanSrt), 0644)
 
-	filmSheet := filepath.Join(projectDir, "output", "film-sheet.png")
-	previewPng := filepath.Join(projectDir, "output", "preview.png")
-	finalSheet := filepath.Join(outDir, preset.Slug+"-onizleme.png")
-	if _, err := os.Stat(filmSheet); err == nil {
-		_ = copyFile(filmSheet, finalSheet)
-	} else if _, err := os.Stat(previewPng); err == nil {
-		_ = copyFile(previewPng, finalSheet)
+	// 2. Generate and write aciklama.txt (A/B/C test titles, post description, viral hashtags)
+	viralMeta := GenerateViralMetadata(preset.Title, preset.Narration)
+	viralText := FormatViralText(preset.Title, preset.Narration, viralMeta)
+	descFile := filepath.Join(videoFolder, "aciklama.txt")
+	_ = os.WriteFile(descFile, []byte(viralText), 0644)
+
+	// 3. Generate high-resolution thumbnail.jpg
+	thumbJpg := filepath.Join(videoFolder, "thumbnail.jpg")
+	ffmpegExe := BinaryPath("ffmpeg")
+	cmd := exec.Command(ffmpegExe, "-y", "-ss", "00:00:01.200", "-i", filmMp4, "-frames:v", "1", "-q:v", "2", thumbJpg)
+	if err := cmd.Run(); err != nil || !isFile(thumbJpg) {
+		previewPng := filepath.Join(projectDir, "output", "preview.png")
+		filmSheet := filepath.Join(projectDir, "output", "film-sheet.png")
+		if isFile(previewPng) {
+			_ = copyFile(previewPng, thumbJpg)
+		} else if isFile(filmSheet) {
+			_ = copyFile(filmSheet, thumbJpg)
+		}
 	}
 
-	fmt.Printf("\n✨ Başarıyla tamamlandı! Çıktı: %s\n", finalMp4)
+	fmt.Printf("\n✨ Başarıyla tamamlandı! Video paketi klasörü: %s\n", videoFolder)
 	return finalMp4, nil
 }

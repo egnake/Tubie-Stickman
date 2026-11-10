@@ -266,16 +266,57 @@ function renderOutputs(outputs) {
   const list = $('#output-list'); list.replaceChildren();
   if (!outputs.length) { list.append(element('div', 'Henüz bir video yok. İlk üretiminiz burada yerini alacak.', 'empty-list')); return; }
   outputs.forEach(output => {
+    const card = element('div', undefined, 'output-card');
     const row = element('div', undefined, 'output-row');
-    const info = element('div');
+
+    if (output.thumbnail) {
+      const thumb = document.createElement('img');
+      thumb.src = media(output.thumbnail);
+      thumb.className = 'output-thumb';
+      thumb.alt = output.name;
+      row.append(thumb);
+    }
+
+    const info = element('div', undefined, 'output-info');
     info.append(element('strong', output.name), element('small', `MP4 · ${(output.size / 1024 / 1024).toFixed(1)} MB`));
+    row.append(info);
+
     const actions = element('div', undefined, 'output-actions');
     const play = element('button', 'İzle ↗');
     play.addEventListener('click', () => { const video = $('#output-player video'); video.src = media(output.file); $('#output-player').hidden = false; video.play().catch(() => {}); });
     actions.append(play);
-    const download = element('a', 'İndir ↓'); download.href = media(output.file); download.download = output.file.split('/').pop(); actions.append(download);
-    if (output.subtitle) { const sub = element('a', 'Altyazı ↓'); sub.href = media(output.subtitle); sub.download = output.subtitle.split('/').pop(); actions.append(sub); }
-    row.append(info, actions); list.append(row);
+
+    const download = element('a', 'Video ↓'); download.href = media(output.file); download.download = output.file.split('/').pop(); actions.append(download);
+    if (output.subtitle) { const sub = element('a', 'Altyazı (.srt) ↓'); sub.href = media(output.subtitle); sub.download = output.subtitle.split('/').pop(); actions.append(sub); }
+    if (output.thumbnail) { const thumbLink = element('a', 'Thumbnail (.jpg) ↓'); thumbLink.href = media(output.thumbnail); thumbLink.download = 'thumbnail.jpg'; actions.append(thumbLink); }
+    if (output.description) { const descLink = element('a', 'aciklama.txt ↓'); descLink.href = media(output.description); descLink.download = 'aciklama.txt'; actions.append(descLink); }
+    if (output.description_text) {
+      const copyBtn = element('button', 'Açıklama & Tag Kopyala 📋');
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(output.description_text);
+          toast('✨ Instagram açıklaması, A/B/C başlıkları ve hashtagler panoya kopyalandı!');
+        } catch {
+          toast('Panoya kopyalanamadı.');
+        }
+      });
+      actions.append(copyBtn);
+    }
+    row.append(actions);
+    card.append(row);
+
+    if (output.description_text) {
+      const details = document.createElement('details');
+      details.className = 'output-desc-details';
+      const summary = document.createElement('summary');
+      summary.textContent = 'A/B/C Başlıkları, Açıklama ve Hashtagleri Gör ↗';
+      const pre = document.createElement('pre');
+      pre.textContent = output.description_text;
+      details.append(summary, pre);
+      card.append(details);
+    }
+
+    list.append(card);
   });
 }
 function render(data) {
@@ -319,7 +360,20 @@ function render(data) {
   const signature = JSON.stringify(job.results || []);
   if ($('#completed').dataset.signature !== signature) {
     $('#completed').dataset.signature = signature; $('#completed').replaceChildren();
-    (job.results || []).forEach((file, index) => { const link = element('a', `Video ${index + 1} · indir ↓`); link.href = media(file); link.download = file.split('/').pop(); $('#completed').append(link); });
+    (job.results || []).forEach((file, index) => {
+      const box = element('div', undefined, 'completed-item');
+      const baseName = file.split('/').pop();
+      const folder = file.includes('/') ? file.substring(0, file.lastIndexOf('/')) : 'output';
+      const slug = baseName.replace('.mp4', '');
+
+      const vidLink = element('a', `Video ${index + 1} (.mp4) ↓`); vidLink.href = media(file); vidLink.download = baseName;
+      const srtLink = element('a', 'Altyazı (.srt) ↓'); srtLink.href = media(folder + '/' + slug + '.srt'); srtLink.download = slug + '.srt';
+      const thumbLink = element('a', 'Thumbnail (.jpg) ↓'); thumbLink.href = media(folder + '/thumbnail.jpg'); thumbLink.download = 'thumbnail.jpg';
+      const descLink = element('a', 'aciklama.txt ↓'); descLink.href = media(folder + '/aciklama.txt'); descLink.download = 'aciklama.txt';
+
+      box.append(vidLink, srtLink, thumbLink, descLink);
+      $('#completed').append(box);
+    });
   }
   $('#completed').hidden = !job.results?.length;
   $('#reference-badge').textContent = data.reference ? 'REFERANS HAZIR' : 'REFERANS YOK';
