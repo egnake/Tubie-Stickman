@@ -35,7 +35,7 @@ def main():
     if not words:
         parser.error('No aligned words returned; inspect the audio')
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open('x') as output:
+    with args.output.open('x', encoding='utf-8') as output:
         json.dump({'words': words, 'method': 'openai-whisper word_timestamps; human text/timing review required'}, output, ensure_ascii=False, indent=2)
     print(json.dumps({'output': str(args.output.resolve()), 'words': len(words)}))
 

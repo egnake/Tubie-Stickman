@@ -2,15 +2,6 @@
 node_modules/
 .npm/
 
-# Build and project caches
-projects/*/output/
-projects/*/cache/
-projects/*/approval.json
-projects/*/narration.wav
-projects/*/bgm.wav
-projects/*/sfx.wav
-projects/*/*.tmp
-
 # Personal user recordings (protecting voice privacy)
 sesim.wav
 
@@ -34,3 +25,55 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+
+# Generated render output at any depth (including local example renders)
+output/
+outputs/
+cache/
+.cache/
+/projects/
+/temp_rec.wav
+
+# Generated audio and approval state
+narration.wav
+bgm.wav
+sfx.wav
+approval.json
+
+# Temporary files and logs
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*.swo
+*~
+
+# Local model downloads and tool caches
+.huggingface/
+.torch/
+.uv-cache/
+.npm-cache/
+
+# Packaging and tooling
+*.egg-info/
+/dist/
+/build/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Test, type-checking and coverage artifacts
+.mypy_cache/
+.pyre/
+.tox/
+.nox/
+htmlcov/
+coverage/
+.coverage.*
+coverage.xml
+
+# Local editor state
+.idea/
+.vscode/
+*.code-workspace

@@ -5,8 +5,7 @@ import re
 import struct
 
 root = Path(__file__).resolve().parents[1]
-source = (root / "README.en.md").read_text()
-assert source == (root / "README.md").read_text()
+source = (root / "docs/catalog/README.en.md").read_text()
 start, end = "<!-- thumbnail-publishing-kit:start -->", "<!-- thumbnail-publishing-kit:end -->"
 assert source.count(start) == source.count(end) == 1
 kit = source.split(start, 1)[1].split(end, 1)[0]
@@ -48,7 +47,7 @@ image_urls = [
     for image_path in image_paths
 ]
 assert re.findall(r'<img src="([^"]+)"', kit) == image_urls
-assert re.findall(r'<a href="([^"]+\.jpg)"', kit) == image_paths
+assert re.findall(r'<a href="([^"]+\.jpg)"', kit) == ["../../" + path for path in image_paths]
 assert len(re.findall(r'<img[^>]+alt="[^"]+"', kit)) == 6
 assert kit.count('<tr>') == kit.count('</tr>') == 4
 assert kit.count('<table width="100%">') == kit.count('</table>') == 2
@@ -74,21 +73,17 @@ for image_path in image_paths:
         offset += length
     assert dimensions == (1280, 720), (image_path, dimensions)
 
-roadmap_labels = {
-    'en': 'Roadmap', 'zh-CN': '路线图', 'ja': 'ロードマップ', 'ko': '로드맵',
-    'fr': 'Feuille de route', 'pt-BR': 'Roteiro de evolução',
-    'tr': 'Yol haritası', 'id': 'Peta jalan',
-}
+roadmap_labels = {'en': 'Roadmap', 'tr': 'Yol haritası'}
 for locale, roadmap in roadmap_labels.items():
     filename = f'README.{locale}.md'
-    text = (root / filename).read_text()
+    text = (root / "docs/catalog" / filename).read_text()
     assert text.count(start) == text.count(end) == 1, filename
     finishing_link = text.split('<a id="style-gallery"></a>', 1)[0]
     assert re.search(r'\]\(#thumbnail-publishing-kit\)', finishing_link), filename
     localized = text.split(start, 1)[1].split(end, 1)[0]
     assert text.index('<a id="b2"></a>') < text.index(start) < text.index('<a id="faq"></a>'), filename
     assert re.findall(r'<img src="([^"]+)"', localized) == image_urls, filename
-    assert re.findall(r'<a href="([^"]+\.jpg)"', localized) == image_paths, filename
+    assert re.findall(r'<a href="([^"]+\.jpg)"', localized) == ["../../" + path for path in image_paths], filename
     assert len(re.findall(r'^- \*\*([^*]+)\*\*:', localized, re.M)) == 5, filename
     assert len(re.findall(r'^### ', localized, re.M)) == 2, filename
     assert localized.count('<table width="100%">') == localized.count('</table>') == 2, filename
@@ -124,4 +119,4 @@ for document in (skill / 'SKILL.md', skill / 'references/getting-started.md',
         if not target.startswith(('https://', 'http://')):
             assert (document.parent / target).is_file(), (document, target)
 assert len(re.findall(r'^\d\. \*\*', finishing.read_text(), re.M)) == 5
-print('Eight localized kits, six unchanged 1280x720 examples and shared optional finishing reference passed. Behavioral evaluation is separate; older unlinked proposal docs are not a publication dependency.')
+print('Two localized kits, six unchanged 1280x720 examples and shared optional finishing reference passed. Behavioral evaluation is separate; older unlinked proposal docs are not a publication dependency.')

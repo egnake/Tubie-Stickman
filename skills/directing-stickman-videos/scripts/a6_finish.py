@@ -9,12 +9,17 @@ from fractions import Fraction
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 
 from PIL import Image, ImageDraw, ImageFont
+
+FFMPEG = os.environ.get('FFMPEG') or 'ffmpeg'
+FFPROBE = os.environ.get('FFPROBE') or 'ffprobe'
+FONT_DIR = Path(__file__).resolve().parent.parent / 'assets' / 'fonts'
 
 
 def tokens(text):
@@ -31,7 +36,7 @@ def sha(path):
 
 def probe(path):
     return json.loads(subprocess.check_output([
-        'ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(path)
+        FFPROBE, '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(path)
     ]))
 
 
@@ -47,7 +52,7 @@ def validate_sequence(items, duration, label):
 
 def prepare(config_path):
     config_path = Path(config_path).resolve()
-    cfg = json.loads(config_path.read_text())
+    cfg = json.loads(config_path.read_text(encoding="utf-8"))
     def resolve(key, default=None):
         value = cfg.get(key, default)
         if not value:
@@ -58,12 +63,12 @@ def prepare(config_path):
             raise ValueError(f'{key} not available: {path}')
         return path.resolve()
 
-    for tool in ('ffmpeg', 'ffprobe'):
+    for tool in (FFMPEG, FFPROBE):
         if not shutil.which(tool):
             raise ValueError(f'{tool} is required; no automatic install')
     picture, audio = resolve('picture'), resolve('audio')
-    caption_font = resolve('caption_font', '/System/Library/Fonts/Supplemental/Impact.ttf')
-    title_font = resolve('title_font', '/System/Library/Fonts/Supplemental/DIN Condensed Bold.ttf')
+    caption_font = resolve('caption_font', FONT_DIR / 'NotoSans.ttf')
+    title_font = resolve('title_font', FONT_DIR / 'NotoSans.ttf')
     vp, ap = probe(picture), probe(audio)
     video = next(s for s in vp['streams'] if s['codec_type'] == 'video')
     sound = next(s for s in ap['streams'] if s['codec_type'] == 'audio')
@@ -163,7 +168,7 @@ def stamp(t):
 
 def audio_hash(path):
     # Stream to a digest; do not load the full encoded soundtrack into memory.
-    proc = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', str(path), '-map', '0:a:0',
+    proc = subprocess.Popen([FFMPEG, '-v', 'error', '-i', str(path), '-map', '0:a:0',
                              '-c', 'copy', '-f', 'adts', '-'], stdout=subprocess.PIPE)
     digest = hashlib.sha256()
     for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b''):
@@ -190,11 +195,11 @@ def render(config_path, output_dir=None, validate_only=False):
     frames = round(duration * float(fps))
     proof_indices = sorted({min(frames - 1, round(frames * f)) for f in (.04, .23, .57, .87)})
     proofs, cache = [], {}
-    with (out / 'render.log').open('w') as log:
-        decoder = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', str(picture), '-an',
+    with (out / 'render.log').open('w', encoding='utf-8') as log:
+        decoder = subprocess.Popen([FFMPEG, '-v', 'error', '-i', str(picture), '-an',
                                     '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],
                                    stdout=subprocess.PIPE, stderr=log)
-        encoder = subprocess.Popen(['ffmpeg', '-v', 'warning', '-f', 'rawvideo', '-pix_fmt',
+        encoder = subprocess.Popen([FFMPEG, '-v', 'warning', '-f', 'rawvideo', '-pix_fmt',
                                     'rgb24', '-s', f'{w}x{h}', '-r', str(fps), '-i', '-',
                                     '-an', '-c:v', 'libx264', '-crf', '18', '-preset', 'fast',
                                     '-pix_fmt', 'yuv420p', str(out / 'picture-captioned.mp4')],
@@ -245,14 +250,14 @@ def render(config_path, output_dir=None, validate_only=False):
                     proc.wait()
         final = out / 'a6-final.mp4'
         copy_audio = sound['codec_name'] == 'aac'
-        cmd = ['ffmpeg', '-v', 'warning', '-i', str(out / 'picture-captioned.mp4'),
+        cmd = [FFMPEG, '-v', 'warning', '-i', str(out / 'picture-captioned.mp4'),
                '-i', str(audio), '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy']
         cmd += ['-c:a', 'copy'] if copy_audio else ['-c:a', 'aac', '-b:a', '192k']
         subprocess.run(cmd + ['-movflags', '+faststart', str(final)], check=True, stderr=log)
-    subprocess.run(['ffmpeg', '-v', 'error', '-i', str(final), '-f', 'null', '-'], check=True)
+    subprocess.run([FFMPEG, '-v', 'error', '-i', str(final), '-f', 'null', '-'], check=True)
     (out / 'captions.srt').write_text('\n\n'.join(
         f"{i+1}\n{stamp(c['start'])} --> {stamp(c['end'])}\n{c['text'].upper()}"
-        for i, c in enumerate(cfg['cues'])) + '\n')
+        for i, c in enumerate(cfg['cues'])) + '\n', encoding='utf-8')
     sheet = Image.new('RGB', (720, 1280), '#151117')
     for i, path in enumerate(proofs):
         tile = Image.open(path).convert('RGB')
@@ -274,7 +279,7 @@ def render(config_path, output_dir=None, validate_only=False):
         'checks_remaining': ['semantic segmentation', 'speech alignment/listening',
                              'mobile readability/safe zones', 'source motion/continuity'],
     }
-    (out / 'manifest.json').write_text(json.dumps(report, indent=2))
+    (out / 'manifest.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     return {key: report[key] for key in ('final', 'sha256', 'decode_pass', 'audio_packets_copied')}
 
 

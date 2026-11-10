@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import {ROOT, FFMPEG, run, save, loadProject, groupWords, hashFile, probe, designPlane} from '../scripts/autopilot-core.mjs';
+import {ROOT, FFMPEG, run, save, loadProject, groupWords, hashFile, probe, designPlane, concatFileLine} from '../scripts/autopilot-core.mjs';
 import {keyState, render, painter} from '../scripts/autopilot-render.mjs';
 
 const cli = path.join(ROOT, 'scripts/autopilot.mjs');
@@ -19,6 +19,18 @@ function fixture(t) {
   const file = path.join(dir, 'project.json'); save(file, project);
   return {dir, project, file};
 }
+test('FFmpeg concat handles apostrophes in paths', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "stickman's test-"));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const clip = path.join(dir, 'clip.wav');
+  run(FFMPEG, ['-v', 'error', '-f', 'lavfi', '-i', 'sine=duration=0.1', clip]);
+  const list = path.join(dir, 'concat.txt');
+  fs.writeFileSync(list, concatFileLine(clip) + '\n');
+  run(FFMPEG, ['-v', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-f', 'null', '-']);
+  assert.equal(concatFileLine("C:\\Users\\O'Brien\\clip.mp4"), "file 'C:/Users/O'\\''Brien/clip.mp4'");
+  assert.throws(() => concatFileLine('bad\npath'), /newlines/);
+});
+
 test('doctor checks local dependencies without network or revealing keys', () => {
   const r = command(['doctor']); assert.equal(r.status, 0, r.stderr); const data = JSON.parse(r.stdout); assert.equal(data.network_checked, false); assert.ok(data.checks.fonts);
 });
@@ -190,13 +202,13 @@ test('approval verifies actual preview bytes and never infers approval of legacy
   r = command(['approve', f.file, '--note', 'Synthetic test only']); assert.notEqual(r.status, 0); assert.match(r.stderr, /Preview changed/);
 });
 test('output symlink cannot redirect writes to another directory', async t => {
-  const f = fixture(t); fs.symlinkSync(os.tmpdir(), path.join(f.dir, 'output'), 'dir'); await assert.rejects(render(loadProject(f.file)), /real project-local/);
+  const f = fixture(t); fs.symlinkSync(os.tmpdir(), path.join(f.dir, 'output'), process.platform === 'win32' ? 'junction' : 'dir'); await assert.rejects(render(loadProject(f.file)), /real project-local/);
 });
 test('nested cache symlink cannot redirect renderer-owned writes', async t => {
   const f = fixture(t), external = path.join(f.dir, 'keep');
   fs.mkdirSync(external); fs.mkdirSync(path.join(f.dir, 'output'));
   fs.writeFileSync(path.join(external, 'sentinel'), 'unchanged');
-  fs.symlinkSync(external, path.join(f.dir, 'output/cache'), 'dir');
+  fs.symlinkSync(external, path.join(f.dir, 'output/cache'), process.platform === 'win32' ? 'junction' : 'dir');
   await assert.rejects(render(loadProject(f.file)), /must not contain symlinks/);
   assert.equal(fs.readFileSync(path.join(external, 'sentinel'), 'utf8'), 'unchanged');
   assert.deepEqual(fs.readdirSync(external), ['sentinel']);

@@ -61,4 +61,4 @@ Before publishing a result or calling it consistent, check:
 - No white card border, unwanted written labels, unintended people, or pressure graphics leaking into the calm ending.
 - Actual audio is compared by listening. Repeated voice text and screenshots are not audio certification.
 
-The 2026-10-14 Flow samples support the location-change approach and show the intended visual style. They are not a guarantee of frame-perfect anatomy, prop state or voice matching; detailed scoped observations live in repository `tests/reports/style-4.md`, not as marketing claims in the README.
+The 2026-10-14 Flow samples support the location-change approach and show the intended visual style. They are not a guarantee of frame-perfect anatomy, prop state or voice matching; detailed scoped observations live in repository `docs/qa/reports/style-4.md`, not as marketing claims in the README.

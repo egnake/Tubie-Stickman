@@ -15,10 +15,10 @@ spec.loader.exec_module(module)
 
 with tempfile.TemporaryDirectory(prefix='a6-finish-test-') as name:
     tmp = Path(name)
-    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
+    subprocess.run([module.FFMPEG, '-v', 'error', '-f', 'lavfi', '-i',
                     'color=c=0x382638:s=360x640:r=24:d=2', '-c:v', 'libx264',
                     '-pix_fmt', 'yuv420p', str(tmp / 'picture.mp4')], check=True)
-    subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
+    subprocess.run([module.FFMPEG, '-v', 'error', '-f', 'lavfi', '-i',
                     'sine=frequency=440:duration=2', '-c:a', 'aac',
                     str(tmp / 'mix.m4a')], check=True)
     cfg = {'picture': 'picture.mp4', 'audio': 'mix.m4a', 'script': 'Go go now.',
@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='a6-finish-test-') as name:
         raise AssertionError('Missing narration accepted')
     config.write_text(json.dumps(cfg))
     # Repeated GO must highlight one positional token, not both occurrences.
-    font = Path('/System/Library/Fonts/Supplemental/Impact.ttf')
+    font = root / 'skills/directing-stickman-videos/assets/fonts/NotoSans.ttf'
     first = module.caption_layer('GO GO NOW.', 0, 360, 640, font)
     second = module.caption_layer('GO GO NOW.', 1, 360, 640, font)
     amber1 = {x for x in range(360) for y in range(first.height)

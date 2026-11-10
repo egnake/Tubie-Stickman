@@ -1,0 +1,10 @@
+{
+  "name": "tubie-stickman",
+  "private": true,
+  "workspaces": ["skills/directing-stickman-videos"],
+  "scripts": {
+    "test": "npm test --workspace directing-stickman-videos-runtime",
+    "doctor": "npm run doctor --workspace directing-stickman-videos-runtime"
+  },
+  "engines": {"node": ">=20"}
+}

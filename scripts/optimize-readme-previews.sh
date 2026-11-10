@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Run from any directory. Source GIFs and videos are never overwritten.
-preview_root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
+preview_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 command -v ffmpeg >/dev/null || { printf 'ffmpeg is required.\n' >&2; exit 1; }
 mkdir -p "$preview_root/assets/readme/previews"
 
