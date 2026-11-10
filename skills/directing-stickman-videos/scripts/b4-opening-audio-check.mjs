@@ -49,7 +49,7 @@ export function analyzeOpening(samples, sampleRate = 16000) {
     physical_listening: 'not performed', human_acceptance: 'not implied'};
 }
 
-export function checkOpeningFile(filename, ffmpeg = 'ffmpeg') {
+export function checkOpeningFile(filename, ffmpeg = process.env.FFMPEG || 'ffmpeg') {
   const file = fs.realpathSync(filename);
   if (!fs.statSync(file).isFile()) throw new Error('Input is not a file');
   const result = spawnSync(ffmpeg, ['-v', 'error', '-i', file, '-t', '3', '-vn',

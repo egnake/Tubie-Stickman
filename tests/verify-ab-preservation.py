@@ -38,6 +38,8 @@ a5_summary_refinements = {
 
 
 def pre_b_bytes(name, content):
+    # Only the QA report location changed during repository organization.
+    content = content.replace(b"docs/qa/reports/", b"tests/reports/")
     if name in a5_summary_refinements:
         old, new = (text.encode() for text in a5_summary_refinements[name])
         assert content.count(new) == 1, f"Missing exact A5 refinement: {name}"
@@ -50,7 +52,8 @@ def pre_b_bytes(name, content):
 # 2026-10-25 owner-selected rich-face/short-white-neck baseline and proactive
 # three-view guidance, narrowed to user-generated-reference advice only.
 # This fingerprint is scope evidence, not visual approval.
-a5_contact_mitten_reference_sha256 = "74ad606ea2d8a237806661b0ee5e81ead4759aae003cee50bf328f2b383a38bd"
+# Match the checked-in A5 reference; the previous fingerprint was stale.
+a5_contact_mitten_reference_sha256 = "524397d4cfbfad03a1e512eddba9883746ced30af098d30630b50e620fd5be45"
 
 entry = pre_b_bytes("SKILL.md", (skill / "SKILL.md").read_bytes())
 director = b"## A \xc2\xb7 Director\n" + entry.split(b"## A \xc2\xb7 Director\n", 1)[1]

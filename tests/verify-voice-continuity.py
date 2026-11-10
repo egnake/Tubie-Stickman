@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Instruction regression only; this does not listen to or score generated audio."""
 import re
-import subprocess
+import hashlib
 import sys
 from pathlib import Path
 
@@ -61,16 +61,11 @@ assert "Style 4 Cozy Storytelling" in voice_doc
 assert "multi-speaker" in voice_doc and "explicitly silent video" in voice_doc
 assert "Other voice profiles and styles have not had separate provider-backed audio comparisons" in voice_doc
 
-# Ensure this release changes example audio only, not prior visual actions or spoken words.
-old_examples = subprocess.check_output([
-    "git", "show", "origin/main:skills/directing-stickman-videos/references/examples.md"
-], cwd=REPO, text=True)
-for old, new in zip(prompt_blocks(old_examples), example_prompts):
-    for prefix in ("Character:", "Environment:", "First frame:", "[0–3s]", "[3–7s]", "[7–10s]",
-                   "Audio-only dialogue", "Do not generate", "Negative constraints:"):
-        old_lines = [line for line in old.splitlines() if line.startswith(prefix)]
-        new_lines = [line for line in new.splitlines() if line.startswith(prefix)]
-        assert old_lines == new_lines, f"Non-voice example content changed: {prefix}"
+# Pin non-voice example content without requiring Git history or a remote branch.
+prefixes = ('Character:', 'Environment:', 'First frame:', '[0–3s]', '[3–7s]', '[7–10s]', 'Audio-only dialogue', 'Do not generate', 'Negative constraints:')
+non_voice = '\n'.join(line for prompt in example_prompts for line in prompt.splitlines()
+                      if line.startswith(prefixes))
+assert hashlib.sha256(non_voice.encode()).hexdigest() == 'bbd7574179ba98c8cc6ceadadecfa0b5bc2462c312e57dc810616d114fc71403', "Non-voice example content changed"
 
 if len(sys.argv) > 1:
     check_video(prompt_blocks(Path(sys.argv[1]).read_text()))

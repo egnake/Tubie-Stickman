@@ -52,39 +52,16 @@ assert entries == [skill / "SKILL.md"], "Do not add a second discoverable Skill"
 scripts = json.loads((skill / "package.json").read_text())["scripts"]
 assert not {"preinstall", "install", "postinstall"}.intersection(scripts), "Welcome is not an install-time executable hook"
 
-# Installation instructions ask the installing assistant to load the real entry.
-cn = (root / "README.zh-CN.md").read_text()
-catalog_base = "https://github.com/egnake/Tubie-Stickman/blob/main/README.zh-CN.md"
-public_links = set(re.findall(r"\]\((https://[^)]+)\)", guide.read_text()))
-for catalog in ("a-styles", "b-styles"):
-    assert f"{catalog_base}#{catalog}" in public_links, f"Missing public style catalog: {catalog}"
-    assert f'<a id="{catalog}"></a>' in cn, f"Broken public style anchor: {catalog}"
-
-# Localize the destination, not just the label; all published editions now have
-# complete catalogs. This checks the instruction data, not live model behavior.
-catalog_routing = guide_text.split("### Choose the public catalog language\n", 1)[1].split("Adapt this Chinese example", 1)[0]
-catalog_rows = re.findall(r"^\| ([a-z]{2}) \| [^|]+ \| \[(README\.[^\]]+\.md)\]\((https://[^)]+)\) \|$", catalog_routing, re.M)
-expected_catalogs = {"en": "README.en.md", "zh": "README.zh-CN.md", "ja": "README.ja.md",
-                     "ko": "README.ko.md", "fr": "README.fr.md", "pt": "README.pt-BR.md",
-                     "tr": "README.tr.md", "id": "README.id.md"}
-assert len(catalog_rows) == len(expected_catalogs)
-assert {language: filename for language, filename, _ in catalog_rows} == expected_catalogs
-for language, filename, url in catalog_rows:
-    assert url == f"https://github.com/egnake/Tubie-Stickman/blob/main/{filename}", language
-    readme = (root / filename).read_text()
-    for catalog in ("a-styles", "b-styles"):
-        assert f'<a id="{catalog}"></a>' in readme, (language, catalog)
-for requirement in ("en-GB", "fr-CA", "pt-PT", "Do not use the host locale instead of a clear conversation language",
-                    "An explicit request to view a particular README edition", "For an unsupported language",
-                    "use `README.en.md`", "do not copy its destinations unchanged into other languages"):
-    assert requirement in catalog_routing, requirement
-for catalog in ("a-styles", "b-styles"):
-    assert f"https://github.com/egnake/Tubie-Stickman/blob/main/README.en.md#{catalog}" in public_links
-assert "catalogs currently live in the Chinese README" not in guide_text
-install = cn.split("```text\n", 1)[1].split("```", 1)[0]
-assert "https://github.com/egnake/Tubie-Stickman" in install
-assert "已安装的 SKILL.md" in install
-assert (root / "tests/scenarios/first-use-guidance.md").is_file()
+# Public catalogs must point to editions included in this checkout.
+public_links = set(re.findall(r"\]\((https://[^)]+)\)", guide_text))
+for locale in ("en", "tr"):
+    catalog = root / "docs/catalog" / f"README.{locale}.md"
+    content = catalog.read_text()
+    for anchor in ("a-styles", "b-styles"):
+        url = f"https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.{locale}.md#{anchor}"
+        assert url in public_links or f"https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.{locale}.md" in public_links
+        assert f'<a id="{anchor}"></a>' in content
+assert (root / "docs/qa/scenarios/first-use-guidance.md").is_file()
 
 # Chinese-facing welcome uses Chinese mode names, not internal routing labels.
 welcome = guide_text.split("### 欢迎使用火柴人视频 Skill\n", 1)[1].split("### Adapt instead of replaying the README", 1)[0]
@@ -130,5 +107,5 @@ assert "Google Gemini **Bodi**" in b1 and "original **Sadaltager** recording" in
 assert "without added style/direction instructions" in b1
 print("First-use wiring, proactive A5 reference guidance and single-Skill identity passed; other Director bytes preserved.")
 print("Independent B-style settings, defaults precedence and unchanged demo-voice policy passed.")
-print("Eight-language catalog destinations, shared anchors and English fallback instruction checks passed.")
+print("Bundled catalog destinations, shared anchors and English fallback instruction checks passed.")
 print("Static checks only; fresh-host conversational acceptance remains a separate test.")

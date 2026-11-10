@@ -52,7 +52,7 @@ for doc in (standard, checklist):
 assert "b1-production-qa.md" in standard.read_text(), "Checklist must be reachable from loaded B1 reference"
 assert common_checklist.name in standard.read_text() and common_checklist.name in checklist.read_text(), "B1 must inherit B common quality separately from its style defaults"
 assert list(skill.rglob("SKILL.md")) == [skill / "SKILL.md"], "Do not create another installable entrypoint"
-assert (repo / "tests/scenarios/b1-production-quality.md").is_file()
+assert (repo / "docs/qa/scenarios/b1-production-quality.md").is_file()
 assert "/Users/" not in manifest_path.read_text()
 print("B1 production revision: portable links, accepted source/sheet provenance, original baseline and style isolation passed.")
 print("Static integrity only: semantic, pacing, visual and listening quality require the production checklist on actual media.")

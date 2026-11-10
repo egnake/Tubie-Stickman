@@ -57,7 +57,7 @@ test('B3 all bundled media match their provenance fingerprints', () => {
 test('B3 motion studies retain timing and dimensions, decode fully, and contain no borrowed soundtrack', () => {
   for (const item of [...manifest.motion, ...manifest.supplements.map(entry => entry.motion)]) {
     const file = inside(pack, item.path);
-    const probe = spawnSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', file], {encoding: 'utf8'});
+    const probe = spawnSync(process.env.FFPROBE || 'ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', file], {encoding: 'utf8'});
     assert.equal(probe.status, 0, probe.stderr || probe.error?.message);
     const info = JSON.parse(probe.stdout);
     assert.equal(info.streams.length, 1);
@@ -67,7 +67,7 @@ test('B3 motion studies retain timing and dimensions, decode fully, and contain 
     assert.equal(info.streams[0].r_frame_rate, item.frame_rate);
     assert.ok(Math.abs(Number(info.format.duration) - item.duration_seconds) < 0.04);
     assert.ok(Math.abs(item.duration_seconds - (item.source_end_seconds - item.source_start_seconds)) < 0.04);
-    const decode = spawnSync('ffmpeg', ['-v', 'error', '-nostdin', '-i', file, '-f', 'null', '-'], {encoding: 'utf8'});
+    const decode = spawnSync(process.env.FFMPEG || 'ffmpeg', ['-v', 'error', '-nostdin', '-i', file, '-f', 'null', '-'], {encoding: 'utf8'});
     assert.equal(decode.status, 0, decode.stderr || decode.error?.message);
     assert.equal(decode.stderr, '');
   }

@@ -20,18 +20,12 @@ Resolve the guidance language using the priority above, then select its README f
 
 | Guidance language code | Language | Public README |
 |---|---|---|
-| en | English | [README.en.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.en.md) |
-| zh | Chinese | [README.zh-CN.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.zh-CN.md) |
-| ja | Japanese | [README.ja.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.ja.md) |
-| ko | Korean | [README.ko.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.ko.md) |
-| fr | French | [README.fr.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.fr.md) |
-| pt | Portuguese | [README.pt-BR.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.pt-BR.md) |
-| tr | Turkish | [README.tr.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.tr.md) |
-| id | Indonesian | [README.id.md](https://github.com/egnake/Tubie-Stickman/blob/main/README.id.md) |
+| en | English | [README.en.md](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.en.md) |
+| tr | Turkish | [README.tr.md](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.tr.md) |
 
-Append `#a-styles` for the Director catalog and `#b-styles` for the Autopilot catalog; these anchors are shared by every listed edition. Localize the visible link labels as well as choosing the right destination. For an unsupported language, keep the guidance and link labels in that language but use `README.en.md` for the catalog. Do not invent a translated filename or anchor, or silently fall back to Chinese.
+Append `#a-styles` for the Director catalog and `#b-styles` for the Autopilot catalog; these anchors are shared by both listed editions. Localize the visible link labels as well as choosing the right destination. For an unsupported language, keep the guidance and link labels in that language but use `README.en.md` for the catalog. Do not invent a translated filename or anchor, or silently fall back to Chinese.
 
-For example, English guidance links to [Director styles and samples](https://github.com/egnake/Tubie-Stickman/blob/main/README.en.md#a-styles) and [Autopilot styles and samples](https://github.com/egnake/Tubie-Stickman/blob/main/README.en.md#b-styles), even on a Chinese-language host. The Chinese welcome below uses the Chinese edition because its guidance is Chinese; do not copy its destinations unchanged into other languages.
+For example, English guidance links to [Director styles and samples](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.en.md#a-styles) and [Autopilot styles and samples](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.en.md#b-styles), even on a Chinese-language host. The Chinese welcome below uses the Chinese edition because its guidance is Chinese; do not copy its destinations unchanged into other languages.
 
 Adapt this Chinese example to the actual environment and installation status:
 
@@ -39,7 +33,7 @@ Adapt this Chinese example to the actual environment and installation status:
 
 给我一个话题、需求、文章链接或故事脚本，就可以开始。**不用先写好完整文案**，我会帮你整理内容，再按你选的模式往下做。一次安装即可使用下面两种模式。
 
-**画风在这里选择：**[导演模式画风一览](https://github.com/egnake/Tubie-Stickman/blob/main/README.zh-CN.md#a-styles) · [全自动模式画风一览](https://github.com/egnake/Tubie-Stickman/blob/main/README.zh-CN.md#b-styles)。打开看样片，选好后把画风编号（如 **A3** 或 **B1**）告诉我即可，不用下载画风包或重新安装。
+**画风在这里选择：**[导演模式画风一览](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.en.md#a-styles) · [全自动模式画风一览](https://github.com/egnake/Tubie-Stickman/blob/main/docs/catalog/README.en.md#b-styles)。打开看样片，选好后把画风编号（如 **A3** 或 **B1**）告诉我即可，不用下载画风包或重新安装。
 
 #### A · 导演模式：先拿分镜和提示词，自己掌控生成与剪辑
 

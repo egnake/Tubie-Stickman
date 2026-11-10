@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readme_root=$(git rev-parse --show-toplevel)
+readme_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 python3 "$readme_root/tests/verify-first-use-guidance.py"
 python3 "$readme_root/tests/verify-b-common-quality.py"
-python3 "$readme_root/tests/verify-chinese-onboarding.py"
 python3 "$readme_root/tests/verify-thumbnail-kit.py"
-python3 "$readme_root/tests/verify-localized-readmes.py" "$@"
+
+python3 "$readme_root/tests/verify-docs.py"
 
 # Preserve the original published demo files as well as the current inline GIFs.
 demo_stems=(

@@ -16,6 +16,10 @@ const findBinary = name => {
 };
 export const FFMPEG = process.env.FFMPEG || findBinary('ffmpeg');
 export const FFPROBE = process.env.FFPROBE || findBinary('ffprobe');
+export function concatFileLine(file) {
+  if (/[\r\n]/.test(file)) throw new Error('Concat paths cannot contain newlines');
+  return `file '${file.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`;
+}
 export const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 export const hashFile = file => sha(fs.readFileSync(file));
 export const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));

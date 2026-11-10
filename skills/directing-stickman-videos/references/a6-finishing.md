@@ -48,7 +48,7 @@ Create a project-specific JSON manifest; resolve media/font paths relative to th
 }
 ```
 
-Optional `caption_font` / `title_font` paths set available approved fonts. Correct ASR against the approved script before using its word timings; normalize spoken numerals in the alignment (e.g. ASR `10` → script `ten`) rather than silently changing displayed script content. The example is a schema illustration, not timing for a different story.
+Optional `caption_font` / `title_font` paths set available approved fonts. Both default to the bundled Noto Sans; set these explicitly when a specific approved look or additional glyph coverage is required. `FFMPEG` and `FFPROBE` may point to executable files when they are not on PATH. Correct ASR against the approved script before using its word timings; normalize spoken numerals in the alignment (e.g. ASR `10` → script `ten`) rather than silently changing displayed script content. The example is a schema illustration, not timing for a different story.
 
 ```sh
 python3 scripts/a6_finish.py --config project/a6-finish.json --validate-only

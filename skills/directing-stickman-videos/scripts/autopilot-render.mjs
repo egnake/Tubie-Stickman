@@ -3,7 +3,8 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {createCanvas, loadImage, GlobalFonts} from '@napi-rs/canvas';
-import {ROOT, FFMPEG, sha, hashFile, save, probe, run, mediaPath, fontPaths, outputDir, designPlane, loadProject} from './autopilot-core.mjs';
+import {ROOT, FFMPEG, sha, hashFile, save, probe, run, mediaPath, fontPaths, outputDir, designPlane, loadProject, concatFileLine} from './autopilot-core.mjs';
+
 import {walkLayers, drawB3Shape, televisionFinish} from './b3-graphics.mjs';
 import {appendB4Audio} from './b4-runtime.mjs';
 import {checkOpeningFile} from './b4-opening-audio-check.mjs';
@@ -279,7 +280,7 @@ export async function render(p, {full = false, seconds = 20, replace = false} = 
       clips.push(clip); process.stdout.write(JSON.stringify({shot: i + 1, total: p.shots.length, cache_hit: valid}) + '\n');
     }
     done('assembling original-speed voice, captions and SFX');
-    const list = path.join(cache, 'concat.txt'); fs.writeFileSync(list, clips.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n') + '\n');
+    const list = path.join(cache, 'concat.txt'); fs.writeFileSync(list, clips.map(concatFileLine).join('\n') + '\n');
     const args = ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-i', p.voicePath];
     const trim = p.voiceTrimStart ? `atrim=start=${p.voiceTrimStart},asetpts=PTS-STARTPTS,` : '';
     const filters = [`[1:a]${trim}adelay=${Math.round(p.lead * 1000)}:all=1,apad,atrim=0:${count / p.fps}[voice]`], mixes = ['[voice]'], backgrounds = [];

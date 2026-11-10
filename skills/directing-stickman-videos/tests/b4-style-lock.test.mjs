@@ -94,7 +94,11 @@ test('resource symlink cannot depend on assets outside the installed Skill', t =
   const installed = fixture(t);
   const target = path.join(installed, 'assets/b4', expectedReferences[3][1]);
   fs.unlinkSync(target);
-  fs.symlinkSync(path.join(root, 'assets/b4', expectedReferences[3][1]), target);
+  try { fs.symlinkSync(path.join(root, 'assets/b4', expectedReferences[3][1]), target); }
+  catch (error) {
+    if (process.platform === 'win32' && error.code === 'EPERM') return t.skip('Creating file symlinks requires Windows developer mode or privilege');
+    throw error;
+  }
   assert.throws(() => verifyB4StyleLock(installed), /escapes installed Skill/);
 });
 

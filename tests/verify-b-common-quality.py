@@ -87,7 +87,7 @@ for source in (common_path, refs / "autopilot.md", refs / "b1-production-qa.md",
             continue
         target = (source.parent / link.split("#", 1)[0]).resolve()
         assert target.is_relative_to(skill.resolve()) and target.is_file(), f"Broken/escaping link: {link}"
-cases = (repo / "tests/scenarios/b-common-production-quality.md").read_text()
+cases = (repo / "docs/qa/scenarios/b-common-production-quality.md").read_text()
 for case_id in ("B-COMMON-01", "B-COMMON-02", "B-COMMON-03", "B-COMMON-04",
                 "B-COMMON-05", "B-COMMON-06", "B-COMMON-07", "B-COMMON-08"):
     assert case_id in cases

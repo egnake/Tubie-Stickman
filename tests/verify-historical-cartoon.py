@@ -96,6 +96,8 @@ baseline = {
 for filename, fingerprint in baseline.items():
     path = skill / "references" / filename
     content = path.read_bytes()
+    # Preserve the frozen style contract while allowing the relocated QA link.
+    content = content.replace(b"docs/qa/reports/", b"tests/reports/")
     if filename == "voice-continuity.md":
         # Only the exact A/B scope notice may precede the unchanged A contract.
         heading = b"# Shared voice continuity \xe2\x80\x94 all visual styles\n\n"

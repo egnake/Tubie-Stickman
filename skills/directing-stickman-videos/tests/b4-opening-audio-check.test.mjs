@@ -35,7 +35,7 @@ test('short deliberate pause is not a two-second-empty-intro failure', () => {
   assert.equal(analyzeOpening(audio).status, 'diagnostic_pass');
 });
 test('decoder checks file audio and rejects sub-only opening; paths need no shell quoting', t => {
-  const available = spawnSync('ffmpeg', ['-version'], {stdio: 'ignore'});
+  const available = spawnSync(process.env.FFMPEG || 'ffmpeg', ['-version'], {stdio: 'ignore'});
   if (available.status !== 0) return t.skip('ffmpeg unavailable');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'b4-opening-audio-'));
   t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
