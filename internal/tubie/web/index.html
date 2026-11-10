@@ -59,9 +59,23 @@
         </div>
       </div>
 
-      <div class="section-title voice-title"><h2>02 <span>Seslendirme</span></h2></div>
-      <label class="sr-only" for="mode">Ses modu</label><select id="mode"><option value="pro">Profesyonel ses · Ahmet (Önerilen)</option><option value="cloned">Kendi sesim · XTTS</option><option value="auto">Otomatik seç</option></select>
-      <p id="mode-hint" class="field-hint">Türkçe anlatıcı. Ses üretimi internet gerektirir.</p>
+      <div class="section-title voice-title"><h2>02 <span>Ses & Müzik</span></h2></div>
+      <label for="voice-style" class="field-label">Seslendirme Stili:</label>
+      <select id="voice-style" class="text-input">
+        <option value="viral-male" selected>🔥 Viral & Enerjik · Ahmet (+15% Hız)</option>
+        <option value="viral-fast">⚡ Çok Hızlı & Seri · Ahmet (+22% Hız)</option>
+        <option value="viral-female">✨ Canlı & Akıcı · Emel (+14% Hız)</option>
+        <option value="deep-male">🎙️ Karizmatik & Derin · Ahmet (-4% Perde)</option>
+        <option value="cloned">👤 Kendi Sesim (sesim.wav referansı)</option>
+      </select>
+      <p id="mode-hint" class="field-hint">Viral tempoda, broadcast filtreli profesyonel seslendirme.</p>
+
+      <label for="bgm-choice" class="field-label" style="margin-top:10px;">Arka Plan Müziği:</label>
+      <select id="bgm-choice" class="text-input">
+        <option value="cyber" selected>🎧 Cyber Synth & Bass (Yüksek Enerji)</option>
+        <option value="lofi">☕ Rahatlatıcı Lo-Fi Beat</option>
+        <option value="none">🔇 Müziksiz (Sadece Ses Efektleri)</option>
+      </select>
       <button id="generate" class="primary">Üretime başla <span>↗</span></button>
       <p class="save-note">Çıktılar bu bilgisayarda saklanır. Kusursuz .srt ve .mp4 otomatik oluşturulur.</p>
     </section>

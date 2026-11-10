@@ -39,11 +39,15 @@ func Main(args []string) int {
 		topic := genFlags.String("topic", "", "Özel konu / fikir (örn: 'İnstagram hesap çalma')")
 		all := genFlags.Bool("all", false, "Tüm şablonları üret")
 		mode := genFlags.String("mode", "auto", "Ses modu: pro, cloned, auto")
+		voice := genFlags.String("voice", "viral-male", "Ses stili: viral-male, viral-fast, viral-female, deep-male, cloned")
+		bgm := genFlags.String("bgm", "cyber", "Arka plan müziği: cyber, lofi, none")
 		_ = genFlags.Parse(args[1:])
 
 		pipeline := &Pipeline{
-			Root: root,
-			Mode: *mode,
+			Root:       root,
+			Mode:       *mode,
+			VoiceStyle: *voice,
+			BGM:        *bgm,
 		}
 
 		if *topic != "" {

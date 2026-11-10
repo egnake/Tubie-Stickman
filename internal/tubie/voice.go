@@ -49,10 +49,17 @@ func GetAudioDuration(filePath string) (float64, error) {
 	return val, nil
 }
 
-// SynthesizeEdgeTTS generates speech via edge-tts CLI and converts it to 24000Hz mono WAV.
-func SynthesizeEdgeTTS(text, voiceName, outWav string) (float64, error) {
+// SynthesizeEdgeTTS generates speech via edge-tts CLI, applies vocal compression/loudnorm,
+// and converts it to 24000Hz mono WAV.
+func SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav string) (float64, error) {
 	if voiceName == "" {
 		voiceName = "tr-TR-AhmetNeural"
+	}
+	if rate == "" {
+		rate = "+15%"
+	}
+	if pitch == "" {
+		pitch = "+0Hz"
 	}
 
 	tempDir, err := os.MkdirTemp("", "tubie-tts-")
@@ -66,10 +73,10 @@ func SynthesizeEdgeTTS(text, voiceName, outWav string) (float64, error) {
 	// Determine edge-tts runner (either binary or python -m edge_tts)
 	var edgeCmd *exec.Cmd
 	if p, err := exec.LookPath("edge-tts"); err == nil {
-		edgeCmd = exec.Command(p, "--voice", voiceName, "--rate", "+12%", "--pitch", "+0Hz", "--text", text, "--write-media", tempMp3)
+		edgeCmd = exec.Command(p, "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
 	} else {
 		pyExe := BinaryPath("python")
-		edgeCmd = exec.Command(pyExe, "-m", "edge_tts", "--voice", voiceName, "--rate", "+12%", "--pitch", "+0Hz", "--text", text, "--write-media", tempMp3)
+		edgeCmd = exec.Command(pyExe, "-m", "edge_tts", "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
 	}
 
 	var stderr bytes.Buffer
@@ -82,8 +89,11 @@ func SynthesizeEdgeTTS(text, voiceName, outWav string) (float64, error) {
 		return 0, err
 	}
 
+	// High-impact broadcast vocal chain: dynamic compression + loudness normalization to -16 LUFS
 	ffmpeg := BinaryPath("ffmpeg")
-	convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", tempMp3, "-ar", "24000", "-ac", "1", outWav)
+	convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", tempMp3,
+		"-af", "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10",
+		"-ar", "24000", "-ac", "1", outWav)
 	if out, err := convCmd.CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("ffmpeg mp3 to wav conversion failed: %v: %s", err, string(out))
 	}
@@ -91,37 +101,64 @@ func SynthesizeEdgeTTS(text, voiceName, outWav string) (float64, error) {
 	return GetAudioDuration(outWav)
 }
 
-// SynthesizeVoice handles voice generation for pro, cloned, or auto modes.
-func SynthesizeVoice(text string, outWav string, mode string, voiceName string, root string) (float64, string, error) {
+// SynthesizeVoice handles voice generation for pro, cloned, or auto modes with custom voice styling.
+func SynthesizeVoice(text string, outWav string, mode string, voiceStyle string, root string) (float64, string, error) {
 	sesimWav := filepath.Join(root, "sesim.wav")
 	modeUsed := mode
+
+	// If mode is auto or empty, default to high-retention pro viral voice
 	if modeUsed == "" || modeUsed == "auto" {
-		if fi, err := os.Stat(sesimWav); err == nil && !fi.IsDir() && fi.Size() > 0 {
-			modeUsed = "cloned"
-		} else {
-			modeUsed = "pro"
-		}
+		modeUsed = "pro"
 	}
 
 	if modeUsed == "cloned" {
 		if fi, err := os.Stat(sesimWav); err != nil || fi.IsDir() || fi.Size() == 0 {
 			return 0, "", fmt.Errorf("klonlanmış ses için referans kaydı bulunamadı: %s", sesimWav)
 		}
-		// If XTTS is available in Python environment, invoke it
+
+		rawClonedWav := filepath.Join(filepath.Dir(outWav), "raw_cloned.wav")
 		pyCode := fmt.Sprintf(`import sys
 from TTS.api import TTS
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-tts.tts_to_file(text=%q, speaker_wav=%q, language="tr", file_path=%q, speed=1.08, repetition_penalty=4.5)
-`, text, sesimWav, outWav)
+tts.tts_to_file(text=%q, speaker_wav=%q, language="tr", file_path=%q, speed=1.12, repetition_penalty=4.5)
+`, text, sesimWav, rawClonedWav)
 		cmd := exec.Command(BinaryPath("python"), "-c", pyCode)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return 0, "", fmt.Errorf("XTTS synthesis failed: %v: %s", err, string(out))
 		}
+
+		// Polish cloned voice with dynamic compressor and loudnorm
+		ffmpeg := BinaryPath("ffmpeg")
+		convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", rawClonedWav,
+			"-af", "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10",
+			"-ar", "24000", "-ac", "1", outWav)
+		_ = convCmd.Run()
+		_ = os.Remove(rawClonedWav)
+
 		dur, err := GetAudioDuration(outWav)
 		return dur, "cloned", err
 	}
 
-	dur, err := SynthesizeEdgeTTS(text, voiceName, outWav)
+	// Resolve voice parameters for viral pro mode
+	voiceName := "tr-TR-AhmetNeural"
+	rate := "+15%"
+	pitch := "+0Hz"
+
+	switch voiceStyle {
+	case "viral-fast":
+		rate = "+22%"
+	case "viral-female":
+		voiceName = "tr-TR-EmelNeural"
+		rate = "+14%"
+	case "deep-male":
+		rate = "+8%"
+		pitch = "-4Hz"
+	default: // "viral-male", "pro", or ""
+		rate = "+15%"
+		pitch = "+0Hz"
+	}
+
+	dur, err := SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav)
 	return dur, "pro", err
 }
 

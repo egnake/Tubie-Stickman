@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,10 +16,12 @@ type Reporter func(event map[string]any)
 
 // Pipeline orchestrates synthesis, storyboard rendering, and export.
 type Pipeline struct {
-	Root     string
-	Mode     string
-	Reporter Reporter
-	Review   func(projectDir string) error
+	Root       string
+	Mode       string
+	VoiceStyle string
+	BGM        string
+	Reporter   Reporter
+	Review     func(projectDir string) error
 }
 
 func copyFile(src, dst string) error {
@@ -71,7 +72,7 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 		p.Reporter(map[string]any{"stage": "voice", "label": "Seslendirme hazırlanıyor", "slug": preset.Slug})
 	}
 	narrationWav := filepath.Join(projectDir, "narration.wav")
-	dur, modeUsed, err := SynthesizeVoice(preset.Narration, narrationWav, p.Mode, "tr-TR-AhmetNeural", p.Root)
+	dur, modeUsed, err := SynthesizeVoice(preset.Narration, narrationWav, p.Mode, p.VoiceStyle, p.Root)
 	if err != nil {
 		return "", fmt.Errorf("seslendirme hatası: %w", err)
 	}
@@ -84,33 +85,7 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 
 	captions := BuildAccurateCaptions(preset.Narration, narrationWav, dur)
 	shots := BuildStoryboard(preset.Scenes, dur)
-
-	// Synced SFX cues
-	sfxList := make([]map[string]any, 0)
-	if len(preset.Scenes) > 0 {
-		step := dur / float64(len(preset.Scenes))
-		for i, sc := range preset.Scenes {
-			t := math.Round(float64(i)*step*1000) / 1000
-			if t < dur {
-				kind := "tap"
-				switch sc.SFX {
-				case "alert", "glitch":
-					kind = "pop"
-				case "lock":
-					kind = "chime"
-				case "paper":
-					kind = "paper"
-				default:
-					kind = "tap"
-				}
-				sfxList = append(sfxList, map[string]any{
-					"time": t,
-					"kind": kind,
-					"gain": 0.08,
-				})
-			}
-		}
-	}
+	sfxList := BuildSoundDesign(preset.Scenes, dur)
 
 	projectConfig := map[string]any{
 		"version":            1,
@@ -137,15 +112,22 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 		"sfx":      sfxList,
 	}
 
-	// Copy BGM if available
-	bgmCyber := filepath.Join(p.Root, "assets", "audio", "bgm_cyber.wav")
-	bgmLofi := filepath.Join(p.Root, "assets", "audio", "bgm_lofi.wav")
-	if _, err := os.Stat(bgmCyber); err == nil {
-		_ = copyFile(bgmCyber, filepath.Join(projectDir, "bgm.wav"))
-		projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.12}
-	} else if _, err := os.Stat(bgmLofi); err == nil {
-		_ = copyFile(bgmLofi, filepath.Join(projectDir, "bgm.wav"))
-		projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.12}
+	// Dynamic Background Music (BGM)
+	bgmChoice := strings.ToLower(strings.TrimSpace(p.BGM))
+	if bgmChoice == "" {
+		bgmChoice = "cyber"
+	}
+	if bgmChoice != "none" {
+		trackFile := fmt.Sprintf("bgm_%s.wav", bgmChoice)
+		bgmPath := filepath.Join(p.Root, "assets", "audio", trackFile)
+		if _, err := os.Stat(bgmPath); err != nil {
+			bgmPath = filepath.Join(p.Root, "assets", "audio", "bgm_cyber.wav")
+		}
+		if _, err := os.Stat(bgmPath); err == nil {
+			_ = copyFile(bgmPath, filepath.Join(projectDir, "bgm.wav"))
+			projectConfig["music"] = map[string]any{"path": "bgm.wav", "gain": 0.13}
+			projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.13}
+		}
 	}
 
 	projectConfigFile := filepath.Join(projectDir, "project.json")
