@@ -19,7 +19,9 @@ class PipelineTest(unittest.TestCase):
             self.skipTest('Run npm ci first')
         with tempfile.TemporaryDirectory(prefix="tubie Türkçe video's-") as name:
             temp = Path(name)
-            pipeline = video.CyberVideoPipeline(mode='pro')
+            events = []
+            reviews = []
+            pipeline = video.CyberVideoPipeline(mode='pro', reporter=lambda **event: events.append(event), review=reviews.append)
 
             def synthesize(text, destination):
                 with wave.open(str(destination), 'wb') as audio:
@@ -41,6 +43,12 @@ class PipelineTest(unittest.TestCase):
                      {'word': 'dünya', 'start': 0.4, 'end': 0.9},
                  ]):
                 film = pipeline.produce(script)
+            self.assertEqual(reviews, [temp / 'projects/turkce_test'])
+            self.assertEqual([event['stage'] for event in events],
+                             ['voice', 'captions', 'storyboard', 'preview', 'render', 'export'])
+            live = temp / 'projects/turkce_test/output/live-frame.jpg'
+            self.assertGreater(live.stat().st_size, 1000)
+            self.assertEqual(live.read_bytes()[:2], b'\xff\xd8')
             self.assertGreater(film.stat().st_size, 1000)
             self.assertTrue(film.with_suffix('.srt').is_file())
             result = subprocess.run([

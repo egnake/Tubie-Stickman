@@ -1,6 +1,6 @@
 # Tubie-Stickman
 
-Türkçe siber güvenlik videoları için seslendirme, kelime zamanlaması ve çöp adam animasyonu üretim araçları. Windows ve Linux için ortak Python komut arayüzü ve Node.js render motoru içerir.
+Türkçe siber güvenlik videoları için seslendirme, kelime zamanlaması ve çöp adam animasyonu üretim araçları. Windows ve Linux için koyu temalı Tubie Studio GUI’si ve Node.js render motoru içerir.
 
 ## Kurulum
 
@@ -15,17 +15,16 @@ git clone https://github.com/egnake/Tubie-Stickman.git
 cd Tubie-Stickman
 uv venv --python 3.11
 source .venv/bin/activate
-uv pip install -e ".[record,dev]"
+uv pip install -e ".[dev]"
 npm ci
-./uret.sh doctor
-./uret.sh
+python baslat.py
 ```
 
 Arch'ın sistem Python sürümünü değiştirmeyin. `uv`, seçilen Python sürümünü ayrı olarak yönetir. Sistemde güncel Node.js zaten varsa ayrıca `nodejs-lts-jod` kurmanız gerekmez. Paket seçimi ve Python ortamları için [Arch paketleri](https://archlinux.org/packages/) ve [uv belgeleri](https://docs.astral.sh/uv/guides/install-python/).
 
 ### Diğer Linux dağıtımları
 
-Dağıtımınızın paket yöneticisinden Node.js, FFmpeg ve mikrofon için PortAudio kurun. Ardından yukarıdaki `uv venv` ile başlayan adımları uygulayın. Uygun Python zaten kuruluysa `python3.11 -m venv .venv` ve etkinleştirmeden sonra `python -m pip install -e ".[record,dev]"` kullanılabilir.
+Dağıtımınızın paket yöneticisinden Node.js, FFmpeg ve mikrofon için PortAudio kurun. Ardından yukarıdaki `uv venv` ile başlayan adımları uygulayın. Uygun Python zaten kuruluysa `python3.11 -m venv .venv` ve etkinleştirmeden sonra `python -m pip install -e ".[dev]"` kullanılabilir.
 
 ### Windows 10 / 11
 
@@ -33,26 +32,31 @@ Python 3.11, Node.js ve FFmpeg kurun; `python`, `node`, `ffmpeg` ve `ffprobe` ko
 
 ```powershell
 py -3.11 -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[record,dev]"
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
 npm ci
-.\uret.bat doctor
-.\uret.bat
+py baslat.py
 ```
 
-Başlatıcılar projenin `.venv` ortamını otomatik seçer. Sanal ortamı elle etkinleştirmek zorunlu değildir.
+Tek başlatıcı `baslat.py`, projenin `.venv` ortamını otomatik seçer ve Tubie Studio’yu varsayılan tarayıcıda açar. Sanal ortamı elle etkinleştirmek zorunlu değildir. Linux’ta `python3 baslat.py`, Windows’ta `py baslat.py` kullanın. Arayüz yalnızca bu bilgisayardan erişilen rastgele bir yerel adreste çalışır; ek bir GUI paketi gerekmez.
 
 ## Kullanım
 
+GUI’den konu ve ses seçimi, sıralı üretim, referans ses yükleme, 15 saniyelik mikrofon kaydı, klonlama testi, ortam kontrolü ve çıktı indirme yönetilir. Üretim sırasında gerçek render kareleri, işlenen kare sayısı, aşamalar ve işlem günlüğü canlı görünür. Önizleme hazır olduğunda videoyu izleyip **Onayla ve tamamla** düğmesine basın. İşlemi GUI’den iptal edebilirsiniz.
+
+Arayüzü kapatmak için **Uygulamayı kapat** düğmesini kullanın. Tarayıcı sekmesini kapatmak üretimi durdurmaz. Aynı bilgisayardaki başka bir tarayıcıdan, terminalde yazan adresle devam edebilirsiniz.
+
+Geliştirme ve otomasyon için komut satırı da kullanılabilir:
+
 ```bash
-tubie                             # Etkileşimli menü
-tubie doctor                      # Eksik bağımlılıkları göster
-tubie generate --preset 1 --mode pro
-tubie generate --all --mode pro
-tubie record                      # Mikrofon veya mevcut dosyadan ses kaydı
-tubie generate --preset 2 --mode cloned
+python baslat.py                   # Tubie Studio GUI
+python baslat.py record            # GUI ses merkezi
+python baslat.py doctor            # Bağımlılık kontrolü
+python baslat.py generate --preset 1 --mode pro
+python baslat.py generate --all --mode pro
+python baslat.py gui --no-browser  # Adresi yazdır; tarayıcıyı elle aç
 ```
 
-`tubie` için sanal ortam etkin olmalıdır. Aynı seçenekler Linux'ta `./uret.sh`, Windows'ta `uret.bat` ile kullanılabilir. Ses kaydı için `sesimi_kaydet.sh` / `sesimi_kaydet.bat` da vardır.
+Etkin sanal ortamda aynı komutlar `tubie` ile de kullanılabilir. `.bat` ve `.sh` başlatıcıları kaldırılmıştır.
 
 | Şablon | Konu |
 | --- | --- |
@@ -77,7 +81,7 @@ GPU kullanımı için donanımınıza ve işletim sisteminize uygun PyTorch kuru
 ## Klasör yapısı
 
 ```text
-src/tubie_stickman/             Python uygulaması ve ortak CLI
+src/tubie_stickman/             Python uygulaması, GUI ve CLI
 skills/directing-stickman-videos/  Node render motoru, stil varlıkları ve skill
 assets/                        Ortak ses dosyaları ve katalog medyası
 docs/                          Kurulum, kullanım, stil kataloğu ve QA kayıtları

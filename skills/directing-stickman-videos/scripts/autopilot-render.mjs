@@ -191,14 +191,18 @@ export async function painter(p) {
     return canvas;
   };
 }
-async function encode(p, frame, start, frames, target) {
+async function encode(p, frame, start, frames, target, onFrame) {
   const child = spawn(FFMPEG, ['-v', 'error', '-y', '-f', 'rawvideo', '-pixel_format', 'rgba', '-video_size', `${p.width}x${p.height}`, '-framerate', String(p.fps), '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', target], {stdio: ['pipe', 'ignore', 'pipe']});
   let error = ''; child.stderr.on('data', b => { error = (error + b).slice(-2400); });
   child.stdin.on('error', () => {});
   const completion = new Promise((resolve, reject) => { child.on('error', reject); child.on('close', code => code === 0 ? resolve() : reject(new Error(`Encode failed: ${error}`))); });
   completion.catch(() => {});
   try {
-    for (let i = 0; i < frames; i++) { const data = frame((start + i) / p.fps).data(); if (!child.stdin.write(data)) await Promise.race([once(child.stdin, 'drain'), completion.then(() => { throw new Error('Encoder closed early'); })]); }
+    for (let i = 0; i < frames; i++) {
+      const canvas = frame((start + i) / p.fps);
+      if (onFrame) onFrame(canvas, start + i + 1);
+      if (!child.stdin.write(canvas.data())) await Promise.race([once(child.stdin, 'drain'), completion.then(() => { throw new Error('Encoder closed early'); })]);
+    }
     child.stdin.end(); await completion;
   } catch (e) { child.kill(); await completion.catch(() => {}); throw e; }
 }
@@ -245,7 +249,7 @@ function makeSfx(p, file, duration) {
 function stamp(seconds, vtt = false) {
   const ms = Math.round(seconds * 1000); return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}${vtt ? '.' : ','}${String(ms % 1000).padStart(3, '0')}`;
 }
-export async function render(p, {full = false, seconds = 20, replace = false} = {}) {
+export async function render(p, {full = false, seconds = 20, replace = false, live = false} = {}) {
   // A preview never loads media or paints frames belonging only to the unfinished tail.
   if (!full) p = loadProject(p.file, {seconds});
   const out = outputDir(p), lock = path.join(out, 'render.lock');
@@ -257,6 +261,17 @@ export async function render(p, {full = false, seconds = 20, replace = false} = 
   const fd = fs.openSync(lock, 'wx'); fs.writeFileSync(fd, JSON.stringify({pid: process.pid})); fs.closeSync(fd);
   const kind = full ? 'film' : 'preview', target = path.join(out, `${kind}.mp4`), reportPath = path.join(out, `${kind}-report.json`);
   const duration = Math.min(p.duration, full ? p.duration : seconds), count = Math.ceil(duration * p.fps - 1e-6);
+  let lastUpdate = 0;
+  const thumbnail = live ? createCanvas(360, Math.round(360 * p.height / p.width)) : null;
+  const onFrame = live ? (canvas, current, force = false) => {
+    if (!force && current !== count && Date.now() - lastUpdate < 500) return;
+    lastUpdate = Date.now();
+    thumbnail.getContext('2d').drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+    const destination = path.join(out, 'live-frame.jpg'), temporary = destination + '.tmp';
+    fs.writeFileSync(temporary, thumbnail.toBuffer('image/jpeg'));
+    fs.renameSync(temporary, destination);
+    process.stdout.write('TUBIE_EVENT ' + JSON.stringify({kind, frame: current, frames: count, seconds: current / p.fps, duration}) + '\n');
+  } : null;
   const done = value => save(path.join(out, 'checkpoint.json'), {stage: value, kind, fingerprint: p.fingerprint, pid: process.pid, updated_at: new Date().toISOString()});
   try {
     if (fs.existsSync(target) && !replace) {
@@ -276,7 +291,15 @@ export async function render(p, {full = false, seconds = 20, replace = false} = 
       const key = sha(JSON.stringify({shot, first, last, style: p.style, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionSize: p.captionSize, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
       const clip = path.join(cache, `${key}.mp4`); let valid = false;
       if (fs.existsSync(clip)) try { const info = probe(clip); valid = Number(info.streams[0].nb_frames) === last - first; } catch {}
-      if (valid) reused++; else { done(`rendering shot ${i + 1}/${p.shots.length}`); const tmp = path.join(cache, `${key}.partial.mp4`); await encode(p, frame, first, last - first, tmp); fs.renameSync(tmp, clip); }
+      if (valid) {
+        reused++;
+        if (onFrame) onFrame(frame((last - 1) / p.fps), last, true);
+      } else {
+        done(`rendering shot ${i + 1}/${p.shots.length}`);
+        const tmp = path.join(cache, `${key}.partial.mp4`);
+        await encode(p, frame, first, last - first, tmp, onFrame);
+        fs.renameSync(tmp, clip);
+      }
       clips.push(clip); process.stdout.write(JSON.stringify({shot: i + 1, total: p.shots.length, cache_hit: valid}) + '\n');
     }
     done('assembling original-speed voice, captions and SFX');

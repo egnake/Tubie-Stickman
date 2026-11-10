@@ -1,6 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
-python3 - <<'PY'
+#!/usr/bin/env python3
+"""Offline classic character instruction regression."""
 from pathlib import Path
 import re
 root = Path('skills/directing-stickman-videos')
@@ -30,4 +29,3 @@ assert 'no facial features, no hair, no clothing, no filled body, stable proport
 assert 'For Style 1, freeze the concise character anchor' in skill
 assert not (root / 'references/continuity-lock.md').exists(), 'Unrelated draft continuity changes included'
 print('Classic character instruction regression passed.')
-PY

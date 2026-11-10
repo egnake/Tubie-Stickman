@@ -19,3 +19,6 @@ tubie = "tubie_stickman.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+tubie_stickman = ["web/*.html", "web/*.css", "web/*.js"]

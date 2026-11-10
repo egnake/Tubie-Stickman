@@ -29,7 +29,9 @@ Faster-Whisper ayrı olarak CTranslate2 kullanır. CUDA'da sorun yaşanırsa [Fa
 
 `ffmpeg` ve `ffprobe` PATH üzerinde olmalıdır. Gerekirse `FFMPEG` ve `FFPROBE` ortam değişkenlerine yürütülebilir dosyanın tam yolunu verin. `NODE` değişkeni Python üretim akışının Node yolunu değiştirebilir. Yolun etrafına değişken değerinin bir parçası olarak tırnak eklemeyin.
 
-Arch/CachyOS'ta mikrofon için `portaudio` paketi ve çalışan bir ses oturumu gerekir. `sounddevice` ses aygıtı bulamıyorsa varsayılan giriş aygıtını sistem ayarlarından seçin. Windows'ta masaüstü uygulamalarının mikrofon iznini kontrol edin. Dosyadan ses yükleme seçeneği mikrofon gerektirmez.
+GUI, tarayıcının mikrofonunu kullanır; Python `record` ek paketleri gerektirmez. Tarayıcı mikrofonu desteklemiyorsa Ses sekmesinden dosya yükleyin. Eski Python ses yardımcılarını doğrudan kullanmak için `.[record]` kurulabilir.
+
+Arch/CachyOS'ta Python mikrofon yardımcıları için `portaudio` paketi ve çalışan bir ses oturumu gerekir. `sounddevice` ses aygıtı bulamıyorsa varsayılan giriş aygıtını sistem ayarlarından seçin. Windows'ta masaüstü uygulamalarının mikrofon iznini kontrol edin. Dosyadan ses yükleme seçeneği mikrofon gerektirmez.
 
 A6 son işleme ve Node render motoru depodaki fontları kullanır; Windows veya macOS font klasörü gerekmez. Yardımcı görsel üretim betiği için `.[dev]` içindeki Pillow gerekir.
 

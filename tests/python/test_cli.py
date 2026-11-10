@@ -11,18 +11,20 @@ class CLITest(unittest.TestCase):
         pipeline.assert_called_once_with(mode="pro")
         self.assertEqual(pipeline.return_value.produce.call_count, 4)
 
-    def test_record_dispatches(self):
-        with patch("tubie_stickman.voice.main", return_value=0) as record:
+    def test_record_opens_voice_gui(self):
+        with patch("tubie_stickman.gui.main", return_value=0) as gui:
             self.assertEqual(cli.main(["record"]), 0)
-        record.assert_called_once_with()
+        gui.assert_called_once_with(port=0, open_browser=True, tab="voice")
 
-    def test_record_failure_propagates(self):
-        with patch("tubie_stickman.voice.main", return_value=1):
-            self.assertEqual(cli.main(["record"]), 1)
-
-    def test_interactive_exit(self):
-        with patch("builtins.input", return_value="0"):
+    def test_default_opens_gui_without_terminal_input(self):
+        with patch("tubie_stickman.gui.main", return_value=0) as gui:
             self.assertEqual(cli.main([]), 0)
+        gui.assert_called_once_with(port=0, open_browser=True, tab="produce")
+
+    def test_gui_options(self):
+        with patch("tubie_stickman.gui.main", return_value=0) as gui:
+            self.assertEqual(cli.main(["gui", "--no-browser", "--port", "8765"]), 0)
+        gui.assert_called_once_with(port=8765, open_browser=False, tab="produce")
 
     def test_conflicting_selection_is_rejected(self):
         with self.assertRaises(SystemExit):
