@@ -52,17 +52,20 @@ func generateViaOllama(prompt string) (*ScriptResult, error) {
 
 	sysPrompt := fmt.Sprintf(`Sen siber güvenlik konusunda uzman, viral YouTube Shorts ve Reels video yönetmenisin.
 Kullanıcının konusu: %q.
-Bu konuda 30 saniyelik çok akıcı, heyecan verici, yüksek enerjili Türkçe seslendirme metni yaz.
+Bu konuda 30 saniyelik çok akıcı, heyecan verici, yüksek tempolu ve bol aksiyonlu Türkçe seslendirme metni yaz.
 Hackerların nasıl tuzak kurduğunu ve kullanıcının nasıl korunacağını anlat.
+Tam olarak 6 farklı sahneden oluşan dinamik bir görsel akış planla.
 Yanıtını kesinlikle SADECE geçerli bir JSON olarak ver:
 {
   "title": "Kısa ve çarpıcı video başlığı",
   "narration": "60-80 kelimelik yüksek tempolu Türkçe seslendirme metni",
   "scenes": [
-    {"title": "Sahne 1 başlığı", "sfx": "keyboard", "color": "#00F0FF"},
-    {"title": "Sahne 2 başlığı", "sfx": "alert", "color": "#FF3B30"},
-    {"title": "Sahne 3 başlığı", "sfx": "glitch", "color": "#FFCC00"},
-    {"title": "Sahne 4 başlığı", "sfx": "lock", "color": "#00FF66"}
+    {"title": "Sahne 1 (Kanca / Şok)", "sfx": "keyboard", "color": "#00F0FF"},
+    {"title": "Sahne 2 (Tuzak Mesajı)", "sfx": "alert", "color": "#FF3B30"},
+    {"title": "Sahne 3 (Sızma / Çalınma)", "sfx": "glitch", "color": "#FFCC00"},
+    {"title": "Sahne 4 (Hacker Terminali)", "sfx": "keyboard", "color": "#E056FD"},
+    {"title": "Sahne 5 (2FA Kalkanı / Çözüm)", "sfx": "lock", "color": "#00FF66"},
+    {"title": "Sahne 6 (Zafer / Takip Çağrısı)", "sfx": "chime", "color": "#00F0FF"}
   ]
 }`, prompt)
 
@@ -137,35 +140,41 @@ func generateViaTemplates(prompt string) *ScriptResult {
 
 	if strings.Contains(lower, "instagram") || strings.Contains(lower, "sosyal medya") || strings.Contains(lower, "hesap çal") {
 		matched = &tpl{
-			title: "İnstagram Hesabınız Nasıl Çalınır?",
+			title:     "İnstagram Hesabınız Nasıl Çalınır?",
 			narration: "Instagram hesabın bir gecede elinden gidebilir! Hackerlar şifreni kırmakla uğraşmaz. 'Telif hakkı ihlali' veya 'Mavi tik kazandınız' diye sahte bir DM atarlar. Panikle linke tıklar ve sahte giriş sayfasına şifreni yazarsın. Tebrikler, hesabını ve tüm takipçilerini hacker'a hediye ettin! Gerçek Instagram asla DM'den şifre istemez. İki faktörlü doğrulamayı hemen aç ve şüpheli linklere tıklama! Uyanık kal, hesabını koru!",
 			scenes: []SceneDefinition{
-				{Title: "SAHTE DM TUZAĞI", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1420, W: 300}},
-				{Title: "ŞİFREN ELE GEÇİRİLDİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1420, W: 300}, Arrow: true},
-				{Title: "HESAP KONTROLÜ KAYBEDİLDİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1420, W: 300}},
-				{Title: "2FA İLE HESABINI KORU!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1420, W: 300}},
+				{Title: "SAHTE DM TUZAĞI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1380, W: 300}},
+				{Title: "ŞİFREN ELE GEÇİRİLDİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1380, W: 300}, Arrow: true},
+				{Title: "HESAP KONTROLÜ KAYBEDİLDİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1380, W: 300}},
+				{Title: "GERÇEK INSTAGRAM ŞİFRE İSTEMEZ", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 490, Y: 1380, W: 300}},
+				{Title: "2FA İLE HESABINI KORU!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1380, W: 300}},
+				{Title: "UYANIK KAL, GÜVENDE OL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 490, Y: 1380, W: 300}},
 			},
 		}
 	} else if strings.Contains(lower, "kripto") || strings.Contains(lower, "bitcoin") || strings.Contains(lower, "cüzdan") {
 		matched = &tpl{
-			title: "Kripto Cüzdanınız Nasıl Sıfırlanır?",
+			title:     "Kripto Cüzdanınız Nasıl Sıfırlanır?",
 			narration: "Kripto cüzdanındaki tüm birikim tek bir saniyede buharlaşabilir! Sahte airdrop siteleri ve dolandırıcı Telegram grupları sana bedava coin vaat eder. Cüzdanını bağladığın an, akıllı sözleşme izniyle tüm tokenlarını çekerler! Altın kural: Hiç kimse durduk yere bedava para dağıtmaz. Gizli kelimelerini asla bir web sitesine yazma ve her sözleşme onayını iki kez kontrol et! Parana sahip çık!",
 			scenes: []SceneDefinition{
-				{Title: "BEDAVA COIN TUZAĞI!", Color: "#FFCC00", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1420, W: 300}},
-				{Title: "AKILLI SÖZLEŞME ONAYI", Color: "#FF3B30", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1420, W: 300}, Arrow: true},
-				{Title: "CÜZDAN BOŞALTILDI!", Color: "#FF3B30", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1420, W: 300}},
-				{Title: "KELİMELERİNİ ASLA PAYLAŞMA", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 490, Y: 1420, W: 300}},
+				{Title: "BEDAVA COIN TUZAĞI!", Color: "#FFCC00", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1380, W: 300}},
+				{Title: "AKILLI SÖZLEŞME ONAYI", Color: "#FF3B30", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1380, W: 300}, Arrow: true},
+				{Title: "CÜZDAN BOŞALTILDI!", Color: "#FF3B30", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1380, W: 300}},
+				{Title: "BEDAVA PARA DİYE BİR ŞEY YOK!", Color: "#00F0FF", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 490, Y: 1380, W: 300}},
+				{Title: "KELİMELERİNİ ASLA PAYLAŞMA", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 490, Y: 1380, W: 300}},
+				{Title: "PARANA VE CÜZDANINA SAHİP ÇIK!", Color: "#00FF66", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1380, W: 300}},
 			},
 		}
 	} else if strings.Contains(lower, "whatsapp") || strings.Contains(lower, "telefon") || strings.Contains(lower, "sms") {
 		matched = &tpl{
-			title: "WhatsApp Hesabınız Nasıl Ele Geçirilir?",
+			title:     "WhatsApp Hesabınız Nasıl Ele Geçirilir?",
 			narration: "WhatsApp hesabından arkadaşlarına borç para isteme mesajları gidebilir! Hacker numaranı sisteme yazar ve sana bir SMS onay kodu gelir. Hemen ardından samimi bir arkadaşından mesaj alırsın: 'Kodu yanlışlıkla sana yolladım, bana atar mısın?' O kodu verdiğin anda hesabın gider! SMS doğrulama kodlarını en yakınına bile asla verme. WhatsApp'ta iki adımlı doğrulamayı hemen etkinleştir!",
 			scenes: []SceneDefinition{
-				{Title: "BEKLENMEDİK ONAY KODU", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 490, Y: 1420, W: 300}},
-				{Title: "KODU VERDİĞİN AN BİTTİN!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1420, W: 300}, Arrow: true},
-				{Title: "HESAP BAŞKASINA GEÇTİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1420, W: 300}},
-				{Title: "İKİ ADIMLI DOĞRULAMAYI AÇ", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1420, W: 300}},
+				{Title: "BEKLENMEDİK ONAY KODU!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 490, Y: 1380, W: 300}},
+				{Title: "KODU VERDİĞİN AN BİTTİN!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1380, W: 300}, Arrow: true},
+				{Title: "HESAP BAŞKASINA GEÇTİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1380, W: 300}},
+				{Title: "ARKADAŞINDAN GELEN SAHTE MESAJ", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1380, W: 300}},
+				{Title: "İKİ ADIMLI DOĞRULAMAYI AÇ", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1380, W: 300}},
+				{Title: "DOĞRULAMA KODUNU ASLA VERME!", Color: "#00FF66", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 490, Y: 1380, W: 300}},
 			},
 		}
 	} else {
@@ -177,13 +186,15 @@ func generateViaTemplates(prompt string) *ScriptResult {
 		}
 
 		matched = &tpl{
-			title: title,
+			title:     title,
 			narration: fmt.Sprintf("Dikkat! %s konusu sandığından çok daha kritik bir siber güvenlik riski taşıyor olabilir. Hackerlar her gün binlerce kullanıcının dikkatsizliğinden faydalanarak sistemlere sızıyor. Basit bir dikkatsizlik, tüm kişisel verilerinin ve parolalarının açığa çıkmasına neden olabilir. Unutma: Siber güvenlikte en zayıf halka insandır. Güçlü parolalar kullan, çift faktörlü korumayı aç ve daima tetikte kal! Takipte ol, güvenle kal!", cleanSubject),
 			scenes: []SceneDefinition{
-				{Title: "GÖRÜNMEYEN TEHLİKE!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1420, W: 300}},
-				{Title: "SİSTEME SIZMA ANI", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1420, W: 300}, Arrow: true},
-				{Title: "VERİLERİN AÇIĞA ÇIKMASI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1420, W: 300}},
-				{Title: "SİSTEMİNİ KORUMA ALTINA AL", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1420, W: 300}},
+				{Title: "GÖRÜNMEYEN TEHLİKE!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 490, Y: 1380, W: 300}},
+				{Title: "SİSTEME SIZMA ANI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 490, Y: 1380, W: 300}, Arrow: true},
+				{Title: "VERİLERİN AÇIĞA ÇIKMASI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 490, Y: 1380, W: 300}},
+				{Title: "EN ZAYIF HALKA: DİKKATSİZLİK", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-bug.png", X: 490, Y: 1380, W: 300}},
+				{Title: "SİSTEMİNİ KORUMA ALTINA AL", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 490, Y: 1380, W: 300}},
+				{Title: "AV DEĞİL, AVCI OL! TAKİP ET", Color: "#00FF66", SFX: "chime", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 490, Y: 1380, W: 300}},
 			},
 		}
 	}
@@ -382,9 +393,7 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 // FormatViralText creates the aciklama.txt document with A/B/C titles, caption, and hashtags.
 func FormatViralText(title, narration string, vm ViralMetadata) string {
 	var sb strings.Builder
-	sb.WriteString("════════════════════════════════════════════════════════════════════\n")
 	sb.WriteString("🎬 TUBIE VİRAL PAYLAŞIM PAKETİ (INSTAGRAM / REELS / TIKTOK / SHORTS)\n")
-	sb.WriteString("════════════════════════════════════════════════════════════════════\n\n")
 
 	sb.WriteString("📌 A / B / C TESTİ İÇİN 3 FARKLI BAŞLIK:\n")
 	sb.WriteString("(En yüksek tıklanma ve izlenme oranını yakalamak için test edin)\n")
@@ -401,8 +410,6 @@ func FormatViralText(title, narration string, vm ViralMetadata) string {
 	sb.WriteString("--------------------------------------------------------------------\n")
 	sb.WriteString(strings.Join(vm.Hashtags, " ") + "\n\n")
 
-	sb.WriteString("════════════════════════════════════════════════════════════════════\n")
-	sb.WriteString("ℹ️ Instagram 2.200 karakter sınırına tam uyumludur.\n")
 	return sb.String()
 }
 
