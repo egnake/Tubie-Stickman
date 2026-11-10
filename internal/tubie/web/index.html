@@ -21,14 +21,49 @@
   <div class="page-heading"><div><div class="eyebrow">FİKİRDEN VİDEOYA</div><h1>Üretim masası</h1><p>Konunu seç. Sesini belirle. Hikâyene hareket kat.</p></div><span class="format-label">720 × 1280 <span>·</span> 30 FPS <span>·</span> MP4</span></div>
   <div class="production-layout">
     <section class="settings-panel" aria-label="Üretim ayarları">
-      <div class="section-title"><h2>01 <span>Konu</span></h2><label class="all-select"><input type="checkbox" id="all"> Tümünü sıraya al</label></div>
-      <div id="presets" class="presets"></div>
-      <details class="script"><summary>Seslendirme metni <span>↗</span></summary><p id="narration"></p></details>
+      <div class="section-title"><h2>01 <span>Konu & Senaryo</span></h2></div>
+      <div class="topic-mode-tabs" role="tablist">
+        <button id="mode-tab-ai" class="mode-tab active" type="button" role="tab" aria-selected="true"><span class="sparkle">✨</span> Yapay Zeka ile Üret</button>
+        <button id="mode-tab-presets" class="mode-tab" type="button" role="tab" aria-selected="false">📋 Hazır Şablonlar</button>
+      </div>
+
+      <div id="ai-panel" class="tab-content">
+        <label for="ai-prompt" class="field-label">Konunuz veya Fikriniz:</label>
+        <textarea id="ai-prompt" rows="2" class="text-input" placeholder="Örn: İnstagram hesap çalma nasıl engellenir? Sahte DM tuzakları..."></textarea>
+        <div class="chip-container">
+          <button type="button" class="chip" data-prompt="İnstagram hesap çalma tuzakları ve korunma yöntemleri">📱 İnstagram Çalma</button>
+          <button type="button" class="chip" data-prompt="Kripto cüzdan dolandırıcılığı ve airdrop tuzağı">💰 Kripto Cüzdan</button>
+          <button type="button" class="chip" data-prompt="WhatsApp hesap çalma ve SMS onay kodu hilesi">💬 WhatsApp Tuzağı</button>
+          <button type="button" class="chip" data-prompt="Kafe Wi-Fi ağlarında şifre hırsızlığı">🔓 Wi-Fi Korsanlığı</button>
+        </div>
+        <button id="btn-ai-generate" type="button" class="secondary ai-generate-btn"><span class="sparkle">✨</span> Yapay Zeka ile Senaryo Üret</button>
+        <div id="ai-status" class="field-hint" hidden></div>
+      </div>
+
+      <div id="presets-panel" class="tab-content" hidden>
+        <div class="preset-header"><label class="all-select"><input type="checkbox" id="all"> Tümünü sıraya al</label></div>
+        <div id="presets" class="presets"></div>
+      </div>
+
+      <div class="script-editor-box">
+        <div class="editor-header"><span class="editor-badge">SENARYO DETAYI</span><span id="char-word-count" class="editor-counter">0 kelime</span></div>
+        <label for="custom-title" class="field-label">Video Başlığı:</label>
+        <input type="text" id="custom-title" class="text-input" placeholder="Video Başlığı">
+
+        <label for="custom-narration" class="field-label" style="margin-top:10px;">Seslendirme Metni (Düzenlenebilir):</label>
+        <textarea id="custom-narration" rows="5" class="text-input" placeholder="Seslendirilecek Türkçe metin..."></textarea>
+
+        <div id="scenes-preview-container" class="scenes-preview-container" hidden>
+          <span class="field-label" style="margin-top:8px;">Planlanan Sahneler:</span>
+          <div id="scenes-badges" class="scenes-badges"></div>
+        </div>
+      </div>
+
       <div class="section-title voice-title"><h2>02 <span>Seslendirme</span></h2></div>
-      <label class="sr-only" for="mode">Ses modu</label><select id="mode"><option value="pro">Profesyonel ses · Ahmet</option><option value="cloned">Kendi sesim · XTTS</option><option value="auto">Otomatik seç</option></select>
+      <label class="sr-only" for="mode">Ses modu</label><select id="mode"><option value="pro">Profesyonel ses · Ahmet (Önerilen)</option><option value="cloned">Kendi sesim · XTTS</option><option value="auto">Otomatik seç</option></select>
       <p id="mode-hint" class="field-hint">Türkçe anlatıcı. Ses üretimi internet gerektirir.</p>
       <button id="generate" class="primary">Üretime başla <span>↗</span></button>
-      <p class="save-note">Çıktılar bu bilgisayarda saklanır. Aynı konunun önceki çıktısı yenilenir.</p>
+      <p class="save-note">Çıktılar bu bilgisayarda saklanır. Kusursuz .srt ve .mp4 otomatik oluşturulur.</p>
     </section>
     <section class="preview-panel" aria-label="Canlı üretim önizlemesi">
       <div class="preview-heading"><h2>Önizleme</h2><span id="preview-badge" class="badge">BEKLEMEDE</span></div>

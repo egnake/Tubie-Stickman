@@ -35,7 +35,8 @@ func Main(args []string) int {
 
 	case "generate":
 		genFlags := flag.NewFlagSet("generate", flag.ExitOnError)
-		preset := genFlags.String("preset", "1", "Şablon numarası (1, 2, 3, 4)")
+		preset := genFlags.String("preset", "", "Şablon numarası (1, 2, 3, 4)")
+		topic := genFlags.String("topic", "", "Özel konu / fikir (örn: 'İnstagram hesap çalma')")
 		all := genFlags.Bool("all", false, "Tüm şablonları üret")
 		mode := genFlags.String("mode", "auto", "Ses modu: pro, cloned, auto")
 		_ = genFlags.Parse(args[1:])
@@ -45,9 +46,32 @@ func Main(args []string) int {
 			Mode: *mode,
 		}
 
+		if *topic != "" {
+			fmt.Printf("✨ Yapay zeka ile senaryo üretiliyor: %q...\n", *topic)
+			res, err := GenerateScript(*topic)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Senaryo üretim hatası: %v\n", err)
+				return 1
+			}
+			customPreset := Preset{
+				ID:        "custom",
+				Title:     res.Title,
+				Slug:      res.Slug,
+				Narration: res.Narration,
+				Scenes:    res.Scenes,
+			}
+			if _, err := pipeline.Produce(customPreset); err != nil {
+				fmt.Fprintf(os.Stderr, "Üretim hatası (%s): %v\n", customPreset.Title, err)
+				return 1
+			}
+			return 0
+		}
+
 		targets := []string{*preset}
 		if *all {
 			targets = []string{"1", "2", "3", "4"}
+		} else if *preset == "" {
+			targets = []string{"1"}
 		}
 
 		for _, pKey := range targets {
@@ -82,6 +106,7 @@ Kullanım:
   go run . gui [--port N] [--no-browser] # Arayüzü başlat
   go run . record                   # GUI ses merkezi sekmesini aç
   go run . doctor                   # Ortam ve bağımlılık kontrolü
+  go run . generate --topic "İnstagram" # Yapay zeka ile senaryo üretip video yap
   go run . generate --preset 1      # 1 numaralı hazır videoyu üret
   go run . generate --all           # Tüm şablonları sırayla üret
   go run . generate --mode pro      # Edge-TTS spiker sesi ile üret`)
