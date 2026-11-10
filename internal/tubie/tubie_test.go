@@ -1,8 +1,10 @@
 package tubie_test
 
 import (
+	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"tubie-stickman/internal/tubie"
 )
@@ -59,6 +61,84 @@ func TestStudioServerInitialization(t *testing.T) {
 	url := server.URL("produce")
 	if url == "" || len(url) < 15 {
 		t.Fatalf("invalid server URL: %s", url)
+	}
+}
+
+func TestAccurateCaptions(t *testing.T) {
+	script := "Hackerlar şifreni tahmin etmeye çalışmaz. Deauth saldırısıyla seni bir saniyede ağdan düşürürler!"
+	captions := tubie.BuildAccurateCaptions(script, "", 10.0)
+	if len(captions) == 0 {
+		t.Fatal("expected non-empty captions")
+	}
+
+	cueEnd := 0.0
+	for i, c := range captions {
+		if c.Start < cueEnd {
+			t.Errorf("cue %d: start %.3f is less than previous end %.3f", i, c.Start, cueEnd)
+		}
+		if c.End <= c.Start {
+			t.Errorf("cue %d: end %.3f <= start %.3f", i, c.End, c.Start)
+		}
+		if c.End > 10.0 {
+			t.Errorf("cue %d: end %.3f exceeds total duration", i, c.End)
+		}
+		cueEnd = c.End
+	}
+
+	srt := tubie.FormatSRT(captions)
+	if srt == "" {
+		t.Fatal("expected non-empty srt")
+	}
+	// Verify that hallucinated Whisper text is NOT present
+	if strings.Contains(srt, "ETMEYE ÇALIŞMAZ DIT") || strings.Contains(srt, "AKARLAR") {
+		t.Fatal("srt contains corrupted Whisper tokens")
+	}
+	// Verify proper Turkish casing
+	if !strings.Contains(srt, "HACKERLAR") || !strings.Contains(srt, "DEAUTH") {
+		t.Errorf("srt missing canonical words: %s", srt)
+	}
+}
+
+func TestBuildStoryboard(t *testing.T) {
+	scenes := []tubie.SceneDefinition{
+		{Title: "SAHTE DM TUZAĞI", SFX: "keyboard"},
+		{Title: "ŞİFREN ELE GEÇİRİLDİ", SFX: "alert"},
+		{Title: "HESAP KONTROLÜ KAYBEDİLDİ", SFX: "glitch"},
+		{Title: "2FA İLE KORU", SFX: "lock"},
+	}
+	totalDur := 25.5
+	shots := tubie.BuildStoryboard(scenes, totalDur)
+	if len(shots) != len(scenes) {
+		t.Fatalf("expected %d shots, got %d", len(scenes), len(shots))
+	}
+
+	currStart := 0.0
+	for i, s := range shots {
+		start := s["start"].(float64)
+		end := s["end"].(float64)
+		if math.Abs(start-currStart) > 0.002 {
+			t.Errorf("shot %d: start %.3f != expected %.3f", i, start, currStart)
+		}
+		if end <= start {
+			t.Errorf("shot %d: end <= start", i)
+		}
+		currStart = end
+	}
+	if math.Abs(currStart-totalDur) > 0.002 {
+		t.Errorf("final shot end %.3f does not match totalDur %.3f", currStart, totalDur)
+	}
+}
+
+func TestGenerateScript(t *testing.T) {
+	res, err := tubie.GenerateScript("İnstagram hesap çalma")
+	if err != nil {
+		t.Fatalf("GenerateScript failed: %v", err)
+	}
+	if res.Title == "" || res.Narration == "" || res.Slug == "" {
+		t.Fatalf("incomplete script result: %+v", res)
+	}
+	if len(res.Scenes) < 3 {
+		t.Fatalf("expected at least 3 scenes, got %d", len(res.Scenes))
 	}
 }
 

@@ -42,11 +42,102 @@ function tab(name) {
 $$('.nav').forEach(button => button.addEventListener('click', () => tab(button.dataset.tab)));
 $('.brand').addEventListener('click', event => { event.preventDefault(); tab('produce'); });
 window.addEventListener('hashchange', () => tab(location.hash.slice(1)));
-function selected() { return $('#all').checked ? presets.map(p => p.id) : [$('#presets input:checked')?.value || '1']; }
-function narration() {
-  $('#narration').textContent = presets.find(p => p.id === selected()[0])?.narration || '';
+let currentTopicMode = 'ai';
+let currentScenes = [];
+
+function setTopicMode(mode) {
+  currentTopicMode = mode;
+  $('#mode-tab-ai').classList.toggle('active', mode === 'ai');
+  $('#mode-tab-ai').setAttribute('aria-selected', mode === 'ai');
+  $('#mode-tab-presets').classList.toggle('active', mode === 'presets');
+  $('#mode-tab-presets').setAttribute('aria-selected', mode === 'presets');
+  $('#ai-panel').hidden = mode !== 'ai';
+  $('#presets-panel').hidden = mode !== 'presets';
 }
-$('#all').addEventListener('change', () => { updateControls(); narration(); });
+$('#mode-tab-ai').addEventListener('click', () => setTopicMode('ai'));
+$('#mode-tab-presets').addEventListener('click', () => {
+  setTopicMode('presets');
+  loadPresetIntoEditor();
+});
+
+function loadPresetIntoEditor() {
+  const p = presets.find(item => item.id === selected()[0]);
+  if (!p) return;
+  $('#custom-title').value = p.title;
+  $('#custom-narration').value = p.narration;
+  currentScenes = p.scenes || [];
+  renderSceneBadges(currentScenes);
+  updateWordCount();
+}
+
+function updateWordCount() {
+  const text = $('#custom-narration').value.trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  $('#char-word-count').textContent = `${words} kelime · ~${Math.round(words / 2.5)} sn`;
+}
+$('#custom-narration').addEventListener('input', updateWordCount);
+
+function renderSceneBadges(scenes) {
+  const container = $('#scenes-preview-container');
+  const badgesBox = $('#scenes-badges');
+  badgesBox.replaceChildren();
+  if (!scenes || !scenes.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  scenes.forEach((sc, idx) => {
+    const badge = element('span', `${idx + 1}. ${sc.title || 'Sahne'}`, 'scene-badge');
+    if (sc.color) badge.style.borderColor = sc.color;
+    badgesBox.append(badge);
+  });
+}
+
+async function triggerAIGenerate(customPrompt) {
+  const prompt = customPrompt || $('#ai-prompt').value.trim();
+  if (!prompt) {
+    toast('Lütfen bir konu veya fikir yazın.');
+    $('#ai-prompt').focus();
+    return;
+  }
+  $('#ai-prompt').value = prompt;
+  const btn = $('#btn-ai-generate');
+  const status = $('#ai-status');
+  btn.disabled = true;
+  status.textContent = '✨ Yapay zeka senaryo ve sahneleri hazırlıyor...';
+  status.hidden = false;
+
+  try {
+    const res = await api('ai-generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt})
+    });
+    if (res.ok && res.result) {
+      $('#custom-title').value = res.result.title;
+      $('#custom-narration').value = res.result.narration;
+      currentScenes = res.result.scenes || [];
+      renderSceneBadges(currentScenes);
+      updateWordCount();
+      status.textContent = '✨ Senaryo başarıyla oluşturuldu! Aşağıdan düzenleyebilir veya doğrudan üretime geçebilirsiniz.';
+    }
+  } catch (err) {
+    status.textContent = 'Hata: ' + err.message;
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('#btn-ai-generate').addEventListener('click', () => triggerAIGenerate());
+$$('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    setTopicMode('ai');
+    triggerAIGenerate(chip.dataset.prompt);
+  });
+});
+
+function selected() { return $('#all').checked ? presets.map(p => p.id) : [$('#presets input:checked')?.value || '1']; }
+$('#all').addEventListener('change', () => { updateControls(); loadPresetIntoEditor(); });
 function modeHint() {
   $('#mode-hint').textContent = {
     pro: 'Türkçe anlatıcı. Ses üretimi internet gerektirir.',
@@ -57,15 +148,43 @@ function modeHint() {
 $('#mode').addEventListener('change', modeHint);
 function updateControls() {
   const blocked = busy || pending || disconnected || !!recorder;
-  ['generate', 'mode', 'all', 'voice-file', 'doctor'].forEach(id => { $('#' + id).disabled = blocked; });
+  ['generate', 'mode', 'all', 'voice-file', 'doctor', 'btn-ai-generate', 'custom-title', 'custom-narration', 'ai-prompt'].forEach(id => {
+    const node = $('#' + id);
+    if (node) node.disabled = blocked;
+  });
   $$('#presets input').forEach(input => { input.disabled = blocked || $('#all').checked; });
+  $$('.chip').forEach(chip => { chip.disabled = blocked; });
   $('#test-voice').disabled = blocked || !state?.reference;
   $('#record').disabled = busy || pending || disconnected;
   $('#cancel').hidden = !busy;
   $('#cancel').disabled = pending || state?.job.status === 'stopping' || disconnected;
   $('#approve').disabled = pending || disconnected;
 }
-$('#generate').addEventListener('click', () => action('job', {action: 'generate', presets: selected(), mode: $('#mode').value}));
+$('#generate').addEventListener('click', () => {
+  if (currentTopicMode === 'ai' || !$('#all').checked) {
+    const title = $('#custom-title').value.trim();
+    const narration = $('#custom-narration').value.trim();
+    if (!narration) {
+      toast('Lütfen bir seslendirme metni girin veya yapay zeka ile oluşturun.');
+      return;
+    }
+    action('job', {
+      action: 'generate',
+      mode: $('#mode').value,
+      custom: {
+        title: title || 'Siber Güvenlik Videosu',
+        narration: narration,
+        scenes: currentScenes
+      }
+    });
+  } else {
+    action('job', {
+      action: 'generate',
+      presets: selected(),
+      mode: $('#mode').value
+    });
+  }
+});
 $('#doctor').addEventListener('click', async () => { $('#log-panel').open = true; await action('job', {action: 'doctor'}); });
 $('#cancel').addEventListener('click', () => action('cancel'));
 $('#approve').addEventListener('click', () => action('approve'));
@@ -168,7 +287,7 @@ function render(data) {
     $('#all').checked = job.presets.length === 4;
     $$('#presets input').forEach(input => { input.checked = input.value === job.presets[0]; });
     $('#mode').value = job.mode;
-    narration(); modeHint();
+    loadPresetIntoEditor(); modeHint();
   }
   $('#job-label').textContent = job.label;
   $('#activity-dot').className = 'status-dot ' + job.status;
@@ -254,9 +373,10 @@ async function init() {
       const number = element('span', '0' + (index + 1), 'preset-number');
       const text = element('span'); text.append(element('strong', topics[index]), element('small', descriptions[index]));
       const input = element('input'); input.type = 'radio'; input.name = 'preset'; input.value = preset.id; input.checked = index === 0;
-      input.addEventListener('change', narration); label.append(number, text, input); $('#presets').append(label);
+      input.addEventListener('change', loadPresetIntoEditor); label.append(number, text, input); $('#presets').append(label);
     });
-    narration(); poll(); setInterval(() => { if (!stopped) tick(); }, 1000);
+    $('#ai-prompt').value = 'İnstagram hesap çalma tuzakları ve korunma yöntemleri';
+    loadPresetIntoEditor(); poll(); setInterval(() => { if (!stopped) tick(); }, 1000);
   } catch (error) { toast('Arayüz yüklenemedi. Sayfayı yenileyin. ' + error.message); }
 }
 init();

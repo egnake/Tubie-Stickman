@@ -76,6 +76,7 @@ func NewStudioServer(root string, port int) (*StudioServer, error) {
 	mux.HandleFunc(s.prefix, s.handleRoot)
 	mux.HandleFunc(s.prefix+"api/state", s.handleState)
 	mux.HandleFunc(s.prefix+"api/presets", s.handlePresets)
+	mux.HandleFunc(s.prefix+"api/ai-generate", s.handleAIGenerate)
 	mux.HandleFunc(s.prefix+"api/job", s.handleJob)
 	mux.HandleFunc(s.prefix+"api/approve", s.handleApprove)
 	mux.HandleFunc(s.prefix+"api/cancel", s.handleCancel)
@@ -263,6 +264,43 @@ func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, target)
 }
 
+func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Prompt string `json:"prompt"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"Geçersiz JSON verisi"}`, http.StatusBadRequest)
+		return
+	}
+
+	prompt := strings.TrimSpace(req.Prompt)
+	if prompt == "" {
+		http.Error(w, `{"error":"Lütfen bir konu yazın"}`, http.StatusBadRequest)
+		return
+	}
+
+	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor: %q...", prompt))
+	result, err := GenerateScript(prompt)
+	if err != nil {
+		s.log(fmt.Sprintf("Yapay zeka hatası: %v", err))
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	s.log(fmt.Sprintf("Senaryo hazır: %s (%d sahne)", result.Title, len(result.Scenes)))
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":     true,
+		"result": result,
+	})
+}
+
 func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -273,11 +311,32 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 		Action  string   `json:"action"`
 		Presets []string `json:"presets"`
 		Mode    string   `json:"mode"`
+		Custom  *struct {
+			Title     string            `json:"title"`
+			Slug      string            `json:"slug"`
+			Narration string            `json:"narration"`
+			Scenes    []SceneDefinition `json:"scenes"`
+		} `json:"custom,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"Geçersiz JSON verisi"}`, http.StatusBadRequest)
 		return
+	}
+
+	var customPreset *Preset
+	if req.Custom != nil && strings.TrimSpace(req.Custom.Narration) != "" {
+		slug := req.Custom.Slug
+		if slug == "" {
+			slug = slugify(req.Custom.Title)
+		}
+		customPreset = &Preset{
+			ID:        "custom",
+			Title:     req.Custom.Title,
+			Slug:      slug,
+			Narration: req.Custom.Narration,
+			Scenes:    req.Custom.Scenes,
+		}
 	}
 
 	s.mu.Lock()
@@ -297,13 +356,13 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 
-	go s.runJob(req.Action, req.Presets, req.Mode)
+	go s.runJob(req.Action, req.Presets, req.Mode, customPreset)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write([]byte(`{"ok":true}`))
 }
 
-func (s *StudioServer) runJob(action string, presets []string, mode string) {
+func (s *StudioServer) runJob(action string, presets []string, mode string, customPreset *Preset) {
 	ctx := s.cancelCtx
 
 	defer func() {
@@ -378,26 +437,32 @@ func (s *StudioServer) runJob(action string, presets []string, mode string) {
 			},
 		}
 
-		for idx, pKey := range presets {
+		var jobsToRun []Preset
+		if customPreset != nil {
+			jobsToRun = append(jobsToRun, *customPreset)
+		} else {
+			for _, pKey := range presets {
+				if preset, ok := CyberPresets[pKey]; ok {
+					jobsToRun = append(jobsToRun, preset)
+				}
+			}
+		}
+
+		for idx, preset := range jobsToRun {
 			select {
 			case <-ctx.Done():
 				return
 			default:
 			}
 
-			preset, ok := CyberPresets[pKey]
-			if !ok {
-				continue
-			}
-
 			s.mu.Lock()
 			s.job["item"] = idx + 1
-			s.job["items"] = len(presets)
+			s.job["items"] = len(jobsToRun)
 			s.job["title"] = preset.Title
 			s.job["slug"] = preset.Slug
 			s.mu.Unlock()
 
-			s.log(fmt.Sprintf("[%d/%d] Üretim başlatılıyor: %s", idx+1, len(presets), preset.Title))
+			s.log(fmt.Sprintf("[%d/%d] Üretim başlatılıyor: %s", idx+1, len(jobsToRun), preset.Title))
 			out, err := pipeline.Produce(preset)
 			if err != nil {
 				s.log(fmt.Sprintf("HATA: %v", err))
