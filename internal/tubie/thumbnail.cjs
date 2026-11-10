@@ -36,65 +36,119 @@ async function main() {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  // Register fonts if present
+  // Register fonts
   const notoSans = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/fonts/NotoSans.ttf');
   const caveat = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/fonts/Caveat.ttf');
   if (fs.existsSync(notoSans)) GlobalFonts.registerFromPath(notoSans, 'NotoSans');
   if (fs.existsSync(caveat)) GlobalFonts.registerFromPath(caveat, 'Caveat');
 
-  // 1. Dark Cyber Gradient Background
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-  bgGrad.addColorStop(0, '#0B0F19');
-  bgGrad.addColorStop(0.35, '#070A12');
-  bgGrad.addColorStop(1, '#020407');
+  // -------------------------------------------------------------
+  // 1. Cinematic Deep Cyber Gradient Background
+  // -------------------------------------------------------------
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, '#0A0E18');
+  bgGrad.addColorStop(0.45, '#05080F');
+  bgGrad.addColorStop(1, '#020306');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // 2. High-Tech Cyber Grid
+  // -------------------------------------------------------------
+  // 2. High-Tech Hex/Grid Lines & Glowing Horizon
+  // -------------------------------------------------------------
   ctx.save();
-  ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
-  ctx.lineWidth = 1.5;
-  for (let x = 40; x < width; x += 60) {
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.065)';
+  ctx.lineWidth = 1.2;
+  const gridSize = 50;
+  for (let x = 20; x < width; x += gridSize) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
   }
-  for (let y = 40; y < height; y += 60) {
+  for (let y = 20; y < height; y += gridSize) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(width, y);
     ctx.stroke();
   }
+
+  // Crosshair dots at grid intersections
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.18)';
+  for (let x = 20; x < width; x += gridSize * 2) {
+    for (let y = 120; y < height - 120; y += gridSize * 2) {
+      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+    }
+  }
   ctx.restore();
 
-  // 3. Central Neon Radial Aura
+  // -------------------------------------------------------------
+  // 3. Dual Radial Atmospheric Glows (Cyber Cyan + Emergency Red)
+  // -------------------------------------------------------------
   ctx.save();
-  const radGrad = ctx.createRadialGradient(width / 2, 730, 60, width / 2, 730, 440);
-  radGrad.addColorStop(0, 'rgba(0, 240, 255, 0.22)');
-  radGrad.addColorStop(0.55, 'rgba(255, 0, 85, 0.13)');
-  radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = radGrad;
-  ctx.fillRect(0, 360, width, 750);
+  // Hero Cyan Aura behind stickman
+  const cyanAura = ctx.createRadialGradient(230, 720, 40, 230, 720, 360);
+  cyanAura.addColorStop(0, 'rgba(0, 240, 255, 0.28)');
+  cyanAura.addColorStop(0.5, 'rgba(0, 255, 128, 0.12)');
+  cyanAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = cyanAura;
+  ctx.fillRect(0, 420, width, 600);
+
+  // Threat Red Aura behind threat prop
+  const redAura = ctx.createRadialGradient(530, 720, 30, 530, 720, 300);
+  redAura.addColorStop(0, 'rgba(255, 42, 85, 0.26)');
+  redAura.addColorStop(0.6, 'rgba(255, 0, 85, 0.08)');
+  redAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = redAura;
+  ctx.fillRect(300, 450, width - 300, 550);
   ctx.restore();
 
-  // 4. Futuristic Cyber Corner Brackets
+  // -------------------------------------------------------------
+  // 4. Subtle Scanline Texture for Terminal Aesthetic
+  // -------------------------------------------------------------
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.015)';
+  for (let y = 0; y < height; y += 4) {
+    ctx.fillRect(0, y, width, 1.5);
+  }
+  ctx.restore();
+
+  // -------------------------------------------------------------
+  // 5. Corner Sci-Fi Brackets & Top HUD Status Bar
+  // -------------------------------------------------------------
   ctx.save();
   ctx.strokeStyle = '#00F0FF';
-  ctx.lineWidth = 4;
-  const bSize = 38;
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = '#00F0FF';
+  ctx.shadowBlur = 10;
+  const bSize = 34;
   const pad = 24;
-  // Top Left
+
+  // Top Left Bracket
   ctx.beginPath(); ctx.moveTo(pad, pad + bSize); ctx.lineTo(pad, pad); ctx.lineTo(pad + bSize, pad); ctx.stroke();
-  // Top Right
+  // Top Right Bracket
   ctx.beginPath(); ctx.moveTo(width - pad - bSize, pad); ctx.lineTo(width - pad, pad); ctx.lineTo(width - pad, pad + bSize); ctx.stroke();
-  // Bottom Left
+  // Bottom Left Bracket
   ctx.beginPath(); ctx.moveTo(pad, height - pad - bSize); ctx.lineTo(pad, height - pad); ctx.lineTo(pad + bSize, height - pad); ctx.stroke();
-  // Bottom Right
+  // Bottom Right Bracket
   ctx.beginPath(); ctx.moveTo(width - pad - bSize, height - pad); ctx.lineTo(width - pad, height - pad); ctx.lineTo(width - pad, height - pad - bSize); ctx.stroke();
+
+  // Top HUD Bar
+  ctx.shadowBlur = 0;
+  ctx.font = '700 16px NotoSans, sans-serif';
+  ctx.fillStyle = '#00F0FF';
+  ctx.textAlign = 'left';
+  ctx.fillText('[ ⚡ SİBER İSTİHBARAT ]', pad + 44, pad + 18);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#FF3B30';
+  ctx.fillText('REC ● ', width - pad - 100, pad + 18);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText('4K UHD', width - pad - 44, pad + 18);
   ctx.restore();
 
-  // 5. Contextual Top Hook Badge
+  // -------------------------------------------------------------
+  // 6. Contextual High-Converting Hook Badge
+  // -------------------------------------------------------------
   let badgeText = "🚨 SİBER GÜVENLİK UYARISI";
   const lowerTitle = (opts.title + " " + opts.topic).toLowerCase();
   if (lowerTitle.includes("instagram") || lowerTitle.includes("sosyal") || lowerTitle.includes("dm")) {
@@ -108,27 +162,33 @@ async function main() {
   }
 
   ctx.save();
-  ctx.font = '800 24px NotoSans, sans-serif';
-  const badgeWidth = ctx.measureText(badgeText).width + 52;
+  ctx.font = '800 22px NotoSans, sans-serif';
+  const badgeWidth = ctx.measureText(badgeText).width + 56;
   const badgeX = (width - badgeWidth) / 2;
-  const badgeY = 88;
-  const badgeH = 48;
+  const badgeY = 66;
+  const badgeH = 46;
 
-  ctx.fillStyle = 'rgba(17, 24, 39, 0.95)';
+  // Badge background plate
+  ctx.fillStyle = 'rgba(10, 16, 28, 0.94)';
   ctx.strokeStyle = '#FF3B30';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.2;
+  ctx.shadowColor = 'rgba(255, 59, 48, 0.55)';
+  ctx.shadowBlur = 14;
   ctx.beginPath();
-  ctx.roundRect(badgeX, badgeY, badgeWidth, badgeH, 24);
+  ctx.roundRect(badgeX, badgeY, badgeWidth, badgeH, 23);
   ctx.fill();
   ctx.stroke();
 
+  ctx.shadowBlur = 0;
   ctx.fillStyle = '#FFE600';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(badgeText, width / 2, badgeY + badgeH / 2);
   ctx.restore();
 
-  // 6. Massive, Clean Multi-Line Hook Headline
+  // -------------------------------------------------------------
+  // 7. Bold High-Impact Hook Headline (3-Line High CTR Staging)
+  // -------------------------------------------------------------
   const rawWords = opts.title.toUpperCase().replace(/[?!.,]/g, '').split(/\s+/).filter(Boolean);
   const lines = [];
   let cur = "";
@@ -144,142 +204,259 @@ async function main() {
   const displayLines = lines.slice(0, 3);
 
   ctx.save();
-  const startY = 185;
-  const lineHeight = 72;
+  const startY = 150;
+  const lineHeight = 76;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
 
   displayLines.forEach((line, i) => {
     const yPos = startY + i * lineHeight;
     let textColor = '#FFFFFF';
-    if (i === 0) textColor = '#00F0FF';
-    else if (i === displayLines.length - 1) textColor = '#FF3344';
+    let fontSize = 58;
 
-    // Drop shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.92)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 6;
+    if (i === 0) {
+      textColor = '#00F0FF';
+      fontSize = 62;
+    } else if (i === displayLines.length - 1) {
+      textColor = '#FF3344';
+      fontSize = 64;
+    }
 
-    // Stroke
-    ctx.font = '900 58px NotoSans, sans-serif';
-    ctx.strokeStyle = '#05080E';
-    ctx.lineWidth = 12;
+    ctx.font = `900 ${fontSize}px NotoSans, sans-serif`;
+
+    // High-impact multi-layer drop shadow for maximum 3D pop
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.96)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+
+    // Dark outline stroke
+    ctx.strokeStyle = '#04070D';
+    ctx.lineWidth = 14;
     ctx.strokeText(line, width / 2, yPos);
 
-    // Fill
+    // If final line, add subtle red warning underplate
+    if (i === displayLines.length - 1) {
+      ctx.save();
+      const txtWidth = ctx.measureText(line).width;
+      ctx.fillStyle = 'rgba(255, 42, 85, 0.18)';
+      ctx.beginPath();
+      ctx.roundRect((width - txtWidth - 36) / 2, yPos + 6, txtWidth + 36, fontSize + 12, 12);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Front fill
     ctx.fillStyle = textColor;
     ctx.fillText(line, width / 2, yPos);
   });
 
-  // Glowing neon underline
+  // Glowing neon underline with diamond terminal endpoints
   const lastLineY = startY + displayLines.length * lineHeight;
   ctx.strokeStyle = '#00FF66';
-  ctx.lineWidth = 6;
+  ctx.lineWidth = 5.5;
   ctx.shadowColor = '#00FF66';
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 16;
   ctx.beginPath();
-  ctx.moveTo(110, lastLineY + 6);
-  ctx.lineTo(width - 110, lastLineY + 6);
+  ctx.moveTo(90, lastLineY + 12);
+  ctx.lineTo(width - 90, lastLineY + 12);
   ctx.stroke();
+
+  // Terminal Diamond Endpoints
+  ctx.fillStyle = '#00FF66';
+  ctx.fillRect(86, lastLineY + 8, 8, 8);
+  ctx.fillRect(width - 94, lastLineY + 8, 8, 8);
   ctx.restore();
 
-  // 7. Hero Stickman in Action
+  // -------------------------------------------------------------
+  // 8. Visual Scene Staging: Stickman + Threats + Stalker
+  // -------------------------------------------------------------
   const poseAtlasPath = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/character-pose-sheet-v6.png');
+  let atlas = null;
   if (fs.existsSync(poseAtlasPath)) {
-    const atlas = await loadImage(poseAtlasPath);
+    atlas = await loadImage(poseAtlasPath);
+  }
+
+  // A. Lurking Hacker Silhouette in background behind the hardware
+  if (atlas) {
+    const sw = atlas.width / 3;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.shadowColor = '#FF3B30';
+    ctx.shadowBlur = 18;
+    const hkW = 320;
+    const hkH = hkW * atlas.height / sw;
+    const hkX = 450;
+    const hkY = 480;
+    // Hacker peeking (Pose 1)
+    ctx.drawImage(atlas, 1 * sw, 0, sw, atlas.height, hkX, hkY, hkW, hkH);
+    ctx.restore();
+  }
+
+  // B. Hero Stickman (Pose 2 Shocked / Panicked)
+  if (atlas) {
     const sw = atlas.width / 3;
     const pIdx = Math.max(0, Math.min(2, opts.pose));
 
     ctx.save();
-    ctx.shadowColor = 'rgba(0, 240, 255, 0.45)';
-    ctx.shadowBlur = 28;
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.65)';
+    ctx.shadowBlur = 32;
 
     const smW = 460;
     const smH = smW * atlas.height / sw;
-    const smX = 60;
-    const smY = 490;
+    const smX = 40;
+    const smY = 470;
     ctx.drawImage(atlas, pIdx * sw, 0, sw, atlas.height, smX, smY, smW, smH);
+    ctx.restore();
+
+    // Shock / Panic Emoticon Accents around head
+    ctx.save();
+    ctx.font = '900 38px NotoSans, sans-serif';
+    ctx.fillStyle = '#FFE600';
+    ctx.shadowColor = '#FFE600';
+    ctx.shadowBlur = 14;
+    // Shock marks
+    ctx.fillText('! !', smX + 110, smY + 50);
+    ctx.fillText('! !', smX + smW - 140, smY + 50);
+
+    // Speed / panic rays near head
+    ctx.strokeStyle = '#FFE600';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(smX + 80, smY + 90); ctx.lineTo(smX + 50, smY + 80);
+    ctx.moveTo(smX + 90, smY + 60); ctx.lineTo(smX + 65, smY + 40);
+    ctx.moveTo(smX + smW - 90, smY + 90); ctx.lineTo(smX + smW - 60, smY + 80);
+    ctx.moveTo(smX + smW - 100, smY + 60); ctx.lineTo(smX + smW - 75, smY + 40);
+    ctx.stroke();
     ctx.restore();
   }
 
-  // 8. Cyber Prop Icon
-  let propFile = opts.prop;
-  if (!propFile || !fs.existsSync(propFile)) {
+  // C. Hardware Props & Threat Staging
+  const laptopFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-laptop.png');
+  if (fs.existsSync(laptopFile)) {
+    const laptopImg = await loadImage(laptopFile);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.55)';
+    ctx.shadowBlur = 25;
+    const lpW = 280;
+    const lpH = lpW * laptopImg.height / laptopImg.width;
+    const lpX = 400;
+    const lpY = 690;
+    ctx.drawImage(laptopImg, lpX, lpY, lpW, lpH);
+    ctx.restore();
+  }
+
+  // D. Floating Threat Prop (Skull or Shield or Padlock)
+  let threatFile = opts.prop;
+  if (!threatFile || !fs.existsSync(threatFile)) {
     if (lowerTitle.includes("kripto")) {
-      propFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-padlock-unlocked.png');
+      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-padlock-unlocked.png');
     } else if (lowerTitle.includes("koru") || lowerTitle.includes("2fa")) {
-      propFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-shield.png');
+      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-shield.png');
     } else if (lowerTitle.includes("wifi")) {
-      propFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-wifi.png');
+      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-wifi.png');
     } else {
-      propFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-skull.png');
+      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-skull.png');
     }
   }
 
-  if (fs.existsSync(propFile)) {
-    const propImg = await loadImage(propFile);
+  if (fs.existsSync(threatFile)) {
+    const threatImg = await loadImage(threatFile);
     ctx.save();
-    ctx.shadowColor = 'rgba(255, 59, 48, 0.75)';
-    ctx.shadowBlur = 30;
+    ctx.shadowColor = 'rgba(255, 42, 85, 0.85)';
+    ctx.shadowBlur = 32;
 
-    const propW = 230;
-    const propH = propW * propImg.height / propImg.width;
-    const propX = 435;
-    const propY = 620;
-    ctx.drawImage(propImg, propX, propY, propW, propH);
+    const trW = 190;
+    const trH = trW * threatImg.height / threatImg.width;
+    const trX = 460;
+    const trY = 530;
+    ctx.drawImage(threatImg, trX, trY, trW, trH);
     ctx.restore();
   }
 
-  // 9. Warning Danger Arrow pointing between prop and stickman
+  // E. Dynamic High-Voltage Threat Arrow
   ctx.save();
-  ctx.strokeStyle = '#FF3B30';
-  ctx.lineWidth = 6;
-  ctx.shadowColor = '#FF3B30';
-  ctx.shadowBlur = 12;
+  ctx.strokeStyle = '#FF2A55';
+  ctx.lineWidth = 6.5;
+  ctx.shadowColor = '#FF2A55';
+  ctx.shadowBlur = 18;
   ctx.beginPath();
-  ctx.moveTo(435, 680);
-  ctx.lineTo(375, 720);
+  ctx.moveTo(460, 640);
+  ctx.lineTo(360, 690);
   ctx.stroke();
+
+  // Arrow Head
   ctx.beginPath();
-  ctx.moveTo(375, 720);
-  ctx.lineTo(395, 705);
-  ctx.moveTo(375, 720);
-  ctx.lineTo(395, 735);
+  ctx.moveTo(360, 690);
+  ctx.lineTo(385, 670);
+  ctx.moveTo(360, 690);
+  ctx.lineTo(385, 710);
   ctx.stroke();
   ctx.restore();
 
-  // 10. High-Converting Call to Action Banner
+  // F. Warning Status Box next to laptop
   ctx.save();
-  const ctaY = 1110;
-  const ctaH = 70;
-  const ctaW = width - 100;
-  const ctaX = 50;
+  const alertBoxX = 430;
+  const alertBoxY = 960;
+  const alertBoxW = 240;
+  const alertBoxH = 42;
 
+  ctx.fillStyle = 'rgba(255, 42, 85, 0.15)';
+  ctx.strokeStyle = '#FF3B30';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.roundRect(alertBoxX, alertBoxY, alertBoxW, alertBoxH, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.font = '800 17px NotoSans, sans-serif';
+  ctx.fillStyle = '#FFE600';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚠️ ŞİFRE SIZDIRILDI!', alertBoxX + alertBoxW / 2, alertBoxY + alertBoxH / 2);
+  ctx.restore();
+
+  // -------------------------------------------------------------
+  // 9. High-Converting Bottom Call-To-Action (CTA) Plate
+  // -------------------------------------------------------------
+  ctx.save();
+  const ctaY = 1115;
+  const ctaH = 78;
+  const ctaW = width - 80;
+  const ctaX = 40;
+
+  // Gradient fill
   const ctaGrad = ctx.createLinearGradient(ctaX, 0, ctaX + ctaW, 0);
   ctaGrad.addColorStop(0, '#00FF66');
-  ctaGrad.addColorStop(1, '#00F0FF');
+  ctaGrad.addColorStop(0.5, '#00F0FF');
+  ctaGrad.addColorStop(1, '#00FF88');
   ctx.fillStyle = ctaGrad;
-  ctx.shadowColor = 'rgba(0, 255, 102, 0.45)';
-  ctx.shadowBlur = 22;
+
+  // Intense neon bloom
+  ctx.shadowColor = 'rgba(0, 255, 102, 0.55)';
+  ctx.shadowBlur = 28;
   ctx.beginPath();
-  ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 35);
+  ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 39);
   ctx.fill();
 
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#05080E';
+  // High contrast bold label
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#04070D';
   ctx.font = '900 30px NotoSans, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText("⚡ 30 SANİYEDE ÖĞREN · İZLE ↗", width / 2, ctaY + ctaH / 2);
+  ctx.fillText("⚡ 30 SANİYEDE KORUN · ŞİMDİ İZLE ↗", width / 2, ctaY + ctaH / 2);
   ctx.restore();
 
-  // Ensure output directory exists and write JPEG
+  // -------------------------------------------------------------
+  // 10. Master Output Encoding
+  // -------------------------------------------------------------
   const outDir = path.dirname(opts.out);
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
 
-  const buf = canvas.toBuffer('image/jpeg', { quality: 95 });
+  // Quality 98 JPEG for pristine clarity without artifacting
+  const buf = canvas.toBuffer('image/jpeg', { quality: 98 });
   fs.writeFileSync(opts.out, buf);
 }
 
@@ -287,4 +464,3 @@ main().catch(err => {
   console.error(err);
   process.exit(1);
 });
-
