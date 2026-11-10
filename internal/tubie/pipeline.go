@@ -98,7 +98,7 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 		"duration":           dur,
 		"captionStyle":       "viral",
 		"captionSize":        56,
-		"captionY":           1460,
+		"captionY":           1780,
 		"captionColor":       "#00FF66",
 		"captionActiveColor": "#00FF66",
 		"captionBg":          "rgba(7, 12, 20, 0.96)",
