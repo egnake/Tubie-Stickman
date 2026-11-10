@@ -35,10 +35,5 @@ jobs:
         run: python -m pip install --no-deps -e . Pillow
       - name: Run regression checks
         run: python scripts/check.py
-      - name: Check Linux launcher
-        if: runner.os == 'Linux'
-        run: ./uret.sh --help
-      - name: Check Windows launcher
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: uret.bat --help
+      - name: Check shared launcher
+        run: python baslat.py --help

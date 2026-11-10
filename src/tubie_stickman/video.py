@@ -781,9 +781,15 @@ class CyberStoryboardDirector:
 # ==============================================================================
 
 class CyberVideoPipeline:
-    def __init__(self, mode: str = "auto", voice_name: str = "tr-TR-AhmetNeural"):
+    def __init__(self, mode: str = "auto", voice_name: str = "tr-TR-AhmetNeural", reporter=None, review=None):
         self.voice_engine = VoiceEngine(mode=mode, voice_name=voice_name)
         self.aligner = WordAligner()
+        self.reporter = reporter
+        self.review = review
+
+    def report(self, stage, label):
+        if self.reporter:
+            self.reporter(stage=stage, label=label)
 
     def produce(self, script_data: Dict[str, Any]) -> Path:
         title = script_data["title"]
@@ -800,16 +806,19 @@ class CyberVideoPipeline:
         project_dir.mkdir(parents=True, exist_ok=True)
 
         # 1. Seslendirme Üret
+        self.report('voice', 'Seslendirme hazırlanıyor')
         narration_wav = project_dir / "narration.wav"
         duration, mode_used = self.voice_engine.synthesize(narration, narration_wav)
 
         # 2. Faster-Whisper ile Kelime Hizalama & Viral Altyazılar
+        self.report('captions', 'Kelime zamanlamaları çıkarılıyor')
         print(f"🧠 Faster-Whisper GPU ile kelime zamanlamaları çıkarılıyor...")
         words = self.aligner.align(narration_wav)
         captions = self.aligner.build_viral_captions(words)
         print(f"✅ Toplam {len(captions)} adet ritmik karaoke altyazı bloğu hazırlandı.")
 
         # 3. Siber Sahne Kurgusu (Dark Cyber Theme)
+        self.report('storyboard', 'Sahneler ve ses tasarımı hazırlanıyor')
         director = CyberStoryboardDirector(scenes, duration)
         shots, sfx = director.build_storyboard()
 
@@ -850,16 +859,23 @@ class CyberVideoPipeline:
 
         # 6. Render Aşaması
         autopilot_script = SKILL_DIR / "scripts" / "autopilot.mjs"
+        live = ['--live'] if self.reporter else []
+        self.report('preview', 'Önizleme oluşturuluyor')
         print(f"[1/3] Video önizlemesi oluşturuluyor...")
-        subprocess.run([NODE_EXE, str(autopilot_script), "preview", str(project_dir / "project.json"), "--replace"], check=True)
+        subprocess.run([NODE_EXE, str(autopilot_script), "preview", str(project_dir / "project.json"), "--replace", *live], check=True)
 
+        if self.review:
+            self.review(project_dir)
         print(f"[2/3] Önizleme onaylanıyor...")
-        subprocess.run([NODE_EXE, str(autopilot_script), "approve", str(project_dir / "project.json"), "--note", "Otomatik Onay: Siber Guvenlik Viral Video"], check=True)
+        note = 'Kullanıcı GUI üzerinden önizlemeyi onayladı' if self.review else 'Otomatik Onay: Siber Guvenlik Viral Video'
+        subprocess.run([NODE_EXE, str(autopilot_script), "approve", str(project_dir / "project.json"), "--note", note], check=True)
 
+        self.report('render', 'Son video işleniyor')
         print(f"[3/3] Tam video MP4 olarak render ediliyor...")
-        subprocess.run([NODE_EXE, str(autopilot_script), "render", str(project_dir / "project.json"), "--full", "--replace"], check=True)
+        subprocess.run([NODE_EXE, str(autopilot_script), "render", str(project_dir / "project.json"), "--full", "--replace", *live], check=True)
 
         # 7. Final Dosyaları output Klasörüne Kopyala
+        self.report('export', 'Video ve altyazılar kaydediliyor')
         film_mp4 = project_dir / "output" / "film.mp4"
         final_video_path = OUTPUT_DIR / f"{slug}.mp4"
         final_srt_path = OUTPUT_DIR / f"{slug}.srt"

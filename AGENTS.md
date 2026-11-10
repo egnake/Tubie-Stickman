@@ -19,15 +19,17 @@
 Run from the repository root:
 ```bash
 python scripts/check.py
-bash tests/verify-readmes.sh
-bash tests/verify-classic-character.sh
-./uret.sh --help
+python tests/verify-readmes.py
+python tests/verify-classic-character.py
+python baslat.py --help
 ```
+
+Shell/batch launchers were replaced by `baslat.py`; keep repository-owned `.sh` and `.bat` files absent.
 
 ## Repo-specific conventions
 - **Editable install / `PYTHONPATH`**: `src/tubie_stickman/runtime.py` computes `ROOT_DIR` from `Path(__file__).resolve().parents[2]` to locate `skills/` and `assets/`. Always use editable installs (`pip install -e .`) or `PYTHONPATH=src`.
 - **Node dependencies**: Workspace dependencies (`@napi-rs/canvas`, `sharp`) belong to `skills/directing-stickman-videos/package.json` and are installed from the repo root via `npm ci`.
-- **Line endings**: `.gitattributes` enforces `LF` for `.py`, `.mjs`, `.sh`, `.md`, `.json`, `.yml` and `CRLF` for `.bat`. Preserve `LF` on Markdown and text assets so byte-level SHA-256 checks pass on both Linux and Windows.
+- **Line endings**: `.gitattributes` enforces `LF` for `.py`, `.mjs`, `.md`, `.json`, `.yml`, `.html`, `.css`, and `.js`. Preserve `LF` on Markdown and text assets so byte-level SHA-256 checks pass on both Linux and Windows.
 
 ## Change safety rules
 - **Catalog docs (`docs/catalog/`)**:
