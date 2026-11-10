@@ -129,6 +129,47 @@ func TestBuildStoryboard(t *testing.T) {
 	}
 }
 
+func TestBuildSoundDesign(t *testing.T) {
+	scenes := []tubie.SceneDefinition{
+		{Title: "SAHTE DM TUZAĞI", SFX: "keyboard"},
+		{Title: "ŞİFREN ELE GEÇİRİLDİ", SFX: "alert"},
+		{Title: "HESAP KONTROLÜ KAYBEDİLDİ", SFX: "glitch"},
+		{Title: "2FA İLE KORU", SFX: "lock"},
+	}
+	totalDur := 20.0
+	sfx := tubie.BuildSoundDesign(scenes, totalDur)
+	if len(sfx) == 0 {
+		t.Fatal("expected non-empty sfx cues")
+	}
+
+	prevTime := -0.001
+	kinds := make(map[string]bool)
+	for i, cue := range sfx {
+		tVal := cue["time"].(float64)
+		gain := cue["gain"].(float64)
+		kind := cue["kind"].(string)
+
+		if tVal < prevTime {
+			t.Errorf("cue %d: time %.3f is not monotonic (prev %.3f)", i, tVal, prevTime)
+		}
+		if tVal >= totalDur {
+			t.Errorf("cue %d: time %.3f exceeds total duration %.3f", i, tVal, totalDur)
+		}
+		if gain <= 0 || gain > 0.30 {
+			t.Errorf("cue %d: gain %.3f invalid (must be 0..0.30)", i, gain)
+		}
+		prevTime = tVal
+		kinds[kind] = true
+	}
+
+	// Verify essential sound design kinds are present
+	for _, expectedKind := range []string{"pop", "paper", "jingle"} {
+		if !kinds[expectedKind] {
+			t.Errorf("expected sound design kind %q was not generated", expectedKind)
+		}
+	}
+}
+
 func TestGenerateScript(t *testing.T) {
 	res, err := tubie.GenerateScript("İnstagram hesap çalma")
 	if err != nil {

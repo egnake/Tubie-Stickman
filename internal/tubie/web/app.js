@@ -161,6 +161,10 @@ function updateControls() {
   $('#approve').disabled = pending || disconnected;
 }
 $('#generate').addEventListener('click', () => {
+  const voiceStyle = $('#voice-style')?.value || 'viral-male';
+  const bgm = $('#bgm-choice')?.value || 'cyber';
+  const mode = voiceStyle === 'cloned' ? 'cloned' : 'pro';
+
   if (currentTopicMode === 'ai' || !$('#all').checked) {
     const title = $('#custom-title').value.trim();
     const narration = $('#custom-narration').value.trim();
@@ -170,7 +174,9 @@ $('#generate').addEventListener('click', () => {
     }
     action('job', {
       action: 'generate',
-      mode: $('#mode').value,
+      mode: mode,
+      voice_style: voiceStyle,
+      bgm: bgm,
       custom: {
         title: title || 'Siber Güvenlik Videosu',
         narration: narration,
@@ -181,7 +187,9 @@ $('#generate').addEventListener('click', () => {
     action('job', {
       action: 'generate',
       presets: selected(),
-      mode: $('#mode').value
+      mode: mode,
+      voice_style: voiceStyle,
+      bgm: bgm
     });
   }
 });

@@ -345,10 +345,12 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Action  string   `json:"action"`
-		Presets []string `json:"presets"`
-		Mode    string   `json:"mode"`
-		Custom  *struct {
+		Action     string   `json:"action"`
+		Presets    []string `json:"presets"`
+		Mode       string   `json:"mode"`
+		VoiceStyle string   `json:"voice_style"`
+		BGM        string   `json:"bgm"`
+		Custom     *struct {
 			Title     string            `json:"title"`
 			Slug      string            `json:"slug"`
 			Narration string            `json:"narration"`
@@ -393,13 +395,13 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 
-	go s.runJob(req.Action, req.Presets, req.Mode, customPreset)
+	go s.runJob(req.Action, req.Presets, req.Mode, req.VoiceStyle, req.BGM, customPreset)
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write([]byte(`{"ok":true}`))
 }
 
-func (s *StudioServer) runJob(action string, presets []string, mode string, customPreset *Preset) {
+func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle, bgm string, customPreset *Preset) {
 	ctx := s.cancelCtx
 
 	defer func() {
@@ -427,8 +429,10 @@ func (s *StudioServer) runJob(action string, presets []string, mode string, cust
 
 	if action == "generate" {
 		pipeline := &Pipeline{
-			Root: s.root,
-			Mode: mode,
+			Root:       s.root,
+			Mode:       mode,
+			VoiceStyle: voiceStyle,
+			BGM:        bgm,
 			Reporter: func(ev map[string]any) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
