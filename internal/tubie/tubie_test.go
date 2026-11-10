@@ -214,3 +214,26 @@ func TestViralMetadata(t *testing.T) {
 	}
 }
 
+func TestGenerateDedicatedThumbnail(t *testing.T) {
+	root, err := tubie.FindRoot()
+	if err != nil {
+		t.Fatalf("FindRoot failed: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	outThumb := filepath.Join(tmpDir, "test_thumbnail.jpg")
+
+	err = tubie.GenerateDedicatedThumbnail(root, "Instagram Hesabınız Nasıl Çalınır?", "sosyal medya tuzağı", "", 2, outThumb, "")
+	if err != nil {
+		t.Fatalf("GenerateDedicatedThumbnail failed: %v", err)
+	}
+
+	fi, err := os.Stat(outThumb)
+	if err != nil {
+		t.Fatalf("thumbnail file not found: %v", err)
+	}
+	if fi.Size() < 5000 {
+		t.Fatalf("thumbnail file suspiciously small: %d bytes", fi.Size())
+	}
+}
+
