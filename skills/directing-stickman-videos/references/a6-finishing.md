@@ -22,9 +22,9 @@ For the approved **720×1280 / 24fps** vertical layout (scale for other resoluti
 
 ## Reusable local finishing
 
-Use [a6_finish.py](../scripts/a6_finish.py) for deterministic title/caption packaging of an **already edited clean picture** plus its **approved synchronized final audio mix**. The Agent prepares the montage/mix and corrected alignment first; this tool does not generate clips, synthesize speech, choose semantic breaks, add SFX or read a private Flow URL. Do not claim this helper alone is the entire two-provider workflow.
+Use [a6_finish.go](../scripts/a6_finish.go) for deterministic title/caption packaging of an **already edited clean picture** plus its **approved synchronized final audio mix**. The Agent prepares the montage/mix and corrected alignment first; this tool does not generate clips, synthesize speech, choose semantic breaks, add SFX or read a private Flow URL. Do not claim this helper alone is the entire two-provider workflow.
 
-Requirements: Python 3 with Pillow, FFmpeg/FFprobe, and Impact plus DIN Condensed Bold (or an explicitly approved close substitute passed by path). Do not install dependencies or substitute a different look silently. No external generation calls are made by this renderer.
+Requirements: Go 1.22+, FFmpeg/FFprobe, and Impact plus DIN Condensed Bold (or an explicitly approved close substitute passed by path). Do not install dependencies or substitute a different look silently. No external generation calls are made by this renderer.
 
 Create a project-specific JSON manifest; resolve media/font paths relative to that manifest:
 
@@ -51,8 +51,8 @@ Create a project-specific JSON manifest; resolve media/font paths relative to th
 Optional `caption_font` / `title_font` paths set available approved fonts. Both default to the bundled Noto Sans; set these explicitly when a specific approved look or additional glyph coverage is required. `FFMPEG` and `FFPROBE` may point to executable files when they are not on PATH. Correct ASR against the approved script before using its word timings; normalize spoken numerals in the alignment (e.g. ASR `10` → script `ten`) rather than silently changing displayed script content. The example is a schema illustration, not timing for a different story.
 
 ```sh
-python3 scripts/a6_finish.py --config project/a6-finish.json --validate-only
-python3 scripts/a6_finish.py --config project/a6-finish.json --output-dir project/a6-final
+go run scripts/a6_finish.go --config project/a6-finish.json --validate-only
+go run scripts/a6_finish.go --config project/a6-finish.json --output-dir project/a6-final
 ```
 
 The output directory must be new or empty. The renderer validates script/cue/word content and non-overlapping times, draws the approved profile, copies AAC mix packets unchanged (or encodes a non-AAC mix once), exports plain SRT, proof frames/contact sheet and a hash/probe/decode manifest. SRT carries text/timing, not the burned-in highlight/pop styling. Retain source hashes, provider/job IDs and the project checkpoint. Do not rerender unchanged accepted clips or regenerate voice to revise only a title/caption.
