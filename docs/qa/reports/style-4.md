@@ -27,7 +27,7 @@ The content mapping was checked from actual video frames, not file-manager thumb
 
 ## Regression checks
 
-`tests/verify-cozy-storytelling.py` tests semantic plan fixtures: different-location success, explicit single-location exception, prop uniqueness, screen-down face, irreversible departure, two-arm/two-leg count, voice profile identity, static-design versus initial-state scope, and scene-local effects. Eight bad mutations must be rejected. These fixtures test the contract, not model behavior. Routing and media-file checks supplement existing README, classic-character and shared-voice regressions.
+`TestVerifyCozyStorytelling` in `tests/verify_test.go` tests semantic plan fixtures: different-location success, explicit single-location exception, prop uniqueness, screen-down face, irreversible departure, two-arm/two-leg count, voice profile identity, static-design versus initial-state scope, and scene-local effects. Eight bad mutations must be rejected. These fixtures test the contract, not model behavior. Routing and media-file checks supplement existing README, classic-character and shared-voice regressions.
 
 ## Publication boundaries
 

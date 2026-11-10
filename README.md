@@ -1,43 +1,45 @@
 # Tubie-Stickman
 
-Türkçe siber güvenlik videoları için seslendirme, kelime zamanlaması ve çöp adam animasyonu üretim araçları. Windows ve Linux için koyu temalı Tubie Studio GUI’si ve Node.js render motoru içerir.
+Türkçe siber güvenlik videoları için seslendirme, kelime zamanlaması ve çöp adam animasyonu üretim araçları. Windows ve Linux için koyu temalı Tubie Studio GUI’si ve Go tabanlı video üretim motoru içerir.
 
 ## Kurulum
 
-**Önerilen ortam:** Python 3.11, Node.js 22 LTS veya üzeri, FFmpeg ve FFprobe. Python komutları proje kökünden, sanal ortam içinde çalıştırılır. Python paketinin dışındaki görsel ve font dosyaları da kullanıldığı için **düzenlenebilir kurulum** (`-e`) gereklidir; depoyu kurulumdan sonra taşımayın.
+**Önerilen ortam:** Go 1.22+, Node.js 22 LTS veya üzeri, FFmpeg ve FFprobe. Uygulama, proje kökünden Go araç zinciri ile doğrudan çalıştırılır veya derlenir. Paket dışındaki görsel ve font dosyaları da kullanıldığı için depoyu kurulumdan sonra taşımayın.
 
 ### CachyOS / Arch Linux
 
 ```bash
-sudo pacman -Syu --needed git nodejs-lts-jod npm ffmpeg portaudio uv
+sudo pacman -Syu --needed git nodejs-lts-jod npm ffmpeg go
 
 git clone https://github.com/egnake/Tubie-Stickman.git
 cd Tubie-Stickman
-uv venv --python 3.11
-source .venv/bin/activate
-uv pip install -e ".[dev]"
 npm ci
-python baslat.py
+go run .
 ```
 
-Arch'ın sistem Python sürümünü değiştirmeyin. `uv`, seçilen Python sürümünü ayrı olarak yönetir. Sistemde güncel Node.js zaten varsa ayrıca `nodejs-lts-jod` kurmanız gerekmez. Paket seçimi ve Python ortamları için [Arch paketleri](https://archlinux.org/packages/) ve [uv belgeleri](https://docs.astral.sh/uv/guides/install-python/).
+Sistemde güncel Node.js ve Go zaten varsa ek paket kurmanız gerekmez.
 
 ### Diğer Linux dağıtımları
 
-Dağıtımınızın paket yöneticisinden Node.js, FFmpeg ve mikrofon için PortAudio kurun. Ardından yukarıdaki `uv venv` ile başlayan adımları uygulayın. Uygun Python zaten kuruluysa `python3.11 -m venv .venv` ve etkinleştirmeden sonra `python -m pip install -e ".[dev]"` kullanılabilir.
+Dağıtımınızın paket yöneticisinden Go 1.22+, Node.js ve FFmpeg kurun. Ardından proje kökünde `npm ci` ve `go run .` komutlarıyla uygulamayı başlatın.
 
 ### Windows 10 / 11
 
-Python 3.11, Node.js ve FFmpeg kurun; `python`, `node`, `ffmpeg` ve `ffprobe` komutlarının terminalden bulunduğunu doğrulayın. Proje kökünde PowerShell veya CMD açın:
+Go 1.22+, Node.js ve FFmpeg kurun; `go`, `node`, `ffmpeg` ve `ffprobe` komutlarının terminalden bulunduğunu doğrulayın. Proje kökünde PowerShell veya CMD açın:
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[dev]"
 npm ci
-py baslat.py
+go run .
 ```
 
-Tek başlatıcı `baslat.py`, projenin `.venv` ortamını otomatik seçer ve Tubie Studio’yu varsayılan tarayıcıda açar. Sanal ortamı elle etkinleştirmek zorunlu değildir. Linux’ta `python3 baslat.py`, Windows’ta `py baslat.py` kullanın. Arayüz yalnızca bu bilgisayardan erişilen rastgele bir yerel adreste çalışır; ek bir GUI paketi gerekmez.
+İsteğe bağlı olarak tek bir yürütülebilir ikili derleyebilirsiniz:
+
+```powershell
+go build -o tubie.exe .
+.\tubie.exe
+```
+
+Tubie Studio varsayılan tarayıcıda otomatik olarak açılır. Arayüz yalnızca bu bilgisayardan erişilen rastgele bir yerel adreste çalışır; ek bir GUI paketi gerekmez.
 
 ## Kullanım
 
@@ -48,15 +50,15 @@ Arayüzü kapatmak için **Uygulamayı kapat** düğmesini kullanın. Tarayıcı
 Geliştirme ve otomasyon için komut satırı da kullanılabilir:
 
 ```bash
-python baslat.py                   # Tubie Studio GUI
-python baslat.py record            # GUI ses merkezi
-python baslat.py doctor            # Bağımlılık kontrolü
-python baslat.py generate --preset 1 --mode pro
-python baslat.py generate --all --mode pro
-python baslat.py gui --no-browser  # Adresi yazdır; tarayıcıyı elle aç
+go run .                          # Tubie Studio GUI
+go run . record                   # GUI ses merkezi
+go run . doctor                   # Bağımlılık kontrolü
+go run . generate --preset 1 --mode pro
+go run . generate --all --mode pro
+go run . gui --no-browser         # Adresi yazdır; tarayıcıyı elle aç
 ```
 
-Etkin sanal ortamda aynı komutlar `tubie` ile de kullanılabilir. `.bat` ve `.sh` başlatıcıları kaldırılmıştır.
+Derlenmiş ikili ile aynı komutlar `./tubie` (veya Windows'ta `.\tubie.exe`) ile doğrudan çalıştırılabilir. `.bat`, `.sh` ve Python başlatıcıları kaldırılmıştır.
 
 | Şablon | Konu |
 | --- | --- |
@@ -65,29 +67,24 @@ Etkin sanal ortamda aynı komutlar `tubie` ile de kullanılabilir. `.bat` ve `.s
 | 3 | SQL injection |
 | 4 | Phishing / oltalama |
 
-`--mode pro` Edge TTS üzerinden ses üretir ve **internet gerektirir**. `--mode cloned` yerel XTTS-v2 kullanır; ek kurulum ve `sesim.wav` referansı gerekir. `auto`, referans varsa klonlama yolunu seçer. Modeller ilk kullanımda indirilir. CUDA bulunmadığında CPU kullanılır; CPU ile üretim daha uzun sürer.
+`--mode pro` Edge TTS üzerinden ses üretir ve **internet gerektirir**. `--mode cloned` yerel ses klonlama referansı (`sesim.wav`) kullanır. `auto`, referans varsa klonlama yolunu seçer.
 
 Üretilen videolar `output/`, ara dosyalar `projects/` altına yazılır. Bunlar ve kişisel `sesim.wav` kaydı Git tarafından dışlanır. Depodaki mevcut örnekler `examples/` altındadır.
 
 ## Ses klonlama ve GPU
 
-```bash
-# Etkin sanal ortamda, isteğe bağlı XTTS bağımlılıkları:
-python -m pip install -e ".[clone]"
-```
-
-GPU kullanımı için donanımınıza ve işletim sisteminize uygun PyTorch kurulumunu [resmî seçiciden](https://pytorch.org/get-started/locally/) yapın. PyTorch CUDA erişimi ile Faster-Whisper'ın CUDA/cuDNN gereksinimleri ayrıdır; ayrıntılar [kurulum rehberinde](docs/setup.md). CPU kullanımı için NVIDIA kart gerekmez. XTTS modelinin lisans koşulları ayrıca değerlendirilmelidir.
+Temel profesyonel seslendirme modu (`pro`) doğrudan Edge TTS üzerinden çalışır ve harici Python veya GPU kütüphanelerine ihtiyaç duymaz. Kendi sesinizi kullanmak için GUI Ses sekmesinden 15 saniyelik referans kaydı alabilir veya hazır bir WAV dosyası yükleyebilirsiniz.
 
 ## Klasör yapısı
 
 ```text
-src/tubie_stickman/             Python uygulaması, GUI ve CLI
+cmd/                           Tubie CLI ve yardımcı araçlar
+internal/tubie/                Go tabanlı video işleme, GUI ve CLI mantığı
 skills/directing-stickman-videos/  Node render motoru, stil varlıkları ve skill
 assets/                        Ortak ses dosyaları ve katalog medyası
 docs/                          Kurulum, kullanım, stil kataloğu ve QA kayıtları
 examples/                      Korunan örnek proje ve video çıktıları
-scripts/                       Geliştirme ve varlık üretim araçları
-tests/                         Python testleri ve belge/kontrat kontrolleri
+tests/                         Go regresyon testleri ve kontrat kontrolleri
 projects/                      Üretim sırasında oluşan ara dosyalar (Git dışı)
 output/                        Yeni video çıktıları (Git dışı)
 ```
@@ -98,11 +95,10 @@ Render motoru kendi içinde dağıtılabilen bir skill olduğu için bağımlıl
 
 ```bash
 npm ci
-python -m pip install -e ".[dev]"
-python scripts/check.py
+go run ./cmd/check
 ```
 
-Kontroller Python testlerini, belgeleri ve Node render testlerini çalıştırır; ücretli API çağrısı veya model indirmesi yapmaz. CI aynı kontrolleri Windows ve Linux üzerinde çalıştırmak üzere yapılandırılmıştır.
+Kontroller Go testlerini (`internal/tubie` ve `tests/verify_test.go`), belgeleri ve Node render testlerini çalıştırır; ücretli API çağrısı veya model indirmesi yapmaz. CI aynı kontrolleri Windows ve Linux üzerinde çalıştırmak üzere yapılandırılmıştır.
 
 - [Kurulum ve sorun giderme](docs/setup.md)
 - [Kullanım rehberi](docs/usage.md)

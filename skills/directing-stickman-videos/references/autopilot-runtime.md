@@ -91,7 +91,7 @@ Exports include an encoded opening-audio diagnostic. Approval is blocked on a fl
 - `approve PROJECT --note "…"`: record a genuine user sample/full-production approval, binding the reviewed sample and its production settings rather than unfinished later shots.
 - `render PROJECT`: validate all full-film media/timing, verify the scoped sample approval, then resume full local composition. Later-shot completion does not itself require re-approving an unchanged sample.
 
-`scripts/align_captions.py AUDIO --output WORDS.json` uses optional `openai-whisper` and an already cached `base` model. Set `--model NAME`, `--language en`, `--device cpu` as appropriate. `--allow-model-download` explicitly permits model download; otherwise it stops if absent. Do not install or download multi-GB models automatically. Already supplied aligned captions need no Whisper dependency.
+`scripts/align_captions.go AUDIO --output WORDS.json` uses an optional Whisper CLI and an already cached `base` model. Set `--model NAME`, `--language en`, `--device cpu` as appropriate. `--allow-model-download` explicitly permits model download; otherwise it stops if absent. Do not install or download multi-GB models automatically. Already supplied aligned captions need no Whisper dependency.
 
 ## Optional Gemini API adapters
 

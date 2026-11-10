@@ -12,13 +12,13 @@ Date: 2026-10-25. Scope: existing `directing-stickman-videos`, A5 only. No new g
 
 ## Checks
 
-PASS: `verify-first-use-guidance.py`, `verify-historical-cartoon.py`, `verify-ab-preservation.py`, `verify-b-common-quality.py`, `verify-voice-continuity.py`, `verify-cozy-storytelling.py`, and `git diff --check`.
+PASS: `tests/verify_test.go`, `go run ./cmd/check`, and `git diff --check`.
 
 PASS: exact comparison of CHARACTER/FACE/PALMS/EXPOSED LIMBS to the owner-supplied source. Anchor SHA-256: `f7f8161688c3c17a4379eaf5e4d64d7c0888f7e4b94ef59b7beb3dcafc785a8e`.
 
 Root entry remains 13,997 bytes. Static checks verify instructions and scope, not model behavior or generated-video quality. Three new A5 conversational acceptance cases are authored but not model-run.
 
-The generic Qiaomu package validator did not pass: this legacy package lacks its required `README.md`, `agents/interface.yaml` and `manifest.json` layout. No unrelated package migration was performed. The generic quick validator could not run under the current Python because PyYAML is absent; no dependencies were installed solely for that check.
+The generic Qiaomu package validator did not pass: this legacy package lacks its required `README.md`, `agents/interface.yaml` and `manifest.json` layout. No unrelated package migration was performed. The generic quick validator could not run because PyYAML is absent; no dependencies were installed solely for that check.
 
 ## Evidence boundary
 

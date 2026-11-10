@@ -2,8 +2,8 @@
 
 ## Must-follow constraints
 - **Do not edit hash-locked Director (`A1`–`A5`) or Voice contracts** without updating their SHA-256 baselines:
-  - `skills/directing-stickman-videos/SKILL.md` from `## A · Director` to EOF is byte-locked in `tests/verify-ab-preservation.py` and `tests/verify-first-use-guidance.py`.
-  - `skills/directing-stickman-videos/references/{style-catalog,prehistoric-dark-comedy,cozy-storytelling,historical-cartoon,voice-continuity,storyboard-template,omni-flash-prompt-contract,examples}.md` are SHA-256 locked across `tests/verify-ab-preservation.py`, `tests/verify-historical-cartoon.py`, and `tests/verify-voice-continuity.py`.
+  - `skills/directing-stickman-videos/SKILL.md` from `## A · Director` to EOF is byte-locked in `tests/verify_test.go` (`TestVerifyABPreservation` and `TestVerifyFirstUseGuidance`).
+  - `skills/directing-stickman-videos/references/{style-catalog,prehistoric-dark-comedy,cozy-storytelling,historical-cartoon,voice-continuity,storyboard-template,omni-flash-prompt-contract,examples}.md` are SHA-256 locked across `TestVerifyABPreservation`, `TestVerifyHistoricalCartoon`, and `TestVerifyVoiceContinuity` in `tests/verify_test.go`.
 - **Keep `skills/directing-stickman-videos/` self-contained and relocatable**:
   - Tests copy `skills/directing-stickman-videos/` into `/tmp` without `node_modules` or the parent repo. All Markdown links, manifest paths, and `require()` paths inside the skill must stay relative and resolve strictly within `skills/directing-stickman-videos/` (no escaping `..` or external symlinks).
   - Never include `/Users/`, `/home/`, `/var/folders/`, `C:\`, or absolute paths in skill docs, manifests, or fixtures.
@@ -18,25 +18,24 @@
 ## Validation before finishing
 Run from the repository root:
 ```bash
-python scripts/check.py
-python tests/verify-readmes.py
-python tests/verify-classic-character.py
-python baslat.py --help
+go run ./cmd/check
+go run . --help
+go run . doctor
 ```
 
-Shell/batch launchers were replaced by `baslat.py`; keep repository-owned `.sh` and `.bat` files absent.
+Shell/batch launchers were replaced by the Go binary `tubie`; keep repository-owned `.sh` and `.bat` files absent.
 
 ## Repo-specific conventions
-- **Editable install / `PYTHONPATH`**: `src/tubie_stickman/runtime.py` computes `ROOT_DIR` from `Path(__file__).resolve().parents[2]` to locate `skills/` and `assets/`. Always use editable installs (`pip install -e .`) or `PYTHONPATH=src`.
+- **Root directory resolution**: `internal/tubie/runtime.go` computes root directory from executable or working directory to locate `skills/` and `assets/`.
 - **Node dependencies**: Workspace dependencies (`@napi-rs/canvas`, `sharp`) belong to `skills/directing-stickman-videos/package.json` and are installed from the repo root via `npm ci`.
-- **Line endings**: `.gitattributes` enforces `LF` for `.py`, `.mjs`, `.md`, `.json`, `.yml`, `.html`, `.css`, and `.js`. Preserve `LF` on Markdown and text assets so byte-level SHA-256 checks pass on both Linux and Windows.
+- **Line endings**: `.gitattributes` enforces `LF` for `.go`, `go.mod`, `.mjs`, `.md`, `.json`, `.yml`, `.html`, `.css`, and `.js`. Preserve `LF` on Markdown and text assets so byte-level SHA-256 checks pass on both Linux and Windows.
 
 ## Change safety rules
 - **Catalog docs (`docs/catalog/`)**:
-  - Only `README.en.md` and `README.tr.md` may exist matching `docs/catalog/README.*.md` (`tests/verify-docs.py` asserts the exact filename set).
-  - Intra-catalog `#fragment` links require explicit `<a id="..."></a>` tags in the target file; Markdown heading slugs alone fail `tests/verify-docs.py`.
-  - Preserve the `<!-- thumbnail-publishing-kit:start -->` ... `<!-- thumbnail-publishing-kit:end -->` block placement (between `<a id="b2"></a>` and `<a id="faq"></a>`), table structure (2 tables, 4 `<tr>`, 6 `<td align="center">`, zero `<th>`), and top nav link order enforced by `tests/verify-thumbnail-kit.py`.
+  - Only `README.en.md` and `README.tr.md` may exist matching `docs/catalog/README.*.md` (`TestVerifyDocs` in `tests/verify_test.go` asserts the exact filename set).
+  - Intra-catalog `#fragment` links require explicit `<a id="..."></a>` tags in the target file; Markdown heading slugs alone fail `TestVerifyDocs`.
+  - Preserve the `<!-- thumbnail-publishing-kit:start -->` ... `<!-- thumbnail-publishing-kit:end -->` block placement (between `<a id="b2"></a>` and `<a id="faq"></a>`), table structure (2 tables, 4 `<tr>`, 6 `<td align="center">`, zero `<th>`), and top nav link order enforced by `TestVerifyThumbnailKit`.
 - **Root `README*.md` restrictions**:
-  - Never include internal A6 routing strings (`Route 2 · Renoise MCP (explicit choice)` or `utm_source=crazyegnake-aini-202610`) in root `README*.md` files (`tests/verify-a6-guidance.py`).
+  - Never include internal A6 routing strings (`Route 2 · Renoise MCP (explicit choice)` or `utm_source=crazyegnake-aini-202610`) in root `README*.md` files (`TestVerifyA6Guidance`).
 - **Untracked runtime artifacts**:
   - Never commit `sesim.wav`, `output/`, `projects/`, `narration.wav`, `bgm.wav`, `sfx.wav`, or `approval.json`.

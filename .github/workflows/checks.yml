@@ -10,16 +10,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    env:
-      PYTHONUTF8: '1'
-      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-go@v5
         with:
-          python-version: '3.11'
+          go-version: '1.22'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -31,9 +28,9 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install ffmpeg --no-progress -y
       - run: npm ci
-      - name: Install test dependencies
-        run: python -m pip install --no-deps -e . Pillow
       - name: Run regression checks
-        run: python scripts/check.py
+        run: go run ./cmd/check
       - name: Check shared launcher
-        run: python baslat.py --help
+        run: go run . --help
+      - name: Build binary
+        run: go build -o tubie .
