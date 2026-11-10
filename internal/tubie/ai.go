@@ -304,6 +304,9 @@ Yanıtını SADECE geçerli bir JSON olarak ver:
 	return &vm, nil
 }
 
+// FixedYouTubeTags contains the mandatory, high-converting YouTube tags for cybersecurity videos.
+const FixedYouTubeTags = "hacker,hack,hackers,hacks,atıl samancıoğlu,can değer,mdisec,para kazanma,etik hacker olma kursu,etik hacker,panel,cc,active directory,redteam,blueteam,pentest,penetration test,analist,soc analisti,soc,ioc,iot,bugbounty,bug bount,etik hacker olma,hacker olma kursu,siber tehdit,siber güvenlik,cyber security,cyber sec,bilgi güvenliği,mit,btk,yazılım,bilişim,bilgisayar,network,veri güvenliği,bilişim güvenliği,siyah şapkalı hacker,hackerlık,darkweb,deepweb,osint"
+
 func generateViralViaTemplates(title, narration string) ViralMetadata {
 	lower := strings.ToLower(title + " " + narration)
 
@@ -312,12 +315,14 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 			TitleA:      "🚨 Instagram Hesabınız 1 Saniyede Nasıl Çalınır? (Sakın Bu Hatayı Yapmayın!)",
 			TitleB:      "⚠️ 'Telif Hakkı İhlali' Mesajı Aldınız mı? Sakın Tıklamayın!",
 			TitleC:      "🛡️ Instagram Hesabınızı Hackerlardan Korumanın 3 Altın Kuralı!",
-			Description: "Instagram hesabın bir gecede elinden gidebilir! 😱 Hackerlar şifreni kırmakla uğraşmaz, sahte telif veya mavi tik mesajlarıyla seni tuzağa düşürür. Panikle sahte bağlantıya tıkladığın an tüm takipçilerini ve hesabını hackerlara hediye edersin!\n\n💡 Unutma: Gerçek Instagram yetkilileri senden asla DM üzerinden şifre istemez! İki faktörlü doğrulamayı (2FA) hemen aktif et ve gelen şüpheli linklere asla tıklama.\n\n👇 Bu tür sahte mesajlarla daha önce karşılaştın mı? Yorumlarda yaz!\n👥 Bu videoyu kaydet ve arkadaşlarına gönder, tuzağa düşmesinler!",
+			Description: "Instagram hesabınız tek bir sahte bağlantıyla saniyeler içinde tamamen elinizden gidebilir! 😱\n\nHackerlar artık karmaşık şifre kırmakla uğraşmıyor. Kullanıcı psikolojisini hedef alan sahte DM ve oltalama (phishing) tuzakları kuruyorlar.\n\n⚠️ EN SIK KULLANILAN TUZAKLAR:\n1️⃣ Telif İhlali Bildirimi: Profilinizin kapatılacağını iddia eden sahte DM'ler.\n2️⃣ Mavi Tik / Rozet Bildirimi: Sahte formla şifre toplayan profiller.\n3️⃣ Şüpheli Giriş Uyarısı: Panikle şifre girmenizi isteyen sahte linkler.\n\n🛡️ HESABINIZI KORUMANIN 4 ALTIN KURALI:\n✅ 1. Instagram yetkilileri ASLA DM ile şifre veya link göndermez.\n✅ 2. Bildirimleri sadece Ayarlar > Güvenlik > Instagram E-postaları sekmesinden kontrol edin.\n✅ 3. SMS yerine mutlaka Google Authenticator gibi bir 2FA uygulaması açın.\n✅ 4. Şüpheli linke tıkladıysanız derhal şifrenizi yenileyin ve oturumları kapatın.\n\n👇 Bu tür sahte mesajlarla daha önce karşılaştınız mı? Yorumlarda yazın!\n👥 Videoyu kaydedin ve arkadaşlarınızı uyarın, kimsenin hesabı çalınmasın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#instagramgüvenliği", "#hesapçalma", "#hacker",
-				"#güvenlik", "#teknoloji", "#bilgi", "#reels", "#keşfet",
-				"#siberbilgi", "#yazılım", "#sosyalmedya", "#dijitalgüvenlik",
-				"#trendler", "#fyp", "#şifregüvenliği", "#tuzak", "#uyanıkol", "#viral",
+				"#sosyalmedya", "#güvenlik", "#teknoloji", "#bilgi", "#reels", "#keşfet",
+				"#siberbilgi", "#yazılım", "#dijitalgüvenlik", "#trendler", "#fyp",
+				"#şifregüvenliği", "#tuzak", "#etikahacker", "#siberfarkındalık",
+				"#phishing", "#oltalama", "#instagramreels", "#bilgisayar", "#veri",
+				"#sibertehdit", "#bilişim", "#viral",
 			},
 		}
 	} else if strings.Contains(lower, "wifi") || strings.Contains(lower, "wi-fi") || strings.Contains(lower, "kafe") || strings.Contains(lower, "ağ") {
@@ -325,12 +330,13 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 			TitleA:      "🚨 Kafe Wi-Fi Ağlarına Bağlananlar DİKKAT! (Bunu Biliyor muydunuz?)",
 			TitleB:      "⚠️ Şifrenizi 10 Saniyede Havada Yakalayabilirler!",
 			TitleC:      "🛡️ Halka Açık Wi-Fi Ağlarında Güvende Kalmanın Tek Yolu!",
-			Description: "Gittiğin kafede ücretsiz Wi-Fi'a bağlandın mı? ☕ İşte o an izleniyor olabilirsin! Hackerlar deauth saldırısı ile seni bir saniyede ağdan düşürür, telefonun tekrar bağlanırken şifreli paket havada yakalanır!\n\n💡 Çözüm: Halka açık ağlarda asla şifresiz dolaşma ve mutlaka güvenilir bir VPN kullan! Siber dünyada av değil, avcı ol.\n\n👇 Kafelerde Wi-Fi kullanıyor musun? Yorumlarda buluşalım!\n👥 Videoyu kaydet ve sevdiklerine ilet!",
+			Description: "Gittiğiniz kafede ücretsiz Wi-Fi ağına bağlandığınız an tüm kişisel verileriniz havada izleniyor olabilir! ☕💻\n\nHalka açık, şifresiz kablosuz ağlar siber saldırganlar için en verimli av sahalarıdır. Hackerlar aynı ağa bağlandıktan sonra trafiği kolayca dinleyebilir.\n\n⚠️ KAFELERDEKİ GÖRÜNMEZ TEHLİKELER:\n1️⃣ Evil Twin (Sahte İkiz Ağ): Kafenin adıyla birebir sahte bir Wi-Fi noktası açarlar.\n2️⃣ Deauth Saldırısı: Sizi ağdan düşürürler; tekrar bağlanırken şifreli paketler havada yakalanır.\n3️⃣ Man-in-the-Middle: Girdiğiniz siteler ile cihazınız arasına girip şifreleri izlerler.\n\n🛡️ AÇIK AĞLARDA GÜVENDE KALMANIN ALTIN KURALLARI:\n✅ 1. Ortak Wi-Fi ağlarında asla bankacılık veya hassas işlemler yapmayın.\n✅ 2. Cihazınızda mutlaka güvenilir ve şifreli bir VPN servisi açık olsun.\n✅ 3. Telefonunuzun 'Bilinen ağlara otomatik bağlan' özelliğini kapatın.\n✅ 4. Girdiğiniz web sitelerinde HTTPS kilit simgesini kontrol edin.\n\n👇 Dışarıda kafelerin Wi-Fi ağlarına bağlanıyor musunuz? Yorumlarda buluşalım!\n👥 Videoyu kaydedin ve sevdiklerinizle paylaşın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#wifi", "#ağgüvenliği", "#vpn", "#hacker",
 				"#teknoloji", "#reels", "#keşfet", "#bilgi", "#dijitaldünya",
 				"#internet", "#güvenlik", "#teknolojihaberleri", "#siberdünya",
-				"#trendler", "#fyp", "#viral",
+				"#deauth", "#network", "#etikahacker", "#veri", "#bilgisayar",
+				"#bilişim", "#sibertehdit", "#trendler", "#fyp", "#viral",
 			},
 		}
 	} else if strings.Contains(lower, "şifre") || strings.Contains(lower, "parola") || strings.Contains(lower, "brute force") {
@@ -338,12 +344,13 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 			TitleA:      "🚨 Kullandığınız Şifre Kaç Saniyede Kırılır? (Şok Eden Gerçek!)",
 			TitleB:      "⚠️ '123456' veya Doğum Tarihi Kullananlar Hemen Değiştirsin!",
 			TitleC:      "🛡️ Kırılması Yüzyıllar Sürecek Güçlü Şifre Oluşturma Formülü!",
-			Description: "Kullandığın sekiz haneli şifre saniyeler içinde kırılabilir! ⏱️ Hackerlar saniyede milyarlarca kombinasyon deneyen sistemlerle basit şifreleri anında çözer. Ama büyük harf, rakam ve sembol eklersen kırılması yüzyıllar sürer!\n\n💡 Parolalarını hemen güncelle ve mutlaka bir parola yöneticisi kullan!\n\n👇 Şifren ne kadar güçlü? Yorumlarda tartışalım!\n👥 Gönderiyi kaydet ve sevdiklerine ulaştır!",
+			Description: "Kullandığınız şifre gerçekten güvende mi yoksa hackerların kırması sadece birkaç saniye mi sürer? ⏱️🔐\n\nHer gün milyonlarca kullanıcı basit parolalar kullanıyor. Oysa yapay zeka ve brute force araçları saniyede milyarlarca kombinasyon deneyebiliyor!\n\n⚠️ EN BÜYÜK ŞİFRE HATALARI:\n1️⃣ Aynı Parolayı Her Yerde Kullanmak: Bir site sızdığında tüm hesaplarınız ele geçirilir.\n2️⃣ Kişisel Bilgileri Şifre Yapmak: İsim, memleket ve tarihler saniyeler içinde çözülür.\n3️⃣ Kısa Şifreler: 8 karakterli küçük harfli şifre ortalama 5 saniyede kırılır!\n\n🛡️ KIRILMASI YÜZYILLAR SÜRECEK GÜÇLÜ PAROLA FORMÜLÜ:\n✅ 1. En az 14-16 karakter uzunluğunda olmalıdır.\n✅ 2. Büyük harf, küçük harf, rakam ve özel semboller içermelidir.\n✅ 3. Her platform için mutlaka farklı bir şifre kullanın.\n✅ 4. Parolalarınızı bir Parola Yöneticisinde güvenle saklayın.\n\n👇 Şifreniz ne kadar güçlü? Yorumlarda konuşalım!\n👥 Sevdiklerinizi uyarmak için videoyu hemen kaydedip gönderin!",
 			Hashtags: []string{
 				"#parola", "#şifregüvenliği", "#bruteforce", "#sibergüvenlik",
 				"#teknoloji", "#güvenlik", "#bilgi", "#reels", "#keşfet",
-				"#dijitalyaşam", "#hacker", "#şifre", "#bilgisayar", "#trendler",
-				"#fyp", "#viral",
+				"#dijitalyaşam", "#hacker", "#şifre", "#bilgisayar", "#etikahacker",
+				"#passwordmanager", "#verigüvenliği", "#siberfarkındalık",
+				"#trendler", "#fyp", "#viral",
 			},
 		}
 	} else if strings.Contains(lower, "kripto") || strings.Contains(lower, "bitcoin") || strings.Contains(lower, "cüzdan") {
@@ -351,11 +358,12 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 			TitleA:      "🚨 Kripto Cüzdanınız 1 Tıkla Nasıl Boşaltılır? (Airdrop Tuzağı!)",
 			TitleB:      "⚠️ 'Bedava Coin Kazandınız' Mesajlarına Sakın İnanmayın!",
 			TitleC:      "🛡️ Kripto Paralarınızı Güvende Tutmanın 3 Temel Kuralı!",
-			Description: "Kripto cüzdanındaki tüm birikim tek bir saniyede buharlaşabilir! 💸 Sahte airdrop siteleri bedava coin vaadiyle cüzdanını bağlatır ve akıllı sözleşme izniyle tüm tokenlarını çeker!\n\n💡 Altın kural: Hiç kimse durduk yere bedava para dağıtmaz! Gizli kelimelerini (seed phrase) asla bir web sitesine girme.\n\n👇 Kripto ile ilgilenen arkadaşını etiketle!\n👥 Gönderiyi kaydet, paranı koru!",
+			Description: "Kripto cüzdanınızdaki tüm birikim tek bir sahte onay ile bir saniyede sıfırlanabilir! 💸⚠️\n\nKripto dünyasında hackerlar sahte airdrop siteleri ve Telegram gruplarıyla kullanıcıları tuzağa düşürüyor!\n\n⚠️ EN TEHLİKELİ KRİPTO TUZAKLARI:\n1️⃣ Akıllı Sözleşme İzni (Approve Drainer): Cüzdanı bağlayıp onay verdiğiniz an tokenlarınız transfer edilir.\n2️⃣ Sahte Cüzdan Güncellemesi: DM ile gelen ve güncelleme isteyen sahte linkler.\n3️⃣ Sahte Destek Ekipleri: Size özelden yazıp yardım teklif eden sahte yöneticiler.\n\n🛡️ KRİPTO VARLIKLARINIZI KORUMANIN 4 KURALI:\n✅ 1. Gizli Kurtarma Kelimelerinizi (Seed Phrase) ASLA hiçbir web sitesine yazmayın!\n✅ 2. Hiç kimse durduk yere karşılıksız bedava para dağıtmaz.\n✅ 3. Bilmediğiniz sitelere cüzdan bağlamayın; onayları düzenli iptal edin.\n✅ 4. Yüksek birikimleriniz için mutlaka Donanım Cüzdanı (Cold Wallet) kullanın.\n\n👇 Kripto yatırımı olan arkadaşını hemen etiketle!\n👥 Gönderiyi kaydet, paranı koru!",
 			Hashtags: []string{
 				"#kripto", "#bitcoin", "#ethereum", "#kriptopara", "#kriptogüvenlik",
 				"#airdrop", "#cüzdan", "#sibergüvenlik", "#teknoloji", "#reels",
-				"#keşfet", "#finans", "#blokzincir", "#bilgi", "#fyp", "#viral",
+				"#keşfet", "#finans", "#blokzincir", "#bilgi", "#donanımcüzdanı",
+				"#dolandırıcılık", "#coldwallet", "#btc", "#etikahacker", "#fyp", "#viral",
 			},
 		}
 	} else if strings.Contains(lower, "whatsapp") || strings.Contains(lower, "sms") || strings.Contains(lower, "telefon") {
@@ -363,11 +371,12 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 			TitleA:      "🚨 Arkadaşınızdan 'Kodu Bana At' Mesajı Gelirse Sakın Atmayın!",
 			TitleB:      "⚠️ WhatsApp Hesabınızı Tek Bir SMS Koduyla Çalıyorlar!",
 			TitleC:      "🛡️ WhatsApp'ta İki Adımlı Doğrulama Nasıl Açılır?",
-			Description: "WhatsApp hesabından arkadaşlarına borç para isteme mesajları gidebilir! 📱 Dolandırıcılar numaranı girip sana SMS onay kodu gönderir ve samimi bir arkadaşının ağzından 'kodu bana at' der. O kodu verdiğin an hesabın gider!\n\n💡 SMS doğrulama kodlarını en yakınına bile asla verme! WhatsApp'ta iki adımlı doğrulamayı hemen aç.\n\n👇 Bu tuzağı duymuş muydun? Yorumlarda paylaş!\n👥 Sevdiklerini uyar!",
+			Description: "WhatsApp hesabınız aniden kapanabilir ve rehberinizdeki herkese adınıza borç isteme mesajları gidebilir! 📱🚨\n\nSaldırganlar yakın arkadaşlarınızın çalınmış profilleri üzerinden SMS onay kodu hırsızlığı yapıyor.\n\n⚠️ DOLANDIRICILAR NASIL ÇALIŞIYOR?\n1️⃣ Saldırgan yeni bir cihaza telefon numaranızı yazar.\n2️⃣ WhatsApp telefonunuza 6 haneli resmi bir SMS onay kodu yollar.\n3️⃣ Arkadaşınızın profilinden mesaj gelir: 'Kodu yanlışlıkla sana yolladım, bana atar mısın?'\n4️⃣ O kodu verdiğiniz anda hesabınız saldırganın eline geçer!\n\n🛡️ HESABINIZI GERİ DÖNÜLMEZ ŞEKİLDE KORUYUN:\n✅ 1. SMS onay kodunu EN YAKININIZA BİLE asla vermeyin!\n✅ 2. Arkadaşınızdan gelen garip taleplerde kendisini sesli arayıp teyit edin.\n✅ 3. WhatsApp Ayarları > Hesap > İki Adımlı Doğrulama'yı hemen aktif edin.\n✅ 4. Hesabınıza e-posta adresi bağlayarak güvenliği ikiye katlayın.\n\n👇 Bu SMS onay hilesiyle daha önce karşılaştınız mı? Yorumlarda paylaşın!\n👥 Sevdiklerinize gönderin, kimse mağdur olmasın!",
 			Hashtags: []string{
 				"#whatsapp", "#dolandırıcılık", "#sibergüvenlik", "#smstuzağı",
 				"#teknoloji", "#güvenlik", "#reels", "#keşfet", "#haberler",
-				"#bilgi", "#iletişim", "#dikkat", "#trendler", "#fyp", "#viral",
+				"#bilgi", "#iletişim", "#dikkat", "#siberbilgi", "#etikahacker",
+				"#dijitalgüvenlik", "#telefon", "#trendler", "#fyp", "#viral",
 			},
 		}
 	}
@@ -380,20 +389,21 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 		TitleA:      fmt.Sprintf("🚨 %s: Sandığınızdan Çok Daha Büyük Bir Tehlike!", cleanTitle),
 		TitleB:      fmt.Sprintf("⚠️ Sakın Bu Hataya Düşmeyin: %s Gerçeği!", cleanTitle),
 		TitleC:      fmt.Sprintf("🛡️ %s Konusunda Kendinizi Korumanın En Etkili Yolu!", cleanTitle),
-		Description: fmt.Sprintf("%s hakkında bilmeniz gereken kritik siber güvenlik gerçekleri! 🚨 Hackerlar her gün kullanıcıların dikkatsizliklerinden faydalanarak sistemlere sızıyor. Siber dünyada en zayıf halka insandır.\n\n💡 Bilgilenin, tedbirinizi alın ve siber dünyada av değil avcı olun!\n\n👇 Fikirlerinizi yorumlarda paylaşın!\n👥 Videoyu kaydet ve sevdiklerinle paylaş!", cleanTitle),
+		Description: fmt.Sprintf("%s hakkında bilmeniz gereken kritik siber güvenlik gerçekleri! 🚨\n\nHackerlar her gün kullanıcıların dikkatsizliklerinden faydalanarak sistemlere sızıyor. Siber dünyada en zayıf halka insandır.\n\n⚠️ DİJİTAL DÜNYADAKİ EN BÜYÜK RİSKLER:\n1️⃣ Oltalama (Phishing) Bildirimleri ve sahte e-postalar.\n2️⃣ Crackli oyun ve korsan yazılımlara gizlenmiş truva atları.\n3️⃣ Darkweb'e sızdırılan parola ve kimlik verileri.\n\n🛡️ DİJİTAL KALKANINIZI GÜÇLENDİRİN:\n✅ 1. Bilmediğiniz hiçbir dosya veya e-posta ekini indirmeyin.\n✅ 2. Bütün kritik hesaplarınızda 2FA koruması açık olsun.\n✅ 3. Lisanssız korsan yazılımlardan uzak durun.\n✅ 4. Dijital dünyada av değil, bilinçli bir avcı olun!\n\n👇 Siz dijital güvenliğinizi nasıl sağlıyorsunuz? Yorumlarda tartışalım!\n👥 Gönderiyi kaydedin ve sevdiklerinizle paylaşın!", cleanTitle),
 		Hashtags: []string{
 			"#sibergüvenlik", "#teknoloji", "#güvenlik", "#hacker",
 			"#bilgi", "#dijitaldünya", "#reels", "#keşfet", "#trendler",
 			"#yazılım", "#bilimveteknoloji", "#önlem", "#farkındalık",
-			"#siberbilgi", "#fyp", "#viral",
+			"#siberbilgi", "#etikahacker", "#darkweb", "#pentest", "#fyp", "#viral",
 		},
 	}
 }
 
-// FormatViralText creates the aciklama.txt document with A/B/C titles, caption, and hashtags.
+// FormatViralText creates the aciklama.txt document with A/B/C titles, caption, hashtags, and YouTube tags.
 func FormatViralText(title, narration string, vm ViralMetadata) string {
 	var sb strings.Builder
 	sb.WriteString("🎬 TUBIE VİRAL PAYLAŞIM PAKETİ (INSTAGRAM / REELS / TIKTOK / SHORTS)\n")
+	sb.WriteString("====================================================================\n\n")
 
 	sb.WriteString("📌 A / B / C TESTİ İÇİN 3 FARKLI BAŞLIK:\n")
 	sb.WriteString("(En yüksek tıklanma ve izlenme oranını yakalamak için test edin)\n")
@@ -409,6 +419,10 @@ func FormatViralText(title, narration string, vm ViralMetadata) string {
 	sb.WriteString("🚀 VİRAL KEŞFET HASHTAGLERİ:\n")
 	sb.WriteString("--------------------------------------------------------------------\n")
 	sb.WriteString(strings.Join(vm.Hashtags, " ") + "\n\n")
+
+	sb.WriteString("🏷️ YOUTUBE TAG (Video Yüklerken Etiket Bölümüne Yapıştırın):\n")
+	sb.WriteString("--------------------------------------------------------------------\n")
+	sb.WriteString(FixedYouTubeTags + "\n")
 
 	return sb.String()
 }

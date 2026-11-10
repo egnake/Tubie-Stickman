@@ -208,9 +208,16 @@ func TestViralMetadata(t *testing.T) {
 	if !strings.Contains(text, "VİRAL KEŞFET HASHTAGLERİ") {
 		t.Fatalf("formatted text missing hashtags: %s", text)
 	}
-	// Verify Instagram 2200 character limit
-	if len([]rune(text)) > 2200 {
-		t.Fatalf("formatted text exceeds 2200 character limit: %d characters", len([]rune(text)))
+	if !strings.Contains(text, "YOUTUBE TAG") {
+		t.Fatalf("formatted text missing youtube tag header: %s", text)
+	}
+	if !strings.Contains(text, "atıl samancıoğlu") || !strings.Contains(text, "can değer") || !strings.Contains(text, "mdisec") {
+		t.Fatalf("formatted text missing required youtube tag keywords: %s", text)
+	}
+	// Verify Instagram 2200 character limit on the post caption + hashtags
+	postCaption := vm.Description + "\n\n" + strings.Join(vm.Hashtags, " ")
+	if len([]rune(postCaption)) > 2200 {
+		t.Fatalf("instagram post caption exceeds 2200 character limit: %d characters", len([]rune(postCaption)))
 	}
 }
 
