@@ -46,3 +46,4 @@ func GenerateDedicatedThumbnail(root string, title string, topic string, propPat
 
 	return fmt.Errorf("failed to generate thumbnail at %s", outPath)
 }
+
