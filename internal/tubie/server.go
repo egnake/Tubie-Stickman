@@ -178,12 +178,48 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// List files in output directory
+	// List files in output directory (both organized subdirectories and legacy root files)
 	outDir := filepath.Join(s.root, "output")
 	outputs := make([]map[string]any, 0)
 	if entries, err := os.ReadDir(outDir); err == nil {
 		for _, entry := range entries {
-			if strings.HasSuffix(entry.Name(), ".mp4") && !strings.HasPrefix(entry.Name(), ".") {
+			if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+				slug := entry.Name()
+				subDir := filepath.Join(outDir, slug)
+				if subEntries, err := os.ReadDir(subDir); err == nil {
+					for _, se := range subEntries {
+						if strings.HasSuffix(se.Name(), ".mp4") && !strings.HasPrefix(se.Name(), ".") {
+							base := strings.TrimSuffix(se.Name(), ".mp4")
+							fi, _ := se.Info()
+							size := int64(0)
+							if fi != nil {
+								size = fi.Size()
+							}
+							item := map[string]any{
+								"name": strings.ReplaceAll(slug, "_", " "),
+								"file": fmt.Sprintf("output/%s/%s", slug, se.Name()),
+								"size": size,
+							}
+							srtPath := filepath.Join(subDir, base+".srt")
+							if isFile(srtPath) {
+								item["subtitle"] = fmt.Sprintf("output/%s/%s.srt", slug, base)
+							}
+							thumbPath := filepath.Join(subDir, "thumbnail.jpg")
+							if isFile(thumbPath) {
+								item["thumbnail"] = fmt.Sprintf("output/%s/thumbnail.jpg", slug)
+							}
+							txtPath := filepath.Join(subDir, "aciklama.txt")
+							if isFile(txtPath) {
+								item["description"] = fmt.Sprintf("output/%s/aciklama.txt", slug)
+								if descBytes, err := os.ReadFile(txtPath); err == nil {
+									item["description_text"] = string(descBytes)
+								}
+							}
+							outputs = append(outputs, item)
+						}
+					}
+				}
+			} else if strings.HasSuffix(entry.Name(), ".mp4") && !strings.HasPrefix(entry.Name(), ".") {
 				base := strings.TrimSuffix(entry.Name(), ".mp4")
 				fi, _ := entry.Info()
 				size := int64(0)
@@ -196,7 +232,7 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 					"size": size,
 				}
 				srtPath := filepath.Join(outDir, base+".srt")
-				if _, err := os.Stat(srtPath); err == nil {
+				if isFile(srtPath) {
 					item["subtitle"] = "output/" + base + ".srt"
 				}
 				outputs = append(outputs, item)
@@ -236,9 +272,10 @@ func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(mediaRel, "/")
 	allowed := false
 
-	if len(parts) == 2 && parts[0] == "output" {
-		ext := filepath.Ext(parts[1])
-		if ext == ".mp4" || ext == ".srt" || ext == ".png" || ext == ".wav" {
+	if len(parts) >= 2 && parts[0] == "output" {
+		filename := parts[len(parts)-1]
+		ext := strings.ToLower(filepath.Ext(filename))
+		if ext == ".mp4" || ext == ".srt" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".wav" || ext == ".txt" {
 			allowed = true
 		}
 	} else if mediaRel == "sesim.wav" {
