@@ -6,10 +6,10 @@ node_modules/
 sesim.wav
 
 # Go binaries and build artifacts
-tubie
-tubie.exe
-baslat
-baslat.exe
+/tubie
+/tubie.exe
+/baslat
+/baslat.exe
 /dist/
 /build/
 

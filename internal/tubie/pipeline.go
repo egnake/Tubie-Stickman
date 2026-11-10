@@ -1,0 +1,225 @@
+package tubie
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// Reporter sends structured progress and stage updates.
+type Reporter func(event map[string]any)
+
+// Pipeline orchestrates synthesis, storyboard rendering, and export.
+type Pipeline struct {
+	Root     string
+	Mode     string
+	Reporter Reporter
+	Review   func(projectDir string) error
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
+// Produce executes the complete video production for a given preset.
+func (p *Pipeline) Produce(preset Preset) (string, error) {
+	fmt.Printf("\n=================================================================\n")
+	fmt.Printf("🎬 SİBER GÜVENLİK VİRAL VİDEO MOTORU: %s\n", preset.Title)
+	fmt.Printf("=================================================================\n")
+
+	outDir := filepath.Join(p.Root, "output")
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return "", err
+	}
+
+	projectDir := filepath.Join(p.Root, "projects", preset.Slug)
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		return "", err
+	}
+
+	// 1. Synthesize Audio
+	if p.Reporter != nil {
+		p.Reporter(map[string]any{"stage": "voice", "label": "Seslendirme hazırlanıyor", "slug": preset.Slug})
+	}
+	narrationWav := filepath.Join(projectDir, "narration.wav")
+	dur, modeUsed, err := SynthesizeVoice(preset.Narration, narrationWav, p.Mode, "tr-TR-AhmetNeural", p.Root)
+	if err != nil {
+		return "", fmt.Errorf("seslendirme hatası: %w", err)
+	}
+	fmt.Printf("✅ Seslendirme tamamlandı! (%s) Süre: %.3f saniye\n", strings.ToUpper(modeUsed), dur)
+
+	// 2. Prepare project.json
+	templateJson := filepath.Join(p.Root, "examples", "projects", preset.Slug, "project.json")
+	var projectConfig map[string]any
+
+	if data, err := os.ReadFile(templateJson); err == nil {
+		if err := json.Unmarshal(data, &projectConfig); err != nil {
+			return "", fmt.Errorf("project.json unmarshal error: %w", err)
+		}
+	} else {
+		// Fallback minimal configuration
+		projectConfig = map[string]any{
+			"version":         1,
+			"style":           "B1",
+			"theme":           "cyber",
+			"backgroundColor": "#0A0E17",
+			"width":           720,
+			"height":          1280,
+			"fps":             30,
+			"shots":           []any{},
+		}
+	}
+
+	// Update duration & voice lead
+	projectConfig["duration"] = dur
+	projectConfig["voice"] = map[string]any{
+		"path": "narration.wav",
+		"lead": 0.0,
+	}
+
+	// Copy BGM if available
+	bgmCyber := filepath.Join(p.Root, "assets", "audio", "bgm_cyber.wav")
+	bgmLofi := filepath.Join(p.Root, "assets", "audio", "bgm_lofi.wav")
+	if _, err := os.Stat(bgmCyber); err == nil {
+		_ = copyFile(bgmCyber, filepath.Join(projectDir, "bgm.wav"))
+		projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.12}
+	} else if _, err := os.Stat(bgmLofi); err == nil {
+		_ = copyFile(bgmLofi, filepath.Join(projectDir, "bgm.wav"))
+		projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.12}
+	}
+
+	projectConfigFile := filepath.Join(projectDir, "project.json")
+	projData, err := json.MarshalIndent(projectConfig, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(projectConfigFile, projData, 0644); err != nil {
+		return "", err
+	}
+
+	// 3. Autopilot execution
+	nodeExe := BinaryPath("node")
+	autopilotScript := filepath.Join(p.Root, "skills", "directing-stickman-videos", "scripts", "autopilot.mjs")
+
+	runAutopilot := func(subcommand string, extraArgs ...string) error {
+		args := []string{autopilotScript, subcommand, projectConfigFile}
+		args = append(args, extraArgs...)
+		cmd := exec.Command(nodeExe, args...)
+		cmd.Dir = p.Root
+		cmd.Env = os.Environ()
+
+		// Stream stdout to parse live-frame events if reporter attached
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Start(); err != nil {
+			return err
+		}
+
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Println(line)
+			if p.Reporter != nil {
+				// Parse frame updates or JSON lines
+				var ev map[string]any
+				if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
+					if err := json.Unmarshal([]byte(line), &ev); err == nil {
+						p.Reporter(ev)
+					}
+				}
+			}
+		}
+
+		return cmd.Wait()
+	}
+
+	liveArgs := []string{}
+	if p.Reporter != nil {
+		liveArgs = append(liveArgs, "--live")
+	}
+
+	// Preview step
+	if p.Reporter != nil {
+		p.Reporter(map[string]any{"stage": "preview", "label": "Önizleme oluşturuluyor", "slug": preset.Slug})
+	}
+	fmt.Println("[1/3] Video önizlemesi oluşturuluyor...")
+	if err := runAutopilot("preview", append([]string{"--replace"}, liveArgs...)...); err != nil {
+		return "", fmt.Errorf("autopilot preview failed: %w", err)
+	}
+
+	// Approval step
+	if p.Review != nil {
+		if err := p.Review(projectDir); err != nil {
+			return "", err
+		}
+	}
+	fmt.Println("[2/3] Önizleme onaylanıyor...")
+	note := "Kullanıcı onayı alındı"
+	if err := runAutopilot("approve", "--note", note); err != nil {
+		return "", fmt.Errorf("autopilot approve failed: %w", err)
+	}
+
+	// Render step
+	if p.Reporter != nil {
+		p.Reporter(map[string]any{"stage": "render", "label": "Son video işleniyor", "slug": preset.Slug})
+	}
+	fmt.Println("[3/3] Tam video MP4 olarak render ediliyor...")
+	if err := runAutopilot("render", append([]string{"--full", "--replace"}, liveArgs...)...); err != nil {
+		return "", fmt.Errorf("autopilot render failed: %w", err)
+	}
+
+	// Export step
+	if p.Reporter != nil {
+		p.Reporter(map[string]any{"stage": "export", "label": "Video ve altyazılar kaydediliyor", "slug": preset.Slug})
+	}
+
+	filmMp4 := filepath.Join(projectDir, "output", "film.mp4")
+	finalMp4 := filepath.Join(outDir, preset.Slug+".mp4")
+	if err := copyFile(filmMp4, finalMp4); err != nil {
+		return "", fmt.Errorf("film.mp4 export failed: %w", err)
+	}
+
+	filmSrt := filepath.Join(projectDir, "output", "film.srt")
+	finalSrt := filepath.Join(outDir, preset.Slug+".srt")
+	if _, err := os.Stat(filmSrt); err == nil {
+		_ = copyFile(filmSrt, finalSrt)
+	}
+
+	filmSheet := filepath.Join(projectDir, "output", "film-sheet.png")
+	previewPng := filepath.Join(projectDir, "output", "preview.png")
+	finalSheet := filepath.Join(outDir, preset.Slug+"-onizleme.png")
+	if _, err := os.Stat(filmSheet); err == nil {
+		_ = copyFile(filmSheet, finalSheet)
+	} else if _, err := os.Stat(previewPng); err == nil {
+		_ = copyFile(previewPng, finalSheet)
+	}
+
+	fmt.Printf("\n✨ Başarıyla tamamlandı! Çıktı: %s\n", finalMp4)
+	return finalMp4, nil
+}
