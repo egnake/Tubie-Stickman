@@ -1,0 +1,36 @@
+# Node dependencies
+node_modules/
+.npm/
+
+# Build and project caches
+projects/*/output/
+projects/*/cache/
+projects/*/approval.json
+projects/*/narration.wav
+projects/*/bgm.wav
+projects/*/sfx.wav
+projects/*/*.tmp
+
+# Personal user recordings (protecting voice privacy)
+sesim.wav
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Operating system files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Worktrees and environments
+.worktrees/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,1403 @@
+{
+  "version": 1,
+  "style": "B1",
+  "theme": "cyber",
+  "backgroundColor": "#0A0E17",
+  "width": 720,
+  "height": 1280,
+  "fps": 30,
+  "duration": 33.336,
+  "captionStyle": "viral",
+  "captionSize": 56,
+  "captionY": 1460,
+  "captionColor": "#00FF66",
+  "captionActiveColor": "#00FF66",
+  "captionBg": "rgba(7, 12, 20, 0.96)",
+  "captionBorder": "rgba(0, 255, 128, 0.50)",
+  "voice": {
+    "path": "narration.wav",
+    "lead": 0.0
+  },
+  "shots": [
+    {
+      "start": 0.0,
+      "end": 5.556,
+      "layers": [
+        {
+          "type": "text",
+          "text": "KAFE WI-FI AĞI GÜVENLİ Mİ?",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#00F0FF",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 832,
+          "color": "#00F0FF",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 130,
+          "y": 790,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 130,
+              "y": 790,
+              "w": 470
+            },
+            {
+              "t": 0.5,
+              "x": 130,
+              "y": 760,
+              "w": 482
+            },
+            {
+              "t": 1.0,
+              "x": 130,
+              "y": 790,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 680,
+          "y": 800,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 680,
+              "y": 800,
+              "w": 470
+            },
+            {
+              "t": 0.08,
+              "x": 666,
+              "y": 800,
+              "w": 470
+            },
+            {
+              "t": 0.16,
+              "x": 694,
+              "y": 800,
+              "w": 470
+            },
+            {
+              "t": 0.24,
+              "x": 672,
+              "y": 800,
+              "w": 470
+            },
+            {
+              "t": 0.32,
+              "x": 688,
+              "y": 800,
+              "w": 470
+            },
+            {
+              "t": 0.4,
+              "x": 680,
+              "y": 800,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-wifi.png",
+          "x": 490,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 5.556,
+      "end": 11.112,
+      "layers": [
+        {
+          "type": "text",
+          "text": "BİR SANİYEDE AĞDAN DÜŞTÜN!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 130,
+          "y": 810,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 130,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.08,
+              "x": 116,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.16,
+              "x": 144,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.24,
+              "x": 122,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.32,
+              "x": 138,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.4,
+              "x": 130,
+              "y": 810,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 670,
+          "y": 780,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 780,
+              "w": 480
+            },
+            {
+              "t": 0.5,
+              "x": 670,
+              "y": 750,
+              "w": 492
+            },
+            {
+              "t": 1.0,
+              "x": 670,
+              "y": 780,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-skull.png",
+          "x": 490,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        },
+        {
+          "type": "arrow",
+          "x": 380,
+          "y": 1490,
+          "w": 520,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "progress": 0
+            },
+            {
+              "t": 0.45,
+              "progress": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 11.112,
+      "end": 16.668,
+      "layers": [
+        {
+          "type": "text",
+          "text": "ŞİFRELİ PAKET YAKALANDI!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FFE500",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 768,
+          "color": "#FFE500",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 140,
+          "y": 790,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 140,
+              "y": 790,
+              "w": 480
+            },
+            {
+              "t": 0.5,
+              "x": 140,
+              "y": 760,
+              "w": 492
+            },
+            {
+              "t": 1.0,
+              "x": 140,
+              "y": 790,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 670,
+          "y": 810,
+          "w": 460,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 810,
+              "w": 460
+            },
+            {
+              "t": 0.08,
+              "x": 656,
+              "y": 810,
+              "w": 460
+            },
+            {
+              "t": 0.16,
+              "x": 684,
+              "y": 810,
+              "w": 460
+            },
+            {
+              "t": 0.24,
+              "x": 662,
+              "y": 810,
+              "w": 460
+            },
+            {
+              "t": 0.32,
+              "x": 678,
+              "y": 810,
+              "w": 460
+            },
+            {
+              "t": 0.4,
+              "x": 670,
+              "y": 810,
+              "w": 460
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-laptop.png",
+          "x": 480,
+          "y": 1420,
+          "w": 310,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 345,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 310,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 16.668,
+      "end": 22.224,
+      "layers": [
+        {
+          "type": "text",
+          "text": "ŞİFRE ÇÖZÜLDÜ: ERİŞİM AÇIK!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 120,
+          "y": 810,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 120,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.08,
+              "x": 106,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.16,
+              "x": 134,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.24,
+              "x": 112,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.32,
+              "x": 128,
+              "y": 810,
+              "w": 480
+            },
+            {
+              "t": 0.4,
+              "x": 120,
+              "y": 810,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 660,
+          "y": 790,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 660,
+              "y": 790,
+              "w": 480
+            },
+            {
+              "t": 0.5,
+              "x": 660,
+              "y": 760,
+              "w": 492
+            },
+            {
+              "t": 1.0,
+              "x": 660,
+              "y": 790,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-padlock-unlocked.png",
+          "x": 490,
+          "y": 1420,
+          "w": 290,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 325,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 290,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        },
+        {
+          "type": "arrow",
+          "x": 380,
+          "y": 1490,
+          "w": 520,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "progress": 0
+            },
+            {
+              "t": 0.45,
+              "progress": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 22.224,
+      "end": 27.78,
+      "layers": [
+        {
+          "type": "text",
+          "text": "KESİN ÇÖZÜM: VPN & WPA3",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#00FF66",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 736,
+          "color": "#00FF66",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 150,
+          "y": 780,
+          "w": 490,
+          "keys": [
+            {
+              "t": 0,
+              "x": 150,
+              "y": 780,
+              "w": 490
+            },
+            {
+              "t": 0.5,
+              "x": 150,
+              "y": 750,
+              "w": 502
+            },
+            {
+              "t": 1.0,
+              "x": 150,
+              "y": 780,
+              "w": 490
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 670,
+          "y": 800,
+          "w": 460,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 800,
+              "w": 460
+            },
+            {
+              "t": 0.5,
+              "x": 670,
+              "y": 770,
+              "w": 472
+            },
+            {
+              "t": 1.0,
+              "x": 670,
+              "y": 800,
+              "w": 460
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-shield.png",
+          "x": 490,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 27.78,
+      "end": 33.336,
+      "layers": [
+        {
+          "type": "text",
+          "text": "GÜVENDE KALMAK İÇİN TAKİP ET!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#00FF66",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 928,
+          "color": "#00FF66",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 140,
+          "y": 770,
+          "w": 500,
+          "keys": [
+            {
+              "t": 0,
+              "x": 140,
+              "y": 770,
+              "w": 500
+            },
+            {
+              "t": 0.5,
+              "x": 140,
+              "y": 740,
+              "w": 512
+            },
+            {
+              "t": 1.0,
+              "x": 140,
+              "y": 770,
+              "w": 500
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 650,
+          "y": 770,
+          "w": 500,
+          "keys": [
+            {
+              "t": 0,
+              "x": 650,
+              "y": 770,
+              "w": 500
+            },
+            {
+              "t": 0.5,
+              "x": 650,
+              "y": 740,
+              "w": 512
+            },
+            {
+              "t": 1.0,
+              "x": 650,
+              "y": 770,
+              "w": 500
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-terminal.png",
+          "x": 480,
+          "y": 1420,
+          "w": 310,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 345,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 310,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "captions": [
+    {
+      "start": 0.0,
+      "end": 1.12,
+      "text": "ŞU AN BAĞLANDIĞIN",
+      "words": [
+        {
+          "word": "ŞU",
+          "start": 0.0,
+          "end": 0.38
+        },
+        {
+          "word": "AN",
+          "start": 0.38,
+          "end": 0.58
+        },
+        {
+          "word": "BAĞLANDIĞIN",
+          "start": 0.58,
+          "end": 1.12
+        }
+      ]
+    },
+    {
+      "start": 1.12,
+      "end": 1.76,
+      "text": "KAFE WI FI",
+      "words": [
+        {
+          "word": "KAFE",
+          "start": 1.12,
+          "end": 1.4
+        },
+        {
+          "word": "WI",
+          "start": 1.4,
+          "end": 1.6
+        },
+        {
+          "word": "FI",
+          "start": 1.6,
+          "end": 1.76
+        }
+      ]
+    },
+    {
+      "start": 1.76,
+      "end": 2.54,
+      "text": "AĞI SENI IZLIYOR",
+      "words": [
+        {
+          "word": "AĞI",
+          "start": 1.76,
+          "end": 2.06
+        },
+        {
+          "word": "SENI",
+          "start": 2.06,
+          "end": 2.28
+        },
+        {
+          "word": "IZLIYOR",
+          "start": 2.28,
+          "end": 2.54
+        }
+      ]
+    },
+    {
+      "start": 2.54,
+      "end": 4.7,
+      "text": "OLABILIR AKARLAR",
+      "words": [
+        {
+          "word": "OLABILIR",
+          "start": 2.54,
+          "end": 2.96
+        },
+        {
+          "word": "AKARLAR",
+          "start": 4.26,
+          "end": 4.7
+        }
+      ]
+    },
+    {
+      "start": 4.7,
+      "end": 5.42,
+      "text": "ŞIFRINI TAHMIN",
+      "words": [
+        {
+          "word": "ŞIFRINI",
+          "start": 4.7,
+          "end": 5.14
+        },
+        {
+          "word": "TAHMIN",
+          "start": 5.14,
+          "end": 5.42
+        }
+      ]
+    },
+    {
+      "start": 5.42,
+      "end": 7.88,
+      "text": "ETMEYE ÇALIŞMAZ DIT",
+      "words": [
+        {
+          "word": "ETMEYE",
+          "start": 5.42,
+          "end": 5.76
+        },
+        {
+          "word": "ÇALIŞMAZ",
+          "start": 5.76,
+          "end": 6.28
+        },
+        {
+          "word": "DIT",
+          "start": 7.58,
+          "end": 7.88
+        }
+      ]
+    },
+    {
+      "start": 7.88,
+      "end": 8.8,
+      "text": "SALDIRISI ILE SENI",
+      "words": [
+        {
+          "word": "SALDIRISI",
+          "start": 7.88,
+          "end": 8.4
+        },
+        {
+          "word": "ILE",
+          "start": 8.4,
+          "end": 8.56
+        },
+        {
+          "word": "SENI",
+          "start": 8.56,
+          "end": 8.8
+        }
+      ]
+    },
+    {
+      "start": 8.8,
+      "end": 9.5,
+      "text": "BIR SANIYE DE",
+      "words": [
+        {
+          "word": "BIR",
+          "start": 8.8,
+          "end": 8.96
+        },
+        {
+          "word": "SANIYE",
+          "start": 8.96,
+          "end": 9.4
+        },
+        {
+          "word": "DE",
+          "start": 9.4,
+          "end": 9.5
+        }
+      ]
+    },
+    {
+      "start": 9.5,
+      "end": 10.3,
+      "text": "ADAM DÜŞÜRÜRLER",
+      "words": [
+        {
+          "word": "ADAM",
+          "start": 9.5,
+          "end": 9.72
+        },
+        {
+          "word": "DÜŞÜRÜRLER",
+          "start": 9.72,
+          "end": 10.3
+        }
+      ]
+    },
+    {
+      "start": 11.5,
+      "end": 12.24,
+      "text": "TELEFONUN TEKRAR",
+      "words": [
+        {
+          "word": "TELEFONUN",
+          "start": 11.5,
+          "end": 12.0
+        },
+        {
+          "word": "TEKRAR",
+          "start": 12.0,
+          "end": 12.24
+        }
+      ]
+    },
+    {
+      "start": 12.24,
+      "end": 12.96,
+      "text": "BAĞLANIRKEN",
+      "words": [
+        {
+          "word": "BAĞLANIRKEN",
+          "start": 12.24,
+          "end": 12.96
+        }
+      ]
+    },
+    {
+      "start": 12.96,
+      "end": 13.96,
+      "text": "ŞIFRELI PAKET HAVADA",
+      "words": [
+        {
+          "word": "ŞIFRELI",
+          "start": 12.96,
+          "end": 13.42
+        },
+        {
+          "word": "PAKET",
+          "start": 13.42,
+          "end": 13.7
+        },
+        {
+          "word": "HAVADA",
+          "start": 13.7,
+          "end": 13.96
+        }
+      ]
+    },
+    {
+      "start": 13.96,
+      "end": 16.18,
+      "text": "YAKALANIR BUNA DÖRT",
+      "words": [
+        {
+          "word": "YAKALANIR",
+          "start": 13.96,
+          "end": 14.48
+        },
+        {
+          "word": "BUNA",
+          "start": 15.62,
+          "end": 15.94
+        },
+        {
+          "word": "DÖRT",
+          "start": 15.94,
+          "end": 16.18
+        }
+      ]
+    },
+    {
+      "start": 16.18,
+      "end": 17.08,
+      "text": "YOLLU EN SIKIŞMA",
+      "words": [
+        {
+          "word": "YOLLU",
+          "start": 16.18,
+          "end": 16.48
+        },
+        {
+          "word": "EN",
+          "start": 16.48,
+          "end": 16.62
+        },
+        {
+          "word": "SIKIŞMA",
+          "start": 16.62,
+          "end": 17.08
+        }
+      ]
+    },
+    {
+      "start": 17.08,
+      "end": 19.06,
+      "text": "DENIR AKAR BU",
+      "words": [
+        {
+          "word": "DENIR",
+          "start": 17.08,
+          "end": 17.38
+        },
+        {
+          "word": "AKAR",
+          "start": 18.6,
+          "end": 18.92
+        },
+        {
+          "word": "BU",
+          "start": 18.92,
+          "end": 19.06
+        }
+      ]
+    },
+    {
+      "start": 19.06,
+      "end": 19.94,
+      "text": "PAKETI GÜÇLÜ BIR",
+      "words": [
+        {
+          "word": "PAKETI",
+          "start": 19.06,
+          "end": 19.42
+        },
+        {
+          "word": "GÜÇLÜ",
+          "start": 19.42,
+          "end": 19.76
+        },
+        {
+          "word": "BIR",
+          "start": 19.76,
+          "end": 19.94
+        }
+      ]
+    },
+    {
+      "start": 19.94,
+      "end": 20.6,
+      "text": "BILGISAYARDA",
+      "words": [
+        {
+          "word": "BILGISAYARDA",
+          "start": 19.94,
+          "end": 20.6
+        }
+      ]
+    },
+    {
+      "start": 20.6,
+      "end": 21.42,
+      "text": "SANIYELER IÇINDE",
+      "words": [
+        {
+          "word": "SANIYELER",
+          "start": 20.6,
+          "end": 21.12
+        },
+        {
+          "word": "IÇINDE",
+          "start": 21.12,
+          "end": 21.42
+        }
+      ]
+    },
+    {
+      "start": 21.42,
+      "end": 23.4,
+      "text": "ÇÖZER ÇÖZÜM ÇOK",
+      "words": [
+        {
+          "word": "ÇÖZER",
+          "start": 21.42,
+          "end": 21.76
+        },
+        {
+          "word": "ÇÖZÜM",
+          "start": 22.8,
+          "end": 23.22
+        },
+        {
+          "word": "ÇOK",
+          "start": 23.22,
+          "end": 23.4
+        }
+      ]
+    },
+    {
+      "start": 23.4,
+      "end": 24.52,
+      "text": "BASIT HALKA AÇIK",
+      "words": [
+        {
+          "word": "BASIT",
+          "start": 23.4,
+          "end": 23.76
+        },
+        {
+          "word": "HALKA",
+          "start": 24.12,
+          "end": 24.36
+        },
+        {
+          "word": "AÇIK",
+          "start": 24.36,
+          "end": 24.52
+        }
+      ]
+    },
+    {
+      "start": 24.52,
+      "end": 25.38,
+      "text": "HALARDA ASLA",
+      "words": [
+        {
+          "word": "HALARDA",
+          "start": 24.52,
+          "end": 24.98
+        },
+        {
+          "word": "ASLA",
+          "start": 24.98,
+          "end": 25.38
+        }
+      ]
+    },
+    {
+      "start": 25.38,
+      "end": 26.34,
+      "text": "ŞIFRESIZ GEZME VE",
+      "words": [
+        {
+          "word": "ŞIFRESIZ",
+          "start": 25.38,
+          "end": 25.9
+        },
+        {
+          "word": "GEZME",
+          "start": 25.9,
+          "end": 26.18
+        },
+        {
+          "word": "VE",
+          "start": 26.18,
+          "end": 26.34
+        }
+      ]
+    },
+    {
+      "start": 26.34,
+      "end": 27.12,
+      "text": "MUTLAKA VE PENE",
+      "words": [
+        {
+          "word": "MUTLAKA",
+          "start": 26.34,
+          "end": 26.7
+        },
+        {
+          "word": "VE",
+          "start": 26.7,
+          "end": 26.9
+        },
+        {
+          "word": "PENE",
+          "start": 26.9,
+          "end": 27.12
+        }
+      ]
+    },
+    {
+      "start": 27.12,
+      "end": 29.46,
+      "text": "KULLAN SIBEL DÜNYADA",
+      "words": [
+        {
+          "word": "KULLAN",
+          "start": 27.12,
+          "end": 27.36
+        },
+        {
+          "word": "SIBEL",
+          "start": 28.36,
+          "end": 28.9
+        },
+        {
+          "word": "DÜNYADA",
+          "start": 28.9,
+          "end": 29.46
+        }
+      ]
+    },
+    {
+      "start": 29.46,
+      "end": 30.42,
+      "text": "AV DEĞIL AVCI",
+      "words": [
+        {
+          "word": "AV",
+          "start": 29.46,
+          "end": 29.62
+        },
+        {
+          "word": "DEĞIL",
+          "start": 29.62,
+          "end": 29.9
+        },
+        {
+          "word": "AVCI",
+          "start": 29.9,
+          "end": 30.42
+        }
+      ]
+    },
+    {
+      "start": 30.42,
+      "end": 32.4,
+      "text": "OL TAKIP TEKAL",
+      "words": [
+        {
+          "word": "OL",
+          "start": 30.42,
+          "end": 30.64
+        },
+        {
+          "word": "TAKIP",
+          "start": 31.38,
+          "end": 32.06
+        },
+        {
+          "word": "TEKAL",
+          "start": 32.06,
+          "end": 32.4
+        }
+      ]
+    }
+  ],
+  "sfx": [
+    {
+      "time": 0.08,
+      "kind": "tap",
+      "gain": 0.25
+    },
+    {
+      "time": 5.636,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 11.192,
+      "kind": "paper",
+      "gain": 0.25
+    },
+    {
+      "time": 16.748,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 22.304,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 27.86,
+      "kind": "jingle",
+      "gain": 0.25
+    }
+  ],
+  "music": {
+    "path": "bgm.wav",
+    "gain": 0.12
+  }
+}

@@ -1,0 +1,1393 @@
+{
+  "version": 1,
+  "style": "B1",
+  "theme": "cyber",
+  "backgroundColor": "#0A0E17",
+  "width": 720,
+  "height": 1280,
+  "fps": 30,
+  "duration": 33.486667,
+  "captionStyle": "viral",
+  "captionSize": 56,
+  "captionY": 1460,
+  "captionColor": "#00FF66",
+  "captionActiveColor": "#00FF66",
+  "captionBg": "rgba(7, 12, 20, 0.96)",
+  "captionBorder": "rgba(0, 255, 128, 0.50)",
+  "voice": {
+    "path": "narration.wav",
+    "lead": 0.0
+  },
+  "shots": [
+    {
+      "start": 0.0,
+      "end": 5.581,
+      "layers": [
+        {
+          "type": "text",
+          "text": "ŞİFREN GÜVENDE Mİ?",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 576,
+          "color": "#FF3B30",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 130,
+          "y": 790,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 130,
+              "y": 790,
+              "w": 470
+            },
+            {
+              "t": 0.5,
+              "x": 130,
+              "y": 760,
+              "w": 482
+            },
+            {
+              "t": 1.0,
+              "x": 130,
+              "y": 790,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 670,
+          "y": 810,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.08,
+              "x": 656,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.16,
+              "x": 684,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.24,
+              "x": 662,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.32,
+              "x": 678,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.4,
+              "x": 670,
+              "y": 810,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-padlock-unlocked.png",
+          "x": 490,
+          "y": 1420,
+          "w": 290,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 325,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 290,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 5.581,
+      "end": 11.162,
+      "layers": [
+        {
+          "type": "text",
+          "text": "SANİYEDE MİLYARLARCA DENEME!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FFE500",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 130,
+          "y": 780,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 130,
+              "y": 780,
+              "w": 480
+            },
+            {
+              "t": 0.5,
+              "x": 130,
+              "y": 750,
+              "w": 492
+            },
+            {
+              "t": 1.0,
+              "x": 130,
+              "y": 780,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 670,
+          "y": 810,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.08,
+              "x": 656,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.16,
+              "x": 684,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.24,
+              "x": 662,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.32,
+              "x": 678,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.4,
+              "x": 670,
+              "y": 810,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-laptop.png",
+          "x": 490,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        },
+        {
+          "type": "arrow",
+          "x": 380,
+          "y": 1490,
+          "w": 520,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "progress": 0
+            },
+            {
+              "t": 0.45,
+              "progress": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 11.162,
+      "end": 16.743,
+      "layers": [
+        {
+          "type": "text",
+          "text": "BRUTE FORCE SALDIRISI!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 704,
+          "color": "#FF3B30",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 110,
+          "y": 810,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 110,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.08,
+              "x": 96,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.16,
+              "x": 124,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.24,
+              "x": 102,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.32,
+              "x": 118,
+              "y": 810,
+              "w": 470
+            },
+            {
+              "t": 0.4,
+              "x": 110,
+              "y": 810,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 670,
+          "y": 780,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 780,
+              "w": 480
+            },
+            {
+              "t": 0.5,
+              "x": 670,
+              "y": 750,
+              "w": 492
+            },
+            {
+              "t": 1.0,
+              "x": 670,
+              "y": 780,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-skull.png",
+          "x": 480,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 16.743,
+      "end": 22.324,
+      "layers": [
+        {
+          "type": "text",
+          "text": "SADECE 3 SANİYE SÜRDÜ!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 120,
+          "y": 820,
+          "w": 480,
+          "keys": [
+            {
+              "t": 0,
+              "x": 120,
+              "y": 820,
+              "w": 480
+            },
+            {
+              "t": 0.08,
+              "x": 106,
+              "y": 820,
+              "w": 480
+            },
+            {
+              "t": 0.16,
+              "x": 134,
+              "y": 820,
+              "w": 480
+            },
+            {
+              "t": 0.24,
+              "x": 112,
+              "y": 820,
+              "w": 480
+            },
+            {
+              "t": 0.32,
+              "x": 128,
+              "y": 820,
+              "w": 480
+            },
+            {
+              "t": 0.4,
+              "x": 120,
+              "y": 820,
+              "w": 480
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 660,
+          "y": 790,
+          "w": 470,
+          "keys": [
+            {
+              "t": 0,
+              "x": 660,
+              "y": 790,
+              "w": 470
+            },
+            {
+              "t": 0.5,
+              "x": 660,
+              "y": 760,
+              "w": 482
+            },
+            {
+              "t": 1.0,
+              "x": 660,
+              "y": 790,
+              "w": 470
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-database.png",
+          "x": 490,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        },
+        {
+          "type": "arrow",
+          "x": 380,
+          "y": 1490,
+          "w": 520,
+          "color": "#FF3B30",
+          "keys": [
+            {
+              "t": 0,
+              "progress": 0
+            },
+            {
+              "t": 0.45,
+              "progress": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 22.324,
+      "end": 27.906,
+      "layers": [
+        {
+          "type": "text",
+          "text": "GÜÇLÜ PAROLA = YÜZLERCE YIL",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#00FF66",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 864,
+          "color": "#00FF66",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 140,
+          "y": 780,
+          "w": 490,
+          "keys": [
+            {
+              "t": 0,
+              "x": 140,
+              "y": 780,
+              "w": 490
+            },
+            {
+              "t": 0.5,
+              "x": 140,
+              "y": 750,
+              "w": 502
+            },
+            {
+              "t": 1.0,
+              "x": 140,
+              "y": 780,
+              "w": 490
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 0,
+          "x": 670,
+          "y": 800,
+          "w": 460,
+          "keys": [
+            {
+              "t": 0,
+              "x": 670,
+              "y": 800,
+              "w": 460
+            },
+            {
+              "t": 0.5,
+              "x": 670,
+              "y": 770,
+              "w": 472
+            },
+            {
+              "t": 1.0,
+              "x": 670,
+              "y": 800,
+              "w": 460
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-padlock-locked.png",
+          "x": 490,
+          "y": 1420,
+          "w": 290,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 325,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 290,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "start": 27.906,
+      "end": 33.487,
+      "layers": [
+        {
+          "type": "text",
+          "text": "ŞİFRENİ HEMEN GÜNCELLE!",
+          "x": 80,
+          "y": 280,
+          "w": 1120,
+          "size": 58,
+          "bold": true,
+          "color": "#00FF66",
+          "keys": [
+            {
+              "t": 0,
+              "alpha": 0.0
+            },
+            {
+              "t": 0.2,
+              "alpha": 1.0
+            }
+          ]
+        },
+        {
+          "type": "underline",
+          "x": 80,
+          "y": 360,
+          "w": 736,
+          "color": "#00FF66",
+          "lineWidth": 7,
+          "keys": [
+            {
+              "t": 0.05,
+              "progress": 0.0
+            },
+            {
+              "t": 0.45,
+              "progress": 1.0
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 1,
+          "x": 130,
+          "y": 770,
+          "w": 500,
+          "keys": [
+            {
+              "t": 0,
+              "x": 130,
+              "y": 770,
+              "w": 500
+            },
+            {
+              "t": 0.5,
+              "x": 130,
+              "y": 740,
+              "w": 512
+            },
+            {
+              "t": 1.0,
+              "x": 130,
+              "y": 770,
+              "w": 500
+            }
+          ]
+        },
+        {
+          "type": "pose",
+          "pose": 2,
+          "x": 660,
+          "y": 770,
+          "w": 500,
+          "keys": [
+            {
+              "t": 0,
+              "x": 660,
+              "y": 770,
+              "w": 500
+            },
+            {
+              "t": 0.5,
+              "x": 660,
+              "y": 740,
+              "w": 512
+            },
+            {
+              "t": 1.0,
+              "x": 660,
+              "y": 770,
+              "w": 500
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "path": "@b1/cyber-shield.png",
+          "x": 480,
+          "y": 1420,
+          "w": 300,
+          "keys": [
+            {
+              "t": 0,
+              "w": 80,
+              "alpha": 0.0,
+              "angle": 0.0
+            },
+            {
+              "t": 0.25,
+              "w": 335,
+              "alpha": 1.0,
+              "angle": 0.05
+            },
+            {
+              "t": 0.42,
+              "w": 300,
+              "alpha": 1.0,
+              "angle": 0.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "captions": [
+    {
+      "start": 0.0,
+      "end": 0.92,
+      "text": "EĞER ŞIFREN 1",
+      "words": [
+        {
+          "word": "EĞER",
+          "start": 0.0,
+          "end": 0.2
+        },
+        {
+          "word": "ŞIFREN",
+          "start": 0.2,
+          "end": 0.68
+        },
+        {
+          "word": "1",
+          "start": 0.68,
+          "end": 0.92
+        }
+      ]
+    },
+    {
+      "start": 0.92,
+      "end": 1.56,
+      "text": "2 3 4",
+      "words": [
+        {
+          "word": "2",
+          "start": 0.92,
+          "end": 1.14
+        },
+        {
+          "word": "3",
+          "start": 1.14,
+          "end": 1.32
+        },
+        {
+          "word": "4",
+          "start": 1.32,
+          "end": 1.56
+        }
+      ]
+    },
+    {
+      "start": 1.96,
+      "end": 2.6,
+      "text": "5 6 VEYA",
+      "words": [
+        {
+          "word": "5",
+          "start": 1.96,
+          "end": 2.12
+        },
+        {
+          "word": "6",
+          "start": 2.12,
+          "end": 2.34
+        },
+        {
+          "word": "VEYA",
+          "start": 2.34,
+          "end": 2.6
+        }
+      ]
+    },
+    {
+      "start": 2.6,
+      "end": 3.62,
+      "text": "DOĞUM TARIHINSE",
+      "words": [
+        {
+          "word": "DOĞUM",
+          "start": 2.6,
+          "end": 2.96
+        },
+        {
+          "word": "TARIHINSE",
+          "start": 2.96,
+          "end": 3.62
+        }
+      ]
+    },
+    {
+      "start": 4.02,
+      "end": 4.48,
+      "text": "HAKERLERIN",
+      "words": [
+        {
+          "word": "HAKERLERIN",
+          "start": 4.02,
+          "end": 4.48
+        }
+      ]
+    },
+    {
+      "start": 4.48,
+      "end": 5.44,
+      "text": "SANA IHTIYACI BILE",
+      "words": [
+        {
+          "word": "SANA",
+          "start": 4.48,
+          "end": 4.72
+        },
+        {
+          "word": "IHTIYACI",
+          "start": 4.72,
+          "end": 5.26
+        },
+        {
+          "word": "BILE",
+          "start": 5.26,
+          "end": 5.44
+        }
+      ]
+    },
+    {
+      "start": 5.44,
+      "end": 7.0,
+      "text": "YOK SIRADAN BIR",
+      "words": [
+        {
+          "word": "YOK",
+          "start": 5.44,
+          "end": 5.66
+        },
+        {
+          "word": "SIRADAN",
+          "start": 6.3,
+          "end": 6.8
+        },
+        {
+          "word": "BIR",
+          "start": 6.8,
+          "end": 7.0
+        }
+      ]
+    },
+    {
+      "start": 7.0,
+      "end": 8.4,
+      "text": "HAKER BILGISAYARI",
+      "words": [
+        {
+          "word": "HAKER",
+          "start": 7.0,
+          "end": 7.38
+        },
+        {
+          "word": "BILGISAYARI",
+          "start": 7.9,
+          "end": 8.4
+        }
+      ]
+    },
+    {
+      "start": 8.4,
+      "end": 9.0,
+      "text": "SANIYE DE",
+      "words": [
+        {
+          "word": "SANIYE",
+          "start": 8.4,
+          "end": 8.84
+        },
+        {
+          "word": "DE",
+          "start": 8.84,
+          "end": 9.0
+        }
+      ]
+    },
+    {
+      "start": 9.0,
+      "end": 9.94,
+      "text": "MILYARLARCA",
+      "words": [
+        {
+          "word": "MILYARLARCA",
+          "start": 9.0,
+          "end": 9.94
+        }
+      ]
+    },
+    {
+      "start": 9.94,
+      "end": 11.6,
+      "text": "PAROLA DENER BUNA",
+      "words": [
+        {
+          "word": "PAROLA",
+          "start": 9.94,
+          "end": 10.28
+        },
+        {
+          "word": "DENER",
+          "start": 10.28,
+          "end": 10.72
+        },
+        {
+          "word": "BUNA",
+          "start": 11.3,
+          "end": 11.6
+        }
+      ]
+    },
+    {
+      "start": 12.02,
+      "end": 13.18,
+      "text": "KABAK KUVVET YANI",
+      "words": [
+        {
+          "word": "KABAK",
+          "start": 12.02,
+          "end": 12.3
+        },
+        {
+          "word": "KUVVET",
+          "start": 12.3,
+          "end": 12.58
+        },
+        {
+          "word": "YANI",
+          "start": 12.94,
+          "end": 13.18
+        }
+      ]
+    },
+    {
+      "start": 13.58,
+      "end": 14.66,
+      "text": "BRUTAFOR SALDIRISI",
+      "words": [
+        {
+          "word": "BRUTAFOR",
+          "start": 13.58,
+          "end": 14.02
+        },
+        {
+          "word": "SALDIRISI",
+          "start": 14.02,
+          "end": 14.66
+        }
+      ]
+    },
+    {
+      "start": 14.66,
+      "end": 17.18,
+      "text": "DENIR 8 KARAKTERLI",
+      "words": [
+        {
+          "word": "DENIR",
+          "start": 14.66,
+          "end": 15.04
+        },
+        {
+          "word": "8",
+          "start": 16.02,
+          "end": 16.46
+        },
+        {
+          "word": "KARAKTERLI",
+          "start": 16.46,
+          "end": 17.18
+        }
+      ]
+    },
+    {
+      "start": 17.18,
+      "end": 18.08,
+      "text": "BASIT BIR ŞIFRE",
+      "words": [
+        {
+          "word": "BASIT",
+          "start": 17.18,
+          "end": 17.54
+        },
+        {
+          "word": "BIR",
+          "start": 17.54,
+          "end": 17.68
+        },
+        {
+          "word": "ŞIFRE",
+          "start": 17.68,
+          "end": 18.08
+        }
+      ]
+    },
+    {
+      "start": 18.08,
+      "end": 18.82,
+      "text": "GÜÇLÜ BIR EKRAN",
+      "words": [
+        {
+          "word": "GÜÇLÜ",
+          "start": 18.08,
+          "end": 18.4
+        },
+        {
+          "word": "BIR",
+          "start": 18.4,
+          "end": 18.56
+        },
+        {
+          "word": "EKRAN",
+          "start": 18.56,
+          "end": 18.82
+        }
+      ]
+    },
+    {
+      "start": 18.82,
+      "end": 20.58,
+      "text": "KARTIYLA SADECE 3",
+      "words": [
+        {
+          "word": "KARTIYLA",
+          "start": 18.82,
+          "end": 19.34
+        },
+        {
+          "word": "SADECE",
+          "start": 19.34,
+          "end": 20.08
+        },
+        {
+          "word": "3",
+          "start": 20.08,
+          "end": 20.58
+        }
+      ]
+    },
+    {
+      "start": 20.58,
+      "end": 21.58,
+      "text": "SANIYE DE KIRILIR",
+      "words": [
+        {
+          "word": "SANIYE",
+          "start": 20.58,
+          "end": 21.0
+        },
+        {
+          "word": "DE",
+          "start": 21.0,
+          "end": 21.1
+        },
+        {
+          "word": "KIRILIR",
+          "start": 21.1,
+          "end": 21.58
+        }
+      ]
+    },
+    {
+      "start": 22.16,
+      "end": 23.54,
+      "text": "BÜYÜK HARF KÜÇÜK",
+      "words": [
+        {
+          "word": "BÜYÜK",
+          "start": 22.16,
+          "end": 22.68
+        },
+        {
+          "word": "HARF",
+          "start": 22.68,
+          "end": 23.06
+        },
+        {
+          "word": "KÜÇÜK",
+          "start": 23.34,
+          "end": 23.54
+        }
+      ]
+    },
+    {
+      "start": 23.54,
+      "end": 24.86,
+      "text": "HARF RAKAM VE",
+      "words": [
+        {
+          "word": "HARF",
+          "start": 23.54,
+          "end": 24.04
+        },
+        {
+          "word": "RAKAM",
+          "start": 24.46,
+          "end": 24.66
+        },
+        {
+          "word": "VE",
+          "start": 24.66,
+          "end": 24.86
+        }
+      ]
+    },
+    {
+      "start": 24.86,
+      "end": 26.14,
+      "text": "SEMBOL KULLANMAK BU",
+      "words": [
+        {
+          "word": "SEMBOL",
+          "start": 24.86,
+          "end": 25.26
+        },
+        {
+          "word": "KULLANMAK",
+          "start": 25.26,
+          "end": 25.88
+        },
+        {
+          "word": "BU",
+          "start": 25.88,
+          "end": 26.14
+        }
+      ]
+    },
+    {
+      "start": 26.14,
+      "end": 27.44,
+      "text": "SÜREYI 100C YILA",
+      "words": [
+        {
+          "word": "SÜREYI",
+          "start": 26.14,
+          "end": 26.58
+        },
+        {
+          "word": "100C",
+          "start": 26.58,
+          "end": 27.14
+        },
+        {
+          "word": "YILA",
+          "start": 27.14,
+          "end": 27.44
+        }
+      ]
+    },
+    {
+      "start": 27.44,
+      "end": 30.2,
+      "text": "ÇIKARIR PAROLA NIN",
+      "words": [
+        {
+          "word": "ÇIKARIR",
+          "start": 27.44,
+          "end": 27.88
+        },
+        {
+          "word": "PAROLA",
+          "start": 29.12,
+          "end": 30.04
+        },
+        {
+          "word": "NIN",
+          "start": 30.04,
+          "end": 30.2
+        }
+      ]
+    },
+    {
+      "start": 30.2,
+      "end": 31.22,
+      "text": "HEMEN GÜNCELLI",
+      "words": [
+        {
+          "word": "HEMEN",
+          "start": 30.2,
+          "end": 30.5
+        },
+        {
+          "word": "GÜNCELLI",
+          "start": 30.5,
+          "end": 31.22
+        }
+      ]
+    },
+    {
+      "start": 31.22,
+      "end": 31.96,
+      "text": "GÜVENLIĞINI",
+      "words": [
+        {
+          "word": "GÜVENLIĞINI",
+          "start": 31.22,
+          "end": 31.96
+        }
+      ]
+    },
+    {
+      "start": 31.96,
+      "end": 32.88,
+      "text": "ŞANSA BIRAKMA",
+      "words": [
+        {
+          "word": "ŞANSA",
+          "start": 31.96,
+          "end": 32.36
+        },
+        {
+          "word": "BIRAKMA",
+          "start": 32.36,
+          "end": 32.88
+        }
+      ]
+    }
+  ],
+  "sfx": [
+    {
+      "time": 0.08,
+      "kind": "tap",
+      "gain": 0.25
+    },
+    {
+      "time": 5.661,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 11.242,
+      "kind": "paper",
+      "gain": 0.25
+    },
+    {
+      "time": 16.823,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 22.404,
+      "kind": "chime",
+      "gain": 0.25
+    },
+    {
+      "time": 27.986,
+      "kind": "jingle",
+      "gain": 0.25
+    }
+  ],
+  "music": {
+    "path": "bgm.wav",
+    "gain": 0.12
+  }
+}
