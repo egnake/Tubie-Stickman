@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -48,6 +49,13 @@ func runStep(name string, dir string, exe string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+	cmd.Env = os.Environ()
+	if runtime.GOOS == "windows" {
+		patchPath := filepath.Join(dir, "cmd", "check", "node-compat.cjs")
+		if fi, err := os.Stat(patchPath); err == nil && !fi.IsDir() {
+			cmd.Env = append(cmd.Env, "NODE_OPTIONS=--require "+patchPath)
+		}
+	}
 	return cmd.Run()
 }
 
