@@ -73,7 +73,7 @@ function loadPresetIntoEditor() {
 function updateWordCount() {
   const text = $('#custom-narration').value.trim();
   const words = text ? text.split(/\s+/).length : 0;
-  $('#char-word-count').textContent = `${words} kelime · ~${Math.round(words / 2.5)} sn`;
+  $('#char-word-count').textContent = `${words} kelime · ~${Math.round(words / 2.6)} sn`;
 }
 $('#custom-narration').addEventListener('input', updateWordCount);
 
@@ -103,15 +103,16 @@ async function triggerAIGenerate(customPrompt) {
   $('#ai-prompt').value = prompt;
   const btn = $('#btn-ai-generate');
   const status = $('#ai-status');
+  const style = $('#ai-style')?.value || 'hybrid';
   btn.disabled = true;
-  status.textContent = '✨ Yapay zeka senaryo ve sahneleri hazırlıyor...';
+  status.textContent = '✨ Yapay zeka seçili tarzda senaryo ve sahneleri hazırlıyor...';
   status.hidden = false;
 
   try {
     const res = await api('ai-generate', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({prompt})
+      body: JSON.stringify({prompt, style})
     });
     if (res.ok && res.result) {
       $('#custom-title').value = res.result.title;
@@ -119,7 +120,14 @@ async function triggerAIGenerate(customPrompt) {
       currentScenes = res.result.scenes || [];
       renderSceneBadges(currentScenes);
       updateWordCount();
-      status.textContent = '✨ Senaryo başarıyla oluşturuldu! Aşağıdan düzenleyebilir veya doğrudan üretime geçebilirsiniz.';
+      const styleNames = {
+        hybrid: 'Sinematik + Bilgi Akışı',
+        cinematic: 'Sinematik',
+        informative: 'Yoğun Bilgi Akışı'
+      };
+      const styleLabel = styleNames[res.result.style || style] || 'Hibrit';
+      const engineLabel = res.result.engine ? ` · ${res.result.engine}` : '';
+      status.textContent = `✨ ${styleLabel} senaryo oluşturuldu (${currentScenes.length} sahne${engineLabel}). Aşağıdan düzenleyebilir veya doğrudan üretime geçebilirsiniz.`;
     }
   } catch (err) {
     status.textContent = 'Hata: ' + err.message;
@@ -139,16 +147,21 @@ $$('.chip').forEach(chip => {
 function selected() { return $('#all').checked ? presets.map(p => p.id) : [$('#presets input:checked')?.value || '1']; }
 $('#all').addEventListener('change', () => { updateControls(); loadPresetIntoEditor(); });
 function modeHint() {
-  $('#mode-hint').textContent = {
-    pro: 'Türkçe anlatıcı. Ses üretimi internet gerektirir.',
-    cloned: 'Ses merkezindeki referansınız kullanılır. XTTS kurulumu gerekir.',
-    auto: 'Referans varsa kendi sesiniz, yoksa profesyonel ses kullanılır.'
-  }[$('#mode').value];
+  const hints = {
+    'viral-male': 'Viral tempoda, broadcast filtreli Ahmet seslendirmesi (+15% hız).',
+    'viral-fast': 'Çok seri ve enerjik Ahmet seslendirmesi (+22% hız).',
+    'viral-female': 'Canlı ve akıcı Emel seslendirmesi (+14% hız).',
+    'deep-male': 'Daha derin ve karizmatik Ahmet seslendirmesi (-4% perde).',
+    'cloned': 'Ses merkezindeki sesim.wav referansı XTTS ile +15% hızlandırılıp akıcı hâle getirilir.',
+    'cloned-fast': 'Ses merkezindeki sesim.wav referansı XTTS ile +25% seri tempoda hızlandırılır.'
+  };
+  const style = $('#voice-style')?.value || 'viral-male';
+  $('#mode-hint').textContent = hints[style] || hints['viral-male'];
 }
-$('#mode').addEventListener('change', modeHint);
+$('#voice-style')?.addEventListener('change', modeHint);
 function updateControls() {
   const blocked = busy || pending || disconnected || !!recorder;
-  ['generate', 'mode', 'all', 'voice-file', 'doctor', 'btn-ai-generate', 'custom-title', 'custom-narration', 'ai-prompt'].forEach(id => {
+  ['generate', 'voice-style', 'bgm-choice', 'ai-style', 'all', 'voice-file', 'doctor', 'btn-ai-generate', 'custom-title', 'custom-narration', 'ai-prompt'].forEach(id => {
     const node = $('#' + id);
     if (node) node.disabled = blocked;
   });
@@ -163,7 +176,7 @@ function updateControls() {
 $('#generate').addEventListener('click', () => {
   const voiceStyle = $('#voice-style')?.value || 'viral-male';
   const bgm = $('#bgm-choice')?.value || 'cyber';
-  const mode = voiceStyle === 'cloned' ? 'cloned' : 'pro';
+  const mode = voiceStyle.startsWith('cloned') ? 'cloned' : 'pro';
 
   if (currentTopicMode === 'ai' || !$('#all').checked) {
     const title = $('#custom-title').value.trim();
@@ -196,7 +209,12 @@ $('#generate').addEventListener('click', () => {
 $('#doctor').addEventListener('click', async () => { $('#log-panel').open = true; await action('job', {action: 'doctor'}); });
 $('#cancel').addEventListener('click', () => action('cancel'));
 $('#approve').addEventListener('click', () => action('approve'));
-$('#test-voice').addEventListener('click', async () => { $('#log-panel').open = true; await action('job', {action: 'test-voice'}); });
+$('#test-voice').addEventListener('click', async () => {
+  $('#log-panel').open = true;
+  const selectedStyle = $('#voice-style')?.value || '';
+  const voiceStyle = selectedStyle.startsWith('cloned') ? selectedStyle : 'cloned';
+  await action('job', {action: 'test-voice', voice_style: voiceStyle});
+});
 async function shutdown() {
   if (busy && !window.confirm('Devam eden işlem durdurulacak. Uygulama kapatılsın mı?')) return;
   if (recorder) { recorder.onstop = null; recorder.stop(); releaseMicrophone(); }
@@ -335,7 +353,7 @@ function render(data) {
     syncedJob = job.started;
     $('#all').checked = job.presets.length === 4;
     $$('#presets input').forEach(input => { input.checked = input.value === job.presets[0]; });
-    $('#mode').value = job.mode;
+    if (job.voice_style && $('#voice-style')) $('#voice-style').value = job.voice_style;
     loadPresetIntoEditor(); modeHint();
   }
   $('#job-label').textContent = job.label;
@@ -437,8 +455,8 @@ async function init() {
       const input = element('input'); input.type = 'radio'; input.name = 'preset'; input.value = preset.id; input.checked = index === 0;
       input.addEventListener('change', loadPresetIntoEditor); label.append(number, text, input); $('#presets').append(label);
     });
-    $('#ai-prompt').value = 'İnstagram hesap çalma tuzakları ve korunma yöntemleri';
-    loadPresetIntoEditor(); poll(); setInterval(() => { if (!stopped) tick(); }, 1000);
+    $('#ai-prompt').value = 'Sahte linkleri 5 saniyede nasıl anlarsın? Oltalama tuzakları';
+    modeHint(); loadPresetIntoEditor(); poll(); setInterval(() => { if (!stopped) tick(); }, 1000);
   } catch (error) { toast('Arayüz yüklenemedi. Sayfayı yenileyin. ' + error.message); }
 }
 init();

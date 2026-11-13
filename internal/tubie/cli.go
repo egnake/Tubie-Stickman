@@ -36,10 +36,11 @@ func Main(args []string) int {
 	case "generate":
 		genFlags := flag.NewFlagSet("generate", flag.ExitOnError)
 		preset := genFlags.String("preset", "", "Şablon numarası (1, 2, 3, 4)")
-		topic := genFlags.String("topic", "", "Özel konu / fikir (örn: 'İnstagram hesap çalma')")
+		topic := genFlags.String("topic", "", "Özel konu / fikir (örn: 'Sahte linkleri 5 saniyede nasıl anlarsın?')")
+		style := genFlags.String("style", StyleHybrid, "Senaryo tarzı: hybrid, cinematic, informative")
 		all := genFlags.Bool("all", false, "Tüm şablonları üret")
 		mode := genFlags.String("mode", "auto", "Ses modu: pro, cloned, auto")
-		voice := genFlags.String("voice", "viral-male", "Ses stili: viral-male, viral-fast, viral-female, deep-male, cloned")
+		voice := genFlags.String("voice", "viral-male", "Ses stili: viral-male, viral-fast, viral-female, deep-male, cloned, cloned-fast")
 		bgm := genFlags.String("bgm", "cyber", "Arka plan müziği: cyber, lofi, none")
 		_ = genFlags.Parse(args[1:])
 
@@ -51,8 +52,9 @@ func Main(args []string) int {
 		}
 
 		if *topic != "" {
-			fmt.Printf("✨ Yapay zeka ile senaryo üretiliyor: %q...\n", *topic)
-			res, err := GenerateScript(*topic)
+			normStyle := NormalizeScriptStyle(*style)
+			fmt.Printf("✨ Yapay zeka ile senaryo üretiliyor [%s]: %q...\n", normStyle, *topic)
+			res, err := GenerateScriptWithStyle(*topic, normStyle)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Senaryo üretim hatası: %v\n", err)
 				return 1
@@ -145,4 +147,3 @@ func isFile(p string) bool {
 func init() {
 	_ = filepath.Separator
 }
-

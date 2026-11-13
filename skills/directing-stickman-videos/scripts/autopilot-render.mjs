@@ -61,11 +61,139 @@ export async function painter(p) {
     ctx.fillRect(0, 0, plane.width, plane.height);
     if ((p.style === 'B1' || isCyber) && p.grid !== false) {
       ctx.beginPath();
-      ctx.strokeStyle = isCyber ? 'rgba(0, 255, 128, 0.045)' : 'rgba(76,90,105,.036)';
+      ctx.strokeStyle = isCyber ? 'rgba(0, 255, 128, 0.055)' : 'rgba(76,90,105,.036)';
       ctx.lineWidth = 0.8;
       for (let x = 32.5; x < plane.width; x += 64) { ctx.moveTo(x, 0); ctx.lineTo(x, captionBand - 1); }
       for (let y = 16.5; y < captionBand; y += 64) { ctx.moveTo(0, y); ctx.lineTo(plane.width, y); }
       ctx.stroke();
+    }
+    if (isCyber) {
+      // 1. Deterministic Animated Cyber Binary Rain (subtle motion & depth)
+      ctx.save();
+      ctx.font = '700 18px B1Caption';
+      ctx.textBaseline = 'top';
+      const cols = 16;
+      const colW = plane.width / cols;
+      for (let c = 0; c < cols; c++) {
+        const speed = 135 + ((c * 43) % 110);
+        const offset = (c * 317) % plane.height;
+        const baseY = (t * speed + offset) % (plane.height + 320) - 160;
+        for (let row = 0; row < 6; row++) {
+          const ch = ((c * 3 + row + Math.floor(t * 5)) % 2 === 0) ? '1' : '0';
+          ctx.fillStyle = `rgba(0, 255, 128, ${(0.085 - row * 0.012).toFixed(3)})`;
+          ctx.fillText(ch, c * colW + 26, baseY - row * 24);
+        }
+      }
+      ctx.restore();
+
+      // 1b. Dynamic Cyber Radar Scanline Sweep
+      ctx.save();
+      const scanY = (t * 210) % (plane.height - 520) + 220;
+      const scanGrad = ctx.createLinearGradient(0, scanY - 36, 0, scanY + 36);
+      scanGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+      scanGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.055)');
+      scanGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+      ctx.fillStyle = scanGrad;
+      ctx.fillRect(40, scanY - 36, plane.width - 80, 72);
+      ctx.restore();
+
+      // 1c. Holographic Cyber Deck Floor Horizon (grounds actors & workstations)
+      ctx.save();
+      const deckY = 1485;
+      const deckGlow = ctx.createLinearGradient(60, deckY, plane.width - 60, deckY);
+      deckGlow.addColorStop(0, 'rgba(0, 240, 255, 0)');
+      deckGlow.addColorStop(0.25, 'rgba(0, 240, 255, 0.28)');
+      deckGlow.addColorStop(0.5, 'rgba(0, 255, 128, 0.42)');
+      deckGlow.addColorStop(0.75, 'rgba(0, 240, 255, 0.28)');
+      deckGlow.addColorStop(1, 'rgba(0, 240, 255, 0)');
+      ctx.strokeStyle = deckGlow;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(60, deckY);
+      ctx.lineTo(plane.width - 60, deckY);
+      ctx.stroke();
+
+      // Perspective deck grid lines fading below the stage
+      const perspGrad = ctx.createLinearGradient(0, deckY, 0, deckY + 185);
+      perspGrad.addColorStop(0, 'rgba(0, 240, 255, 0.14)');
+      perspGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+      ctx.strokeStyle = perspGrad;
+      ctx.lineWidth = 1.2;
+      for (let gx = 160; gx <= plane.width - 160; gx += 160) {
+        ctx.beginPath();
+        ctx.moveTo(gx, deckY);
+        ctx.lineTo(gx + (gx - plane.width / 2) * 0.35, deckY + 185);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(110, deckY + 48);
+      ctx.lineTo(plane.width - 110, deckY + 48);
+      ctx.moveTo(85, deckY + 108);
+      ctx.lineTo(plane.width - 85, deckY + 108);
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Cinematic Radial Cyber Vignette
+      const vig = ctx.createRadialGradient(plane.width / 2, plane.height * 0.45, plane.width * 0.25, plane.width / 2, plane.height * 0.45, plane.width * 0.85);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, 'rgba(4, 8, 16, 0.72)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, plane.width, plane.height);
+
+      // 3. High-Tech Cyber HUD Corner Brackets
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.50)';
+      ctx.lineWidth = 3.5;
+      const bLen = 42, bPad = 36;
+      // Top-Left
+      ctx.beginPath(); ctx.moveTo(bPad, bPad + bLen); ctx.lineTo(bPad, bPad); ctx.lineTo(bPad + bLen, bPad); ctx.stroke();
+      // Top-Right
+      ctx.beginPath(); ctx.moveTo(plane.width - bPad - bLen, bPad); ctx.lineTo(plane.width - bPad, bPad); ctx.lineTo(plane.width - bPad, bPad + bLen); ctx.stroke();
+      // Bottom-Left
+      ctx.beginPath(); ctx.moveTo(bPad, plane.height - bPad - bLen); ctx.lineTo(bPad, plane.height - bPad); ctx.lineTo(bPad + bLen, plane.height - bPad); ctx.stroke();
+      // Bottom-Right
+      ctx.beginPath(); ctx.moveTo(plane.width - bPad - bLen, plane.height - bPad); ctx.lineTo(plane.width - bPad, plane.height - bPad); ctx.lineTo(plane.width - bPad, plane.height - bPad - bLen); ctx.stroke();
+
+      // 4. Top Cyber Broadcast HUD (REC 4K UHD, Threat Intel & Progress Bar)
+      ctx.font = '700 24px B1Caption';
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.85)';
+      ctx.textBaseline = 'top';
+      ctx.fillText('[ SİBER İSTİHBARAT ]', bPad + 12, bPad + 10);
+
+      const recBlink = Math.floor(t * 2) % 2 === 0 ? 0.95 : 0.30;
+      ctx.fillStyle = `rgba(255, 59, 48, ${recBlink})`;
+      ctx.beginPath();
+      ctx.arc(plane.width - bPad - 165, bPad + 22, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 59, 48, 0.95)';
+      ctx.fillText('REC', plane.width - bPad - 148, bPad + 10);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
+      ctx.fillText('4K UHD', plane.width - bPad - 95, bPad + 10);
+
+      // Subtle retention progress bar under top HUD
+      const barW = plane.width - (bPad + 12) * 2;
+      const pct = clamp(t / Math.max(0.1, p.duration || 30));
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(bPad + 12, bPad + 44, barW, 3);
+      const barGrad = ctx.createLinearGradient(bPad + 12, 0, bPad + 12 + barW, 0);
+      barGrad.addColorStop(0, '#00F0FF');
+      barGrad.addColorStop(1, '#00FF66');
+      ctx.fillStyle = barGrad;
+      ctx.fillRect(bPad + 12, bPad + 44, barW * pct, 3);
+
+      // Micro Telemetry Bar & Equalizer Visualizer
+      ctx.font = '600 13px B1Caption';
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.42)';
+      ctx.fillText('NODE 0x7F // SSL_TLS · AES-256 MONITORING', bPad + 12, bPad + 54);
+
+      for (let eq = 0; eq < 5; eq++) {
+        const eqH = 4 + Math.abs(Math.sin(t * (7 + eq * 2.3) + eq)) * 11;
+        ctx.fillStyle = 'rgba(0, 255, 102, 0.65)';
+        ctx.fillRect(plane.width - bPad - 44 + eq * 6, bPad + 66 - eqH, 3.5, eqH);
+      }
+      ctx.restore();
     }
     const shot = p.shots.find(s => t >= s.start && t < s.end) || p.shots.at(-1);
     function paintLayers(layers) { for (const layer of layers) {
@@ -80,10 +208,30 @@ export async function painter(p) {
       else if (l.type === 'image') {
         const img = images.get(mediaPath(p.base, l.path)), h = l.h || w * img.height / img.width;
         const scale = Math.min(w / img.width, h / img.height);
-        ctx.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
+        if (isCyber && l.glow) {
+          ctx.save();
+          ctx.shadowColor = l.glow === 'red' ? 'rgba(255, 59, 48, 0.70)' : (l.glow === 'green' ? 'rgba(0, 255, 102, 0.65)' : (l.glow === 'yellow' ? 'rgba(255, 204, 0, 0.70)' : 'rgba(0, 240, 255, 0.65)'));
+          ctx.shadowBlur = 24;
+          ctx.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
+          ctx.restore();
+        } else {
+          ctx.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
+        }
       } else if (l.type === 'pose') {
         const poseSheet = (isCyber || l.sheet === 'cyber') ? '@b1/character-pose-sheet-cyber.png' : '@b1/character-pose-sheet-v6.png';
         const img = images.get(mediaPath(p.base, poseSheet)), sw = img.width / 3;
+        if (isCyber && l.aura) {
+          ctx.save();
+          const cx = w / 2, cy = (w * img.height / sw) * 0.45, r = w * 0.48;
+          const auraGrad = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+          auraGrad.addColorStop(0, l.aura === 'red' ? 'rgba(255, 59, 48, 0.24)' : (l.aura === 'green' ? 'rgba(0, 255, 102, 0.22)' : 'rgba(0, 240, 255, 0.22)'));
+          auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
         ctx.drawImage(img, l.pose * sw, 0, sw, img.height, 0, 0, w, w * img.height / sw);
       } else if (l.type === 'shadow') {
         const gradient = ctx.createLinearGradient(0, 0, w, 0);
@@ -92,11 +240,38 @@ export async function painter(p) {
         gradient.addColorStop(1, 'rgba(10,12,14,0)');
         ctx.fillStyle = gradient; ctx.fillRect(0, 0, w, l.h);
       } else if (l.type === 'text') {
-        const size = l.size || 52; ctx.font = `${l.bold ? 700 : 400} ${size}px ${['B3', 'B4'].includes(p.style) ? 'B1Caption' : 'B1Hand'}`;
-        ctx.fillStyle = l.color || (isCyber ? '#E6EDF3' : (['B3', 'B4'].includes(p.style) ? '#e9eaea' : '#191916'));
+        const size = l.size || 52;
+        const fontName = (isCyber || l.font === 'caption' || ['B3', 'B4'].includes(p.style)) ? 'B1Caption' : 'B1Hand';
+        ctx.font = `${l.bold ? 700 : 400} ${size}px ${fontName}`;
         ctx.textBaseline = 'top';
         const lines = wrap(ctx, l.text, l.w || 1080 - x);
-        lines.forEach((s, i) => ctx.fillText(s, 0, i * size * 1.15));
+        if (isCyber && l.badge) {
+          const maxLineW = Math.max(...lines.map(s => ctx.measureText(s).width));
+          const padX = 28, padY = 12;
+          const bw = maxLineW + padX * 2;
+          const bh = lines.length * size * 1.15 + padY * 2 - 4;
+          const offsetX = l.center ? -bw / 2 : -padX;
+          ctx.save();
+          ctx.fillStyle = 'rgba(8, 16, 28, 0.90)';
+          ctx.strokeStyle = l.badge;
+          ctx.lineWidth = 2.5;
+          ctx.shadowColor = l.badge;
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(offsetX, -padY, bw, bh, 14);
+          else ctx.rect(offsetX, -padY, bw, bh);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.fillStyle = l.color || (isCyber ? '#E6EDF3' : (['B3', 'B4'].includes(p.style) ? '#e9eaea' : '#191916'));
+        if (isCyber && l.center) {
+          ctx.textAlign = 'center';
+          lines.forEach((s, i) => ctx.fillText(s, 0, i * size * 1.15));
+          ctx.textAlign = 'left';
+        } else {
+          lines.forEach((s, i) => ctx.fillText(s, 0, i * size * 1.15));
+        }
       } else {
         let points = l.points;
         if (l.type === 'underline') points = [[0, 1], [w * 0.25, -1], [w * 0.55, 2], [w, -2]];
@@ -150,19 +325,30 @@ export async function painter(p) {
             const wText = (p.captionUppercase !== false) ? wObj.word.toUpperCase() : wObj.word;
             const wWidth = ctx.measureText(wText).width;
             const isActive = t >= wObj.start && t < wObj.end;
+            const drawY = isActive && isCyber ? cy - 3 : cy;
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 6;
-            ctx.strokeText(wText, curX, cy);
+            ctx.strokeText(wText, curX, drawY);
             if (isActive) {
+              let activeColor = p.captionActiveColor || '#FFE500';
+              if (isCyber) {
+                if (/(HACKER|ŞİFRE|ÇALIN|SAHTE|TUZA[ĞG]|TEHLİKE|SIZDIR|KAYIP|PANİK|SIFIRLAN|SALDIR|KRİPT|KIRMAK|AĞDAN|HEDİYE|ATLAR|KÖTÜ|BOŞALT|VİRÜS)/.test(wText)) {
+                  activeColor = '#FF3B4E';
+                } else if (/(2FA|KORU|GÜVEN|DOĞRULAMA|ŞİMDİ|VPN|UYANIK|KALKAN|AVCI|GÜÇLÜ|TAKİP|AÇ|PAROLA)/.test(wText)) {
+                  activeColor = '#00FF66';
+                } else {
+                  activeColor = '#00F0FF';
+                }
+              }
               ctx.save();
-              ctx.shadowColor = isCyber ? '#00FF66' : '#FFE500';
-              ctx.shadowBlur = 14;
-              ctx.fillStyle = p.captionActiveColor || (isCyber ? '#00FF66' : '#FFE500');
-              ctx.fillText(wText, curX, cy);
+              ctx.shadowColor = activeColor;
+              ctx.shadowBlur = 16;
+              ctx.fillStyle = activeColor;
+              ctx.fillText(wText, curX, drawY);
               ctx.restore();
             } else {
               ctx.fillStyle = '#FFFFFF';
-              ctx.fillText(wText, curX, cy);
+              ctx.fillText(wText, curX, drawY);
             }
             curX += wWidth + spaceW;
           }

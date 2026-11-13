@@ -309,6 +309,7 @@ func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) 
 
 	var req struct {
 		Prompt string `json:"prompt"`
+		Style  string `json:"style"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -322,15 +323,16 @@ func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor: %q...", prompt))
-	result, err := GenerateScript(prompt)
+	style := NormalizeScriptStyle(req.Style)
+	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor [%s]: %q...", style, prompt))
+	result, err := GenerateScriptWithStyle(prompt, style)
 	if err != nil {
 		s.log(fmt.Sprintf("Yapay zeka hatası: %v", err))
 		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
 
-	s.log(fmt.Sprintf("Senaryo hazır: %s (%d sahne)", result.Title, len(result.Scenes)))
+	s.log(fmt.Sprintf("Senaryo hazır (%s · %s): %s (%d sahne)", result.Style, result.Engine, result.Title, len(result.Scenes)))
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"ok":     true,
@@ -387,11 +389,13 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 
 	s.cancelCtx, s.cancelFunc = context.WithCancel(context.Background())
 	s.job = map[string]any{
-		"status":  "running",
-		"stage":   "starting",
-		"label":   "İşlem başlatılıyor",
-		"action":  req.Action,
-		"results": []string{},
+		"status":      "running",
+		"stage":       "starting",
+		"label":       "İşlem başlatılıyor",
+		"action":      req.Action,
+		"voice_style": req.VoiceStyle,
+		"started":     time.Now().Unix(),
+		"results":     []string{},
 	}
 	s.mu.Unlock()
 
@@ -406,6 +410,7 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 
 	defer func() {
 		s.mu.Lock()
+		s.job["ended"] = time.Now().Unix()
 		if s.job["status"] == "stopping" {
 			s.job["status"] = "cancelled"
 			s.job["label"] = "İşlem iptal edildi"
@@ -424,6 +429,40 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 		} else {
 			s.log("Bazı bağımlılıklar eksik.")
 		}
+		return
+	}
+
+	if action == "test-voice" {
+		if !strings.HasPrefix(voiceStyle, "cloned") {
+			voiceStyle = "cloned"
+		}
+		outDir := filepath.Join(s.root, "output")
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			s.log(fmt.Sprintf("Test sesi klasörü oluşturulamadı: %v", err))
+			s.mu.Lock()
+			s.job["status"] = "failed"
+			s.job["error"] = err.Error()
+			s.job["label"] = "Test sesi hatası"
+			s.mu.Unlock()
+			return
+		}
+		outWav := filepath.Join(outDir, "test-voice.wav")
+		sampleText := "Merhaba! Klonlanmış sesin artık çok daha hızlı, enerjik ve akıcı."
+		s.log(fmt.Sprintf("Klonlanmış ses testi başlatılıyor (%s)...", voiceStyle))
+		dur, used, err := SynthesizeVoice(sampleText, outWav, "cloned", voiceStyle, s.root)
+		if err != nil {
+			s.log(fmt.Sprintf("Ses testi hatası: %v", err))
+			s.mu.Lock()
+			s.job["status"] = "failed"
+			s.job["error"] = err.Error()
+			s.job["label"] = "Ses testi başarısız"
+			s.mu.Unlock()
+			return
+		}
+		s.mu.Lock()
+		s.job["audio"] = "output/test-voice.wav"
+		s.mu.Unlock()
+		s.log(fmt.Sprintf("Test sesi hazır (%s · %.2f sn): output/test-voice.wav", used, dur))
 		return
 	}
 
@@ -598,6 +637,14 @@ func (s *StudioServer) Serve() error {
 	return s.server.Serve(s.listener)
 }
 
+// Close closes the underlying HTTP server cleanly.
+func (s *StudioServer) Close() error {
+	if s.server != nil {
+		return s.server.Close()
+	}
+	return nil
+}
+
 // OpenBrowser opens the URL in the system default browser.
 func OpenBrowser(url string) {
 	var cmd *exec.Cmd
@@ -611,4 +658,3 @@ func OpenBrowser(url string) {
 	}
 	_ = cmd.Start()
 }
-
