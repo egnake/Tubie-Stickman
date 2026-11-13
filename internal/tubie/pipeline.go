@@ -125,8 +125,8 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 		}
 		if _, err := os.Stat(bgmPath); err == nil {
 			_ = copyFile(bgmPath, filepath.Join(projectDir, "bgm.wav"))
-			projectConfig["music"] = map[string]any{"path": "bgm.wav", "gain": 0.13}
-			projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.13}
+			projectConfig["music"] = map[string]any{"path": "bgm.wav", "gain": 0.15}
+			projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.15}
 		}
 	}
 

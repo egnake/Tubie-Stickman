@@ -29,8 +29,15 @@
 
       <div id="ai-panel" class="tab-content">
         <label for="ai-prompt" class="field-label">Konunuz veya Fikriniz:</label>
-        <textarea id="ai-prompt" rows="2" class="text-input" placeholder="Örn: İnstagram hesap çalma nasıl engellenir? Sahte DM tuzakları..."></textarea>
+        <textarea id="ai-prompt" rows="2" class="text-input" placeholder="Örn: Sahte linkleri 5 saniyede nasıl anlarsın? Tıklamadan önce dikkat etmen gereken işaretler..."></textarea>
+        <label for="ai-style" class="field-label">Senaryo Tarzı:</label>
+        <select id="ai-style" class="text-input">
+          <option value="hybrid" selected>🎬 Sinematik + Bilgi Akışı (Önerilen)</option>
+          <option value="cinematic">🎥 Sinematik Gerilim & Hikâye</option>
+          <option value="informative">⚡ Yoğun Bilgi Akışı (Rehber)</option>
+        </select>
         <div class="chip-container">
+          <button type="button" class="chip" data-prompt="Sahte linkleri 5 saniyede nasıl anlarsın? Oltalama tuzakları">🔗 Sahte Link / Oltalama</button>
           <button type="button" class="chip" data-prompt="İnstagram hesap çalma tuzakları ve korunma yöntemleri">📱 İnstagram Çalma</button>
           <button type="button" class="chip" data-prompt="Kripto cüzdan dolandırıcılığı ve airdrop tuzağı">💰 Kripto Cüzdan</button>
           <button type="button" class="chip" data-prompt="WhatsApp hesap çalma ve SMS onay kodu hilesi">💬 WhatsApp Tuzağı</button>
@@ -66,7 +73,8 @@
         <option value="viral-fast">⚡ Çok Hızlı & Seri · Ahmet (+22% Hız)</option>
         <option value="viral-female">✨ Canlı & Akıcı · Emel (+14% Hız)</option>
         <option value="deep-male">🎙️ Karizmatik & Derin · Ahmet (-4% Perde)</option>
-        <option value="cloned">👤 Kendi Sesim (sesim.wav referansı)</option>
+        <option value="cloned">👤 Kendi Sesim · Hızlı & Akıcı (sesim.wav, +15% Tempo)</option>
+        <option value="cloned-fast">⚡ Kendi Sesim · Çok Hızlı (sesim.wav, +25% Tempo)</option>
       </select>
       <p id="mode-hint" class="field-hint">Viral tempoda, broadcast filtreli profesyonel seslendirme.</p>
 

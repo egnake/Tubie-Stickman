@@ -340,15 +340,16 @@ async function main() {
     ctx.restore();
   }
 
-  // Floating Threat Prop (Skull / Shield / Padlock)
+  // Floating Threat Prop (Skull / Unlocked Padlock / Wi-Fi / Shield)
+  const titleOnly = (opts.title || "").toLowerCase();
   let threatFile = opts.prop;
   if (!threatFile || !fs.existsSync(threatFile)) {
-    if (lowerTitle.includes("kripto")) {
+    if (titleOnly.includes("kripto") || titleOnly.includes("cüzdan")) {
       threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-padlock-unlocked.png');
-    } else if (lowerTitle.includes("koru") || lowerTitle.includes("2fa")) {
-      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-shield.png');
-    } else if (lowerTitle.includes("wifi")) {
+    } else if (titleOnly.includes("wifi") || titleOnly.includes("wi-fi")) {
       threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-wifi.png');
+    } else if ((titleOnly.includes("koru") || titleOnly.includes("2fa")) && !/(çal|kır|saldır|tuzak|sıfırlan)/.test(titleOnly)) {
+      threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-shield.png');
     } else {
       threatFile = path.resolve(repoRoot, 'skills/directing-stickman-videos/assets/b1/cyber-skull.png');
     }

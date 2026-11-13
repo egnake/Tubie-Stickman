@@ -2,6 +2,7 @@ package tubie
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -101,6 +102,32 @@ func SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav string) (float64, er
 	return GetAudioDuration(outWav)
 }
 
+// ClonedVoiceTiming returns the XTTS synthesis speed and pitch-preserving FFmpeg atempo multiplier.
+// Keeping XTTS speed in a crisp range while applying FFmpeg atempo yields energetic pacing without slurring.
+func ClonedVoiceTiming(voiceStyle string) (xttsSpeed float64, atempo float64) {
+	switch strings.TrimSpace(voiceStyle) {
+	case "cloned-fast":
+		return 1.16, 1.18
+	default:
+		return 1.15, 1.10
+	}
+}
+
+// BuildClonedAudioFilter constructs the FFmpeg audio filter chain for cloned voice polishing and tempo.
+func BuildClonedAudioFilter(atempo float64) string {
+	base := "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10"
+	if atempo > 0 && atempo != 1.0 {
+		return fmt.Sprintf("atempo=%.2f,%s", atempo, base)
+	}
+	return base
+}
+
+func normalizeSpeechText(text string) string {
+	replacer := strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ")
+	fields := strings.Fields(replacer.Replace(text))
+	return strings.Join(fields, " ")
+}
+
 // SynthesizeVoice handles voice generation for pro, cloned, or auto modes with custom voice styling.
 func SynthesizeVoice(text string, outWav string, mode string, voiceStyle string, root string) (float64, string, error) {
 	sesimWav := filepath.Join(root, "sesim.wav")
@@ -111,29 +138,49 @@ func SynthesizeVoice(text string, outWav string, mode string, voiceStyle string,
 		modeUsed = "pro"
 	}
 
-	if modeUsed == "cloned" {
+	if modeUsed == "cloned" || strings.HasPrefix(strings.TrimSpace(voiceStyle), "cloned") {
 		if fi, err := os.Stat(sesimWav); err != nil || fi.IsDir() || fi.Size() == 0 {
 			return 0, "", fmt.Errorf("klonlanmış ses için referans kaydı bulunamadı: %s", sesimWav)
 		}
 
+		if err := os.MkdirAll(filepath.Dir(outWav), 0755); err != nil {
+			return 0, "", err
+		}
+
+		xttsSpeed, atempo := ClonedVoiceTiming(voiceStyle)
 		rawClonedWav := filepath.Join(filepath.Dir(outWav), "raw_cloned.wav")
-		pyCode := fmt.Sprintf(`import sys
+		defer os.Remove(rawClonedWav)
+
+		textJSON, _ := json.Marshal(normalizeSpeechText(text))
+		speakerJSON, _ := json.Marshal(sesimWav)
+		outJSON, _ := json.Marshal(rawClonedWav)
+
+		pyCode := fmt.Sprintf(`import json
 from TTS.api import TTS
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-tts.tts_to_file(text=%q, speaker_wav=%q, language="tr", file_path=%q, speed=1.12, repetition_penalty=4.5)
-`, text, sesimWav, rawClonedWav)
+tts.tts_to_file(
+    text=json.loads(%q),
+    speaker_wav=json.loads(%q),
+    language="tr",
+    file_path=json.loads(%q),
+    speed=%.2f,
+    repetition_penalty=4.5,
+)
+`, string(textJSON), string(speakerJSON), string(outJSON), xttsSpeed)
+
 		cmd := exec.Command(BinaryPath("python"), "-c", pyCode)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return 0, "", fmt.Errorf("XTTS synthesis failed: %v: %s", err, string(out))
 		}
 
-		// Polish cloned voice with dynamic compressor and loudnorm
+		// Apply pitch-preserving speedup + broadcast compression and loudnorm
 		ffmpeg := BinaryPath("ffmpeg")
 		convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", rawClonedWav,
-			"-af", "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10",
+			"-af", BuildClonedAudioFilter(atempo),
 			"-ar", "24000", "-ac", "1", outWav)
-		_ = convCmd.Run()
-		_ = os.Remove(rawClonedWav)
+		if out, err := convCmd.CombinedOutput(); err != nil {
+			return 0, "", fmt.Errorf("ffmpeg cloned voice filter failed: %v: %s", err, string(out))
+		}
 
 		dur, err := GetAudioDuration(outWav)
 		return dur, "cloned", err
@@ -161,4 +208,3 @@ tts.tts_to_file(text=%q, speaker_wav=%q, language="tr", file_path=%q, speed=1.12
 	dur, err := SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav)
 	return dur, "pro", err
 }
-
