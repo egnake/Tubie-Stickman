@@ -575,3 +575,116 @@ func TestDetectSpeechSegmentsOffline(t *testing.T) {
 		t.Fatalf("unexpected speech boundaries: %+v", segs)
 	}
 }
+
+func TestAIPrivacyTopicDoesNotHijackToDeepfakeOrInstagram(t *testing.T) {
+	// Exact user scenario: "Yapay zeka sizi internette ne kadar tanıyor?"
+	res, err := tubie.GenerateScriptWithStyle("Yapay zeka sizi internette ne kadar tanıyor?", tubie.StyleHybrid)
+	if err != nil {
+		t.Fatalf("GenerateScriptWithStyle failed: %v", err)
+	}
+	lowNarr := strings.ToLower(res.Narration)
+	if strings.Contains(lowNarr, "kaza yaptım") || strings.Contains(lowNarr, "sesini birebir klonlayabiliyor") {
+		t.Fatalf("AI privacy prompt was hijacked to deepfake voice cloning: %s", res.Narration)
+	}
+	if !strings.Contains(lowNarr, "yapay zeka") {
+		t.Fatalf("expected narration to stay on AI privacy topic, got: %s", res.Narration)
+	}
+
+	// Regression check for the exact output/yapay_zeka_sizi_internette_ne_kadar_tani/aciklama.txt bug:
+	// Narration mentions "sosyal medyada paylaştıkların" and "sağlık sorunlarını" ("ağ" substring).
+	userTitle := "Yapay Zeka Sizi İnternette Ne Kadar Tanıyor?"
+	userNarration := "Yapay zeka seni internette ne kadar tanıyor? Belki de tahmin ettiğinden çok daha fazla. Çünkü artık sadece sosyal medyada paylaştıkların değil, yapay zekayla yaptığın sohbetler de senin hakkında bilgi veriyor. Ona hangi şehirde yaşadığını, nerede çalıştığını, ilişkini, korkularını, sağlık sorunlarını anlatıyor olabilirsin. Peki kendini nasıl koruyabilirsin? Bir: Yapay zekayla konuşurken şifre, kimlik numarası, adres ve banka bilgilerini paylaşma. İki: Özel fotoğraflarını, belgelerini ve başkalarına ait kişisel bilgileri yüklemeden önce iki kez düşün. Üç: Kullandığın yapay zeka araçlarının veri saklama, sohbet geçmişi ve model eğitimi ayarlarını kontrol et."
+
+	vm := tubie.GenerateViralMetadata(userTitle, userNarration)
+	combined := strings.ToLower(vm.TitleA + " " + vm.TitleB + " " + vm.TitleC + " " + vm.Description + " " + strings.Join(vm.Hashtags, " "))
+	if strings.Contains(combined, "telif hakkı") || strings.Contains(combined, "instagram hesabınız") || strings.Contains(combined, "evil twin") {
+		t.Fatalf("GenerateViralMetadata hijacked AI privacy video into unrelated template:\nTitleA: %s\nDesc: %s", vm.TitleA, vm.Description)
+	}
+	if !strings.Contains(combined, "yapay zeka") {
+		t.Fatalf("expected metadata to reference yapay zeka, got: %s", combined)
+	}
+	if !strings.Contains(strings.ToLower(vm.Description), "veri saklama") && !strings.Contains(strings.ToLower(vm.Description), "kimlik numarası") {
+		t.Fatalf("expected description to reflect actual narration rules, got: %s", vm.Description)
+	}
+	postCaption := vm.Description + "\n\n" + strings.Join(vm.Hashtags, " ")
+	if len([]rune(postCaption)) > 2200 {
+		t.Fatalf("caption exceeds 2200 runes: %d", len([]rune(postCaption)))
+	}
+}
+
+func TestNormalizeViralMetadataSanitizesAndBounds(t *testing.T) {
+	dirty := tubie.ViralMetadata{
+		TitleA:      "Kuantum Şifreleme Nedir?",
+		TitleB:      "Şifreleme Riski",
+		TitleC:      "Korunma Rehberi",
+		Description: strings.Repeat("Kuantum bilgisayarlar modern şifrelemeyi tehdit ediyor. ", 60),
+		Hashtags:    []string{"#siberg%C3%BCvenlik", "kuantum", "#kuantum", "#bad tag!", "#yapayzeka"},
+	}
+	norm := tubie.NormalizeViralMetadata(dirty, "Kuantum Bilgisayarlar", "Kuantum bilgisayarlar ve şifreleme güvenliği.")
+	if !strings.HasPrefix(norm.TitleA, "🚨") || !strings.HasPrefix(norm.TitleB, "⚠️") || !strings.HasPrefix(norm.TitleC, "🛡️") {
+		t.Fatalf("missing required title emojis: %+v", norm)
+	}
+	joinedTags := strings.Join(norm.Hashtags, " ")
+	if strings.Contains(joinedTags, "%") || strings.Contains(joinedTags, "bad tag") {
+		t.Fatalf("invalid hashtag survived sanitization: %s", joinedTags)
+	}
+	if !strings.Contains(joinedTags, "#sibergüvenlik") {
+		t.Fatalf("expected URL-encoded Turkish hashtag to decode cleanly, got: %s", joinedTags)
+	}
+	full := norm.Description + "\n\n" + joinedTags
+	if len([]rune(full)) > 2200 {
+		t.Fatalf("normalized metadata exceeds 2200 runes: %d", len([]rune(full)))
+	}
+}
+
+func TestEnsureScenesForScriptAndStorytellingBounds(t *testing.T) {
+	title := "Yapay Zeka Sizi İnternette Ne Kadar Tanıyor?"
+	narration := "Yapay zeka seni internette ne kadar tanıyor? Belki de tahmin ettiğinden çok daha fazla. Sosyal medya dışında yapay zeka sohbetlerin de bilgi veriyor. Bir: Şifre ve kimlik bilgilerini paylaşma. İki: Özel belgeleri yüklemeden önce iki kez düşün. Üç: Sohbet geçmişi ve model eğitimi ayarlarını kontrol et. Özel hayatını koru!"
+	scenes := tubie.EnsureScenesForScript(title, narration)
+	if len(scenes) != 6 {
+		t.Fatalf("expected 6 derived scenes, got %d", len(scenes))
+	}
+	for i, sc := range scenes {
+		if sc.Title == "" || strings.HasPrefix(sc.Title, "SAHNE ") {
+			t.Fatalf("unexpected generic/empty scene title at %d: %q", i, sc.Title)
+		}
+		if sc.Prop == nil || !strings.HasPrefix(sc.Prop.Path, "@b1/") {
+			t.Fatalf("invalid scene prop at %d: %+v", i, sc.Prop)
+		}
+	}
+	shots := tubie.BuildStoryboard(scenes, 45.0)
+	if len(shots) != 6 {
+		t.Fatalf("expected 6 storyboard shots, got %d", len(shots))
+	}
+}
+
+func TestDescribeSubcommand(t *testing.T) {
+	if code := tubie.Main([]string{"describe"}); code == 0 {
+		t.Fatalf("expected non-zero exit when --text and --title are missing")
+	}
+
+	outPath := filepath.Join(t.TempDir(), "nested", "aciklama.txt")
+	code := tubie.Main([]string{
+		"describe",
+		"--title", "Yapay Zeka Sizi İnternette Ne Kadar Tanıyor?",
+		"--text", "Yapay zeka sohbetlerin sağlık sorunlarını ve kişisel bilgilerini ortaya çıkarabilir. Veri saklama ve model eğitimi ayarlarını kontrol et.",
+		"--out", outPath,
+	})
+	if code != 0 {
+		t.Fatalf("describe subcommand failed with exit code %d", code)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed reading written aciklama.txt: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"[BAŞLIK A", "[BAŞLIK B", "[BAŞLIK C", "YOUTUBE TAG"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("missing section %q in describe output:\n%s", want, content)
+		}
+	}
+	if strings.Contains(strings.ToLower(content), "telif hakkı") {
+		t.Fatalf("describe output hijacked into unrelated template:\n%s", content)
+	}
+}

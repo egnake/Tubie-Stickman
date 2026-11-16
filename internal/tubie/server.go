@@ -371,12 +371,16 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 		if slug == "" {
 			slug = slugify(req.Custom.Title)
 		}
+		scenes := req.Custom.Scenes
+		if len(scenes) == 0 {
+			scenes = EnsureScenesForScript(req.Custom.Title, req.Custom.Narration)
+		}
 		customPreset = &Preset{
 			ID:        "custom",
 			Title:     req.Custom.Title,
 			Slug:      slug,
 			Narration: req.Custom.Narration,
-			Scenes:    req.Custom.Scenes,
+			Scenes:    scenes,
 		}
 	}
 

@@ -83,6 +83,9 @@ func (p *Pipeline) Produce(preset Preset) (string, error) {
 		p.Reporter(map[string]any{"stage": "captions", "label": "Kusursuz altyazılar ve sahneler derleniyor", "slug": preset.Slug})
 	}
 
+	if len(preset.Scenes) == 0 {
+		preset.Scenes = EnsureScenesForScript(preset.Title, preset.Narration)
+	}
 	captions := BuildAccurateCaptions(preset.Narration, narrationWav, dur)
 	shots := BuildStoryboard(preset.Scenes, dur)
 	sfxList := BuildSoundDesign(preset.Scenes, dur)

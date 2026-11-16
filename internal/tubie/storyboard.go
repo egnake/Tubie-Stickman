@@ -596,29 +596,33 @@ func BuildStoryboard(scenes []SceneDefinition, totalDuration float64) []map[stri
 func getHUDBadge(idx int, title string) (string, string) {
 	lower := strings.ToLower(title)
 	switch {
-	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm"):
+	case strings.Contains(lower, "yapay zeka") || strings.Contains(lower, "gizli") || strings.Contains(lower, "sohbet") || strings.Contains(lower, "profil") || strings.Contains(lower, "dijital iz"):
+		return "[ DİJİTAL GİZLİLİK // VERİ ANALİZİ ]", "#00F0FF"
+	case strings.Contains(lower, "kripto") || strings.Contains(lower, "cüzdan") || strings.Contains(lower, "airdrop") || strings.Contains(lower, "token"):
+		return "[ KRİPTO GÜVENLİK // CÜZDAN ALARMI ]", "#FFCC00"
+	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm") || strings.Contains(lower, "oltalama"):
 		return "[ ALERT // OLTALAMA SALDIRISI ]", "#FF3B30"
-	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre"):
-		return "[ SİSTEM İHLALİ // HESAP ELE GEÇİRİLDİ ]", "#FF3B30"
-	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma"):
-		return "[ KRİTİK ALARM // KONTROL KAYBI ]", "#FFCC00"
+	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre") || strings.Contains(lower, "parola"):
+		return "[ SİSTEM İHLALİ // KRİTİK UYARI ]", "#FF3B30"
+	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma") || strings.Contains(lower, "takip"):
+		return "[ KRİTİK ALARM // RİSK TESPİTİ ]", "#FFCC00"
 	case strings.Contains(lower, "istemez") || strings.Contains(lower, "gerçek") || strings.Contains(lower, "farkındalık") || strings.Contains(lower, "halka"):
 		return "[ SİBER GERÇEK // TUZAĞA DÜŞME ]", "#E056FD"
-	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan"):
-		return "[ GÜVENLİK DUVARI // 2FA SAVUNMASI ]", "#00FF66"
-	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "takip") || strings.Contains(lower, "avcı"):
+	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan") || strings.Contains(lower, "kapat"):
+		return "[ GÜVENLİK DUVARI // AKTİF SAVUNMA ]", "#00FF66"
+	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "avcı"):
 		return "[ KORUMA AKTİF // GÜVENDESİN ]", "#00F0FF"
 	default:
 		hudList := []struct {
 			text  string
 			color string
 		}{
-			{"[ SİBER İSTİHBARAT // ACİL UYARI ]", "#00F0FF"},
+			{"[ SİBER İSTİHBARAT // VERİ ANALİZİ ]", "#00F0FF"},
 			{"[ TEHLİKE DÜZEYİ // KRİTİK ALARM ]", "#FF3B30"},
-			{"[ SİSTEM İHLALİ // RİSK TESPİTİ ]", "#FFCC00"},
+			{"[ SİSTEM ANALİZİ // RİSK TESPİTİ ]", "#FFCC00"},
 			{"[ GÜVENLİK GERÇEĞİ // DİKKAT ]", "#E056FD"},
 			{"[ AKTİF SAVUNMA // SİBER KALKAN ]", "#00FF66"},
-			{"[ GÜVENDE KAL // BİLİNÇLİ AVCI ]", "#00F0FF"},
+			{"[ GÜVENDE KAL // BİLİNÇLİ KULLANICI ]", "#00F0FF"},
 		}
 		item := hudList[idx%len(hudList)]
 		return item.text, item.color
@@ -628,28 +632,32 @@ func getHUDBadge(idx int, title string) (string, string) {
 func getStatusPill(idx int, title string) (string, string) {
 	lower := strings.ToLower(title)
 	switch {
-	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm"):
+	case strings.Contains(lower, "yapay zeka") || strings.Contains(lower, "gizli") || strings.Contains(lower, "sohbet") || strings.Contains(lower, "profil") || strings.Contains(lower, "dijital iz"):
+		return "[ DİJİTAL İZ VE VERİ TOPLAMA ANALİZİ ]", "#00F0FF"
+	case strings.Contains(lower, "kripto") || strings.Contains(lower, "cüzdan") || strings.Contains(lower, "airdrop") || strings.Contains(lower, "token"):
+		return "[ UYARI: AKILLI SÖZLEŞME VE CÜZDAN RİSKİ ]", "#FFCC00"
+	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm") || strings.Contains(lower, "oltalama"):
 		return "[ TEHLİKELİ BAĞLANTI TESPİT EDİLDİ ]", "#FF3B30"
-	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre"):
-		return "[ ALARM: KİMLİK BİLGİLERİ SIZDIRILDI ]", "#FF3B30"
-	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma"):
-		return "[ KRİTİK İHLAL: HESAP KONTROLÜ KAYIP ]", "#FFCC00"
+	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre") || strings.Contains(lower, "parola"):
+		return "[ ALARM: KİMLİK BİLGİLERİ RİSK ALTINDA ]", "#FF3B30"
+	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma") || strings.Contains(lower, "takip"):
+		return "[ KRİTİK İHLAL: DİJİTAL KONTROL RİSKİ ]", "#FFCC00"
 	case strings.Contains(lower, "istemez") || strings.Contains(lower, "gerçek") || strings.Contains(lower, "farkındalık") || strings.Contains(lower, "halka"):
 		return "[ SİBER GERÇEK: EN ZAYIF HALKA İNSAN ]", "#E056FD"
-	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan"):
-		return "[ 2FA DOĞRULAMA: GÜVENLİK KALKANI DEVREDE ]", "#00FF66"
-	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "takip") || strings.Contains(lower, "avcı"):
-		return "[ TAM SAVUNMA: AV DEĞİL AVCI OL ]", "#00F0FF"
+	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan") || strings.Contains(lower, "kapat"):
+		return "[ GÜVENLİK KALKANI: ÖNLEMLER DEVREDE ]", "#00FF66"
+	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "avcı"):
+		return "[ TAM SAVUNMA: BİLİNÇLİ KULLANICI ]", "#00F0FF"
 	default:
 		pills := []struct {
 			text  string
 			color string
 		}{
-			{"[ OLTALAMA SALDIRISI TESPİT EDİLDİ ]", "#00F0FF"},
-			{"[ TEHLİKELİ BAĞLANTI UYARISI ]", "#FF3B30"},
-			{"[ ALARM: ŞİFRE SIZDIRILDI ]", "#FFCC00"},
-			{"[ DİKKAT: ŞÜPHELİ LİNKLERİ SİL ]", "#E056FD"},
-			{"[ 2FA AKTİF: HESAP GÜVENDE ]", "#00FF66"},
+			{"[ SİBER GÜVENLİK ANALİZİ BAŞLATILDI ]", "#00F0FF"},
+			{"[ KRİTİK DİJİTAL RİSK UYARISI ]", "#FF3B30"},
+			{"[ ALARM: GİZLİ VERİ İHLALİ RİSKİ ]", "#FFCC00"},
+			{"[ DİKKAT: VERİ PAYLAŞIMINI KONTROL ET ]", "#E056FD"},
+			{"[ GÜVENLİK KALKANI DEVREDE ]", "#00FF66"},
 			{"[ BİLİNÇLİ KULLANICI // TAM KORUMA ]", "#00F0FF"},
 		}
 		item := pills[idx%len(pills)]

@@ -70,6 +70,13 @@ func Doctor(root string) int {
 		}
 	}
 
+	// g4f for free cloud AI script and aciklama.txt generation
+	if CheckG4FAvailable() {
+		fmt.Println("✅ OK g4f (Python): Hazır (Bulut yapay zeka senaryo ve açıklama üretimi)")
+	} else {
+		fmt.Println("ℹ️  OPTIONAL g4f: pip install -U g4f (Bulut yapay zeka senaryo ve açıklama üretimi için)")
+	}
+
 	// Reference voice
 	sesimWav := filepath.Join(root, "sesim.wav")
 	if fi, err := os.Stat(sesimWav); err == nil && !fi.IsDir() && fi.Size() > 0 {

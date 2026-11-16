@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Main is the primary entrypoint for the Tubie CLI and Studio.
@@ -93,6 +94,9 @@ func Main(args []string) int {
 		}
 		return 0
 
+	case "describe":
+		return runDescribe(args[1:])
+
 	case "--help", "-h", "help":
 		printHelp()
 		return 0
@@ -115,7 +119,49 @@ Kullanım:
   go run . generate --topic "İnstagram" # Yapay zeka ile senaryo üretip video yap
   go run . generate --preset 1      # 1 numaralı hazır videoyu üret
   go run . generate --all           # Tüm şablonları sırayla üret
-  go run . generate --mode pro      # Edge-TTS spiker sesi ile üret`)
+  go run . generate --mode pro      # Edge-TTS spiker sesi ile üret
+  go run . describe --title "..." --text "..." [--out aciklama.txt] # İçerikle uyumlu aciklama.txt üret`)
+}
+
+// runDescribe generates content-matched aciklama.txt metadata from a title and narration text.
+func runDescribe(args []string) int {
+	fs := flag.NewFlagSet("describe", flag.ContinueOnError)
+	title := fs.String("title", "", "Video başlığı")
+	text := fs.String("text", "", "Video seslendirme metni")
+	out := fs.String("out", "", "Çıktı dosyası (boş bırakılırsa standart çıktıya yazar)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	t := strings.TrimSpace(*title)
+	n := strings.TrimSpace(*text)
+	if t == "" && n == "" {
+		fmt.Fprintln(os.Stderr, "Hata: --text veya --title parametresi gerekli")
+		return 1
+	}
+
+	vm := GenerateViralMetadata(t, n)
+	content := FormatViralText(t, n, vm)
+
+	outPath := strings.TrimSpace(*out)
+	if outPath == "" {
+		fmt.Print(content)
+		return 0
+	}
+
+	cleanOut := filepath.Clean(outPath)
+	if dir := filepath.Dir(cleanOut); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Klasör oluşturulamadı (%s): %v\n", dir, err)
+			return 1
+		}
+	}
+	if err := os.WriteFile(cleanOut, []byte(content), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "Dosya yazılamadı (%s): %v\n", cleanOut, err)
+		return 1
+	}
+	fmt.Printf("📝 Viral paylaşım paketi yazıldı: %s\n", cleanOut)
+	return 0
 }
 
 func runGUI(root string, port int, openBrowser bool, tab string) int {

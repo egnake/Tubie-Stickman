@@ -162,7 +162,9 @@ async function main() {
   // -------------------------------------------------------------
   let badgeText = "SİBER GÜVENLİK UYARISI";
   const lowerTitle = (opts.title + " " + opts.topic).toLowerCase();
-  if (lowerTitle.includes("instagram") || lowerTitle.includes("sosyal") || lowerTitle.includes("dm")) {
+  if (lowerTitle.includes("yapay zeka") || lowerTitle.includes("dijital iz") || lowerTitle.includes("gizlilik") || lowerTitle.includes("sohbet")) {
+    badgeText = "DİJİTAL GİZLİLİK ANALİZİ";
+  } else if (lowerTitle.includes("instagram") || lowerTitle.includes("dm")) {
     badgeText = "HESAP GÜVENLİĞİ PROTOKOLÜ";
   } else if (lowerTitle.includes("kripto") || lowerTitle.includes("bitcoin") || lowerTitle.includes("cüzdan")) {
     badgeText = "KRİPTO GÜVENLİK UYARISI";
@@ -421,11 +423,23 @@ async function main() {
   ctx.fillRect(triX - 1, triY + 4, 2, 2);
 
   // Status text
+  let alertStatus = 'KRİTİK SİBER TEHDİT!';
+  if (lowerTitle.includes("yapay zeka") || lowerTitle.includes("dijital iz") || lowerTitle.includes("sohbet") || lowerTitle.includes("gizlilik")) {
+    alertStatus = 'VERİ İZİN AÇIĞA ÇIKIYOR!';
+  } else if (lowerTitle.includes("kripto") || lowerTitle.includes("cüzdan")) {
+    alertStatus = 'CÜZDAN RİSK ALTINDA!';
+  } else if (lowerTitle.includes("instagram") || lowerTitle.includes("whatsapp") || lowerTitle.includes("hesap")) {
+    alertStatus = 'HESAP ELE GEÇİRİLEBİLİR!';
+  } else if (lowerTitle.includes("şifre") || lowerTitle.includes("parola") || lowerTitle.includes("wifi")) {
+    alertStatus = 'ŞİFRE ELE GEÇİRİLDİ!';
+  } else if (lowerTitle.includes("link") || lowerTitle.includes("oltalama") || lowerTitle.includes("phishing")) {
+    alertStatus = 'SAHTE BAĞLANTI TUZAĞI!';
+  }
   ctx.font = '800 16px NotoSans, sans-serif';
   ctx.fillStyle = '#FFE600';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('ŞİFRE ELE GEÇİRİLDİ!', alertBoxX + 42, alertBoxY + alertBoxH / 2);
+  ctx.fillText(alertStatus, alertBoxX + 42, alertBoxY + alertBoxH / 2);
   ctx.restore();
 
   // -------------------------------------------------------------

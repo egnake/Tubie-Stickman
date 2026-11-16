@@ -44,6 +44,7 @@ $('.brand').addEventListener('click', event => { event.preventDefault(); tab('pr
 window.addEventListener('hashchange', () => tab(location.hash.slice(1)));
 let currentTopicMode = 'ai';
 let currentScenes = [];
+let scenesSource = {title: '', narration: ''};
 
 function setTopicMode(mode) {
   currentTopicMode = mode;
@@ -66,8 +67,24 @@ function loadPresetIntoEditor() {
   $('#custom-title').value = p.title;
   $('#custom-narration').value = p.narration;
   currentScenes = p.scenes || [];
+  scenesSource = {title: p.title, narration: p.narration};
   renderSceneBadges(currentScenes);
   updateWordCount();
+}
+
+function scenesMatchCurrentScript(title, narration) {
+  if (!currentScenes || !currentScenes.length) return false;
+  if (!scenesSource.narration) return true;
+  const norm = s => s.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+  const srcWords = new Set(norm(scenesSource.narration));
+  const curWords = norm(narration);
+  if (!srcWords.size || !curWords.length) return false;
+  let shared = 0;
+  curWords.forEach(w => { if (srcWords.has(w)) shared++; });
+  const overlap = shared / Math.max(curWords.length, 1);
+  const titleChanged = title.trim().toLowerCase() !== (scenesSource.title || '').trim().toLowerCase();
+  if (overlap < 0.25 || (titleChanged && overlap < 0.4)) return false;
+  return true;
 }
 
 function updateWordCount() {
@@ -105,7 +122,7 @@ async function triggerAIGenerate(customPrompt) {
   const status = $('#ai-status');
   const style = $('#ai-style')?.value || 'hybrid';
   btn.disabled = true;
-  status.textContent = '✨ Yapay zeka seçili tarzda senaryo ve sahneleri hazırlıyor...';
+  status.textContent = '✨ Bulut yapay zeka (g4f) seçili tarzda senaryo ve sahneleri hazırlıyor...';
   status.hidden = false;
 
   try {
@@ -118,6 +135,7 @@ async function triggerAIGenerate(customPrompt) {
       $('#custom-title').value = res.result.title;
       $('#custom-narration').value = res.result.narration;
       currentScenes = res.result.scenes || [];
+      scenesSource = {title: res.result.title || '', narration: res.result.narration || ''};
       renderSceneBadges(currentScenes);
       updateWordCount();
       const styleNames = {
@@ -185,6 +203,7 @@ $('#generate').addEventListener('click', () => {
       toast('Lütfen bir seslendirme metni girin veya yapay zeka ile oluşturun.');
       return;
     }
+    const scenesToSend = scenesMatchCurrentScript(title, narration) ? currentScenes : [];
     action('job', {
       action: 'generate',
       mode: mode,
@@ -193,7 +212,7 @@ $('#generate').addEventListener('click', () => {
       custom: {
         title: title || 'Siber Güvenlik Videosu',
         narration: narration,
-        scenes: currentScenes
+        scenes: scenesToSend
       }
     });
   } else {

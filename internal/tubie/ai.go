@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -23,7 +24,7 @@ const (
 	StyleInformative = "informative"
 )
 
-const defaultOllamaBaseURL = "http://localhost:11434"
+const defaultOllamaBaseURL = "http://127.0.0.1:11434"
 
 // ScriptResult represents the complete generated script, title, and storyboard.
 type ScriptResult struct {
@@ -79,7 +80,14 @@ func GenerateScriptWithStyle(userPrompt string, style string) (*ScriptResult, er
 		}
 	}
 
-	// 3. Built-in high-craft Turkish cybersecurity scenario engine (instant, offline, zero failure)
+	// 3. Try free cloud AI via Python g4f bridge (Yqcloud, Pollinations, ChatGPT, DeepAI)
+	if allowLiveAI {
+		if res, err := generateScriptViaG4F(trimmed, normalizedStyle); err == nil && res != nil && len(res.Scenes) >= 3 {
+			return res, nil
+		}
+	}
+
+	// 4. Built-in high-craft Turkish cybersecurity scenario engine (instant, offline, zero failure)
 	return generateViaTemplatesWithStyle(trimmed, normalizedStyle), nil
 }
 
@@ -135,51 +143,47 @@ func buildScriptSystemPrompt(topic string, style string) string {
 	switch style {
 	case StyleCinematic:
 		styleDirective = `SEÇİLEN TARZ: SİNEMATİK GERİLİM VE HİKÂYE
-- İzleyiciyi daha ilk cümlede sahnenin içine sok: telefon titremesi, gelen sahte bir bildirim veya tırnak içinde gerçekçi bir mesaj diyaloğuyla başla.
-- Gerilimi adım adım tırmandır: saldırganın arka planda neyi hedeflediğini hissettir, ardından çarpıcı bir kırılma anı ve net bir kurtuluş kuralı ver.
-- Kısa, nefesli, sinematik cümleler kullan ("Bir mesaj geliyor… Gönderen tanıdık gibi…").`
+- İzleyiciyi daha ilk cümlede sahnenin içine sok: gerçekçi bir durum, gelen bir bildirim veya çarpıcı bir senaryoyla başla.
+- Gerilimi adım adım tırmandır: arka planda verinin/hesabın nasıl riske girdiğini hissettir, ardından kırılma anı ve net bir korunma kuralı ver.
+- Kısa, nefesli, sinematik cümleler kullan ("Bir bildirim geliyor… Her şey normal gibi…").`
 	case StyleInformative:
 		styleDirective = `SEÇİLEN TARZ: YOĞUN BİLGİ AKIŞI VE REHBER
-- İlk 3 saniyede keskin bir test sorusu veya şaşırtıcı bir tespit ile aç ("Sahte bir linki 5 saniyede nasıl anlarsın?").
-- Hemen ardından 3-4 somut, uygulanabilir kontrol maddesi ver (küçük harf hileleri, sahte aciliyet, gönderici doğrulaması gibi).
-- Mutlaka yaygın bir yanlışı çürüt (ör. "HTTPS kilit simgesi tek başına güven garantisi değildir").
-- Net, akılda kalıcı bir aksiyon çağrısıyla bitir.`
+- İlk 3 saniyede keskin bir test sorusu veya şaşırtıcı bir tespit ile aç.
+- Hemen ardından konuya doğrudan bağlı 3 somut, teknik olarak doğru ve uygulanabilir kontrol kuralı ver.
+- Yaygın bir yanlışı çürüt ve net, akılda kalıcı bir aksiyon çağrısıyla bitir.`
 	default:
 		styleDirective = `SEÇİLEN TARZ: SİNEMATİK + BİLGİ AKIŞI (HİBRİT)
-- İLK 3 SANİYE (SİNEMATİK KANCA): İzleyiciyi olayın tam ortasına atan canlı bir sahne ve gerçekçi bir mesaj/olay örneğiyle başla ("Bir mesaj geliyor… Gönderen tanıdık gibi. Logo gerçek… Peki ya bu bir tuzaksa?").
-- KÖPRÜ: Tek cümleyle soruna bağla ("İşte saldırılar tam böyle başlıyor! Peki bunu 5 saniyede nasıl fark edersin?").
-- BİLGİ AKIŞI: 3-4 somut, teknik olarak doğru ve hemen uygulanabilir kontrol kuralı + bir efsane yıkıcı gerçek ver (ör. kilit simgesi/acil uyarı manipülasyonu gibi).
-- FİNAL VURUŞ: Kısa ve vurucu bir uyarı ("DUR. DÜŞÜN. DOĞRULA!") ve akıcı kapanış ("Takipte kal, güvende kal!").`
+- İLK 3 SANİYE (SİNEMATİK KANCA): İzleyiciyi tam konunun ortasına çeken canlı bir sahne veya merak uyandıran soruyla başla.
+- KÖPRÜ: Tek cümleyle soruna veya riskin nasıl oluştuğuna bağla.
+- BİLGİ AKIŞI: 3 somut, teknik olarak doğru ve hemen uygulanabilir korunma adımı + bir efsane yıkıcı gerçek ver.
+- FİNAL VURUŞ: Kısa, vurucu bir uyarı ("DUR. DÜŞÜN. DOĞRULA!") ve akıcı kapanış ("Takipte kal, güvende kal!").`
 	}
 
-	return fmt.Sprintf(`Sen Türkiye'nin en yüksek izlenme ve kaydetme oranlarına sahip siber güvenlik YouTube Shorts / Instagram Reels senaristi ve yönetmenisin.
+	return fmt.Sprintf(`Türkçe YouTube Shorts / Instagram Reels için siber güvenlik ve dijital gizlilik video senaryosu üret.
 
 KONU: %q
 %s
 
 KALİTE KURALLARI:
-1. KESİNLİKLE robotik yapay zeka klişeleri KULLANMA ("konusu sandığından çok daha kritik bir risk taşıyor olabilir", "Hackerlar her gün binlerce kullanıcının dikkatsizliğinden faydalanarak..." gibi kalıplar YASAK).
-2. Seslendirme metni 105-155 kelime arasında olsun (35-50 saniyelik hızlı ve doyurucu anlatım).
-3. Doğal, konuşma diline uygun, ritmik Türkçe yaz; kısa vurucu cümlelerle ("…", "?", "!") izleyiciyi ekranda tut.
-4. Soyut öğüt vermek yerine somut örnek, tırnak içi mesaj örneği veya teknik ipucu ver.
-5. Tam olarak 6 sahne planla. Her sahne başlığı kısa (en fazla 4-5 kelime) ve BÜYÜK HARF olmalı.
+1. Başlık, seslendirme ve sahnelerin TAMAMI doğrudan yukarıdaki KONU ile ilgili olsun; konu dışına asla çıkma.
+2. Klişe yapay zeka girişleri ("Merhaba", "Bugün sizlerle", "konusu sandığından çok daha kritik") veya yer tutucular ("[İsim]") KULLANMA.
+3. Seslendirme metni ("narration") 105-150 kelime arasında olsun; yalnızca okunacak akıcı konuşma metnini yaz, markdown (** veya ##) veya sahne tarifi ekleme.
+4. Soyut öğüt vermek yerine somut örnekler ve pratik kurallar ver.
+5. Tam olarak 6 sahne planla. Her sahne başlığı 2-5 kelimelik BÜYÜK HARF kısa Türkçe başlık olmalı ("SAHNE 1:" gibi önek KOYMA).
 6. Her sahne için şu varlık yollarından uygun olanı seç:
    "@b1/cyber-laptop.png", "@b1/cyber-skull.png", "@b1/cyber-terminal.png", "@b1/cyber-wifi.png", "@b1/cyber-padlock-unlocked.png", "@b1/cyber-padlock-locked.png", "@b1/cyber-shield.png", "@b1/cyber-bug.png", "@b1/cyber-database.png", "@b1/idea-bulb-crayon.png"
 
-ÖRNEK TON VE KALİTE REFERANSI:
-"Bir mesaj geliyor… Gönderen tanıdık gibi. Logo gerçek: 'Güvenliğiniz için hesabınızı hemen doğrulayın!' Her şey normal görünüyor, değil mi? Peki ya o bağlantı bir tuzaksa? İlk olarak internet adresini dikkatlice incele…"
-
-Yanıtını SADECE geçerli JSON formatında ver:
+Yanıtını SADECE tek bir geçerli JSON objesi olarak ver (markdown veya ek açıklama yazma):
 {
-  "title": "Dikkat çekici, merak uyandıran Türkçe video başlığı",
-  "narration": "105-155 kelimelik yüksek kaliteli Türkçe seslendirme metni",
+  "title": "Dikkat çekici, konuya özel Türkçe video başlığı",
+  "narration": "105-150 kelimelik doğal konuşma dilinde Türkçe seslendirme metni",
   "scenes": [
-    {"title": "SAHNE 1 BAŞLIĞI", "sfx": "keyboard", "color": "#00F0FF", "prop": {"path": "@b1/cyber-laptop.png"}, "arrow": false},
-    {"title": "SAHNE 2 BAŞLIĞI", "sfx": "alert", "color": "#FF3B30", "prop": {"path": "@b1/cyber-skull.png"}, "arrow": true},
-    {"title": "SAHNE 3 BAŞLIĞI", "sfx": "glitch", "color": "#FFCC00", "prop": {"path": "@b1/cyber-terminal.png"}, "arrow": false},
-    {"title": "SAHNE 4 BAŞLIĞI", "sfx": "paper", "color": "#E056FD", "prop": {"path": "@b1/cyber-padlock-unlocked.png"}, "arrow": false},
-    {"title": "SAHNE 5 BAŞLIĞI", "sfx": "lock", "color": "#00FF66", "prop": {"path": "@b1/cyber-shield.png"}, "arrow": false},
-    {"title": "SAHNE 6 BAŞLIĞI", "sfx": "chime", "color": "#00F0FF", "prop": {"path": "@b1/cyber-padlock-locked.png"}, "arrow": false}
+    {"title": "SAHNE BAŞLIĞI", "sfx": "keyboard", "color": "#00F0FF", "prop": {"path": "@b1/cyber-laptop.png"}, "arrow": false},
+    {"title": "İKİNCİ SAHNE", "sfx": "alert", "color": "#FF3B30", "prop": {"path": "@b1/cyber-skull.png"}, "arrow": true},
+    {"title": "ÜÇÜNCÜ SAHNE", "sfx": "glitch", "color": "#FFCC00", "prop": {"path": "@b1/cyber-terminal.png"}, "arrow": false},
+    {"title": "DÖRDÜNCÜ SAHNE", "sfx": "paper", "color": "#E056FD", "prop": {"path": "@b1/cyber-database.png"}, "arrow": false},
+    {"title": "BEŞİNCİ SAHNE", "sfx": "lock", "color": "#00FF66", "prop": {"path": "@b1/cyber-shield.png"}, "arrow": false},
+    {"title": "ALTINCI SAHNE", "sfx": "chime", "color": "#00F0FF", "prop": {"path": "@b1/cyber-padlock-locked.png"}, "arrow": false}
   ]
 }`, topic, styleDirective)
 }
@@ -327,6 +331,28 @@ func stripJSONFences(raw string) string {
 	return strings.TrimSpace(trimmed)
 }
 
+func cleanMarkdownInline(s string) string {
+	r := strings.NewReplacer("**", "", "__", "", "```", "", "`", "")
+	return strings.Join(strings.Fields(r.Replace(strings.TrimSpace(s))), " ")
+}
+
+var scenePrefixRe = regexp.MustCompile(`(?i)^(?:sahne\s*\d+\s*[:.\-–—]*\s*|\d+\s*[.):\-]\s*)`)
+
+func cleanSceneTitle(raw string, idx int) string {
+	t := cleanMarkdownInline(raw)
+	t = scenePrefixRe.ReplaceAllString(t, "")
+	t = strings.TrimSpace(t)
+	upper := strings.ToUpperSpecial(unicode.TurkishCase, t)
+	if upper == "" || upper == fmt.Sprintf("SAHNE %d BAŞLIĞI", idx+1) {
+		return fmt.Sprintf("SAHNE %d", idx+1)
+	}
+	words := strings.Fields(upper)
+	if len(words) > 6 {
+		words = words[:6]
+	}
+	return strings.Join(words, " ")
+}
+
 func decodeRawProp(raw json.RawMessage) *SceneProp {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -388,12 +414,12 @@ func parseAndNormalizeScript(rawJSON, fallbackTopic, style, engine string) (*Scr
 		return nil, err
 	}
 
-	title := strings.TrimSpace(parsed.Title)
-	narration := strings.TrimSpace(parsed.Narration)
-	if title == "" {
+	title := cleanMarkdownInline(parsed.Title)
+	narration := cleanMarkdownInline(parsed.Narration)
+	if title == "" || strings.EqualFold(title, "siber güvenlik senaryosu") {
 		title = turkishTitle(fallbackTopic)
 	}
-	if narration == "" || len(parsed.Scenes) < 3 {
+	if narration == "" || len(strings.Fields(narration)) < 15 || len(parsed.Scenes) < 3 {
 		return nil, fmt.Errorf("incomplete ai script response")
 	}
 
@@ -434,17 +460,43 @@ var allowedB1Props = map[string]bool{
 	"@b1/idea-note-crayon.png":       true,
 }
 
-func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
-	defaultColors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#E056FD", "#00FF66", "#00F0FF"}
-	defaultSFX := []string{"keyboard", "alert", "glitch", "paper", "lock", "chime"}
+func pickSmartB1Prop(sceneTitle string, idx int) string {
+	norm := normalizeMatchText(sceneTitle)
+	switch {
+	case containsAnyKeyword(norm, []string{"veri", "profil", "veritabani", "kayit", "gecmis", "arsiv", "analiz"}):
+		return "@b1/cyber-database.png"
+	case containsAnyKeyword(norm, []string{"wifi", "wi-fi", "izleme", "takip", "internet", "sinyal", "baglanti"}):
+		return "@b1/cyber-wifi.png"
+	case containsAnyKeyword(norm, []string{"koru", "kalkan", "savun", "guven", "kontrol", "onlem", "kural"}):
+		return "@b1/cyber-shield.png"
+	case containsAnyKeyword(norm, []string{"kilit", "2fa", "parola", "sifre", "dogrula", "gizli"}):
+		if containsAnyKeyword(norm, []string{"kiril", "calin", "acik", "ele gec", "sizinti", "tehlike"}) {
+			return "@b1/cyber-padlock-unlocked.png"
+		}
+		return "@b1/cyber-padlock-locked.png"
+	case containsAnyKeyword(norm, []string{"tehlike", "risk", "saldiri", "tuzak", "korsan", "golge", "ihlali"}):
+		return "@b1/cyber-skull.png"
+	case containsAnyKeyword(norm, []string{"virus", "zararli", "hata", "acik", "casus", "bocek"}):
+		return "@b1/cyber-bug.png"
+	case containsAnyKeyword(norm, []string{"kod", "terminal", "sistem", "ayar", "panel"}):
+		return "@b1/cyber-terminal.png"
+	case containsAnyKeyword(norm, []string{"fark", "ipucu", "bilgi", "dusun", "gercek"}):
+		return "@b1/idea-bulb-crayon.png"
+	}
 	defaultProps := []string{
 		"@b1/cyber-laptop.png",
 		"@b1/cyber-skull.png",
 		"@b1/cyber-terminal.png",
-		"@b1/idea-bulb-crayon.png",
+		"@b1/cyber-database.png",
 		"@b1/cyber-shield.png",
 		"@b1/cyber-padlock-locked.png",
 	}
+	return defaultProps[idx%len(defaultProps)]
+}
+
+func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
+	defaultColors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#E056FD", "#00FF66", "#00F0FF"}
+	defaultSFX := []string{"keyboard", "alert", "glitch", "paper", "lock", "chime"}
 	validSFX := map[string]bool{
 		"keyboard": true, "alert": true, "glitch": true,
 		"paper": true, "lock": true, "chime": true, "jingle": true, "tap": true,
@@ -452,10 +504,7 @@ func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
 
 	out := make([]SceneDefinition, len(scenes))
 	for i, sc := range scenes {
-		sc.Title = strings.ToUpperSpecial(unicode.TurkishCase, strings.TrimSpace(sc.Title))
-		if sc.Title == "" {
-			sc.Title = fmt.Sprintf("SAHNE %d", i+1)
-		}
+		sc.Title = cleanSceneTitle(sc.Title, i)
 		if !strings.HasPrefix(sc.Color, "#") || len(sc.Color) != 7 {
 			sc.Color = defaultColors[i%len(defaultColors)]
 		}
@@ -465,7 +514,7 @@ func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
 			sc.SFX = strings.ToLower(sc.SFX)
 		}
 		if sc.Prop == nil || !allowedB1Props[sc.Prop.Path] {
-			sc.Prop = &SceneProp{Path: defaultProps[i%len(defaultProps)], X: 390, Y: 1040, W: 500}
+			sc.Prop = &SceneProp{Path: pickSmartB1Prop(sc.Title, i), X: 390, Y: 1040, W: 500}
 		} else {
 			if sc.Prop.X == 0 {
 				sc.Prop.X = 390
@@ -482,7 +531,77 @@ func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
 	return out
 }
 
+func isWordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// containsKeyword matches kw inside normText on word-start boundaries (both ends strict for <=3 rune words)
+// so short tokens like "ai" or "ag" never falsely match inside unrelated words like "mail" or "saglik".
+func containsKeyword(normText, kw string) bool {
+	normKW := normalizeMatchText(strings.TrimSpace(kw))
+	if normKW == "" || normText == "" {
+		return false
+	}
+	kwRunes := []rune(normKW)
+	strictEnd := len(kwRunes) <= 3
+
+	offset := 0
+	for {
+		idx := strings.Index(normText[offset:], normKW)
+		if idx < 0 {
+			return false
+		}
+		absStart := offset + idx
+		absEnd := absStart + len(normKW)
+
+		startOK := absStart == 0
+		if !startOK {
+			prevRune := rune(0)
+			for _, r := range normText[:absStart] {
+				prevRune = r
+			}
+			startOK = !isWordRune(prevRune)
+		}
+
+		endOK := true
+		if strictEnd && absEnd < len(normText) {
+			for _, r := range normText[absEnd:] {
+				endOK = !isWordRune(r)
+				break
+			}
+		}
+
+		if startOK && endOK {
+			return true
+		}
+		offset = absStart + 1
+		if offset >= len(normText) {
+			return false
+		}
+	}
+}
+
+func containsAnyKeyword(normText string, keywords []string) bool {
+	for _, kw := range keywords {
+		if containsKeyword(normText, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func scoreKeywords(normText string, keywords []string) int {
+	score := 0
+	for _, kw := range keywords {
+		if containsKeyword(normText, kw) {
+			score++
+		}
+	}
+	return score
+}
+
 type topicBlueprint struct {
+	id        string
 	keywords  []string
 	titles    map[string]string
 	narration map[string]string
@@ -491,9 +610,32 @@ type topicBlueprint struct {
 
 var cyberTopicLibrary = []topicBlueprint{
 	{
+		id:       "ai-privacy",
+		keywords: []string{"yapay zeka", "dijital iz", "dijital ayak", "sohbet gecmisi", "ne kadar taniyor", "profil cikariyor", "chatgpt", "model egitimi", "veri toplama", "gizlilik"},
+		titles: map[string]string{
+			StyleHybrid:      "Yapay Zeka Seni İnternette Ne Kadar Tanıyor?",
+			StyleCinematic:   "Yapay Zekaya Anlattıkların Nereye Gidiyor?",
+			StyleInformative: "Yapay Zeka Kullanırken Gizliliğini Koruma Rehberi",
+		},
+		narration: map[string]string{
+			StyleHybrid:      "Yapay zeka seni internette ne kadar tanıyor? Belki de tahmin ettiğinden çok daha fazla! Çünkü artık sadece paylaştığın fotoğraflar değil, yapay zeka sohbetlerin, arama geçmişin ve ekranda geçirdiğin her saniye dijital bir profil oluşturuyor. Hangi şehirde yaşadığını, alışkanlıklarını, hatta kimseye anlatmadığın sorunlarını tek bir sohbet penceresinde biriktiriyor olabilirsin. Peki kendi verilerini nasıl korursun? Bir: Yapay zeka araçlarıyla konuşurken asla şifre, kimlik numarası, ev adresi ve banka bilgilerini yazma. İki: Özel belgeleri, ekran görüntülerini ve başkalarına ait kişisel bilgileri yüklemeden önce iki kez düşün. Üç: Kullandığın araçların sohbet geçmişi, hafıza ve model eğitimi ayarlarını hemen kapat! Unutma, ekrana yazdığın her cümle kalıcı bir dijital ize dönüşebilir. Teknolojiyi akıllıca kullan, özel hayatını koru. Takipte kal, güvende kal!",
+			StyleCinematic:   "Gece geç saatte bir yapay zeka sohbet ekranı açıyorsun… İşinden, yaşadığın şehirden, endişelerinden ve günlük planlarından tek tek bahsediyorsun. Karşında seni yargılamayan hızlı bir asistan var gibi görünüyor, değil mi? Oysa arka planda her cümle, her dosya ve her tercih kalıcı bir kullanıcı profiline ekleniyor. Sosyal medya paylaşımlarının çok ötesinde, düşüncelerinin bile haritası çıkarılıyor! Bir veri sızıntısında ya da açık kalan bir hesapta bu arşiv kimin eline geçer? Bu yüzden sohbet kutusunu güvenli bir sırdaş sanma: kimlik, adres ve finans bilgisi paylaşma; özel belge yükleme ve model eğitimi iznini ayarlardan mutlaka kapat!",
+			StyleInformative: "Yapay zeka araçlarının internette hakkında profil oluşturmasını engelleyen üç temel kural! Bir: Sohbet pencerelerine kesinlikle şifre, kimlik numarası, açık adres veya finansal veri girme. İki: Kişisel fotoğrafları, iş sözleşmelerini ve başkalarının gizli verilerini analiz için yüklemeden önce anonimleştir. Üç: Kullandığın yapay zeka servislerinde sohbet geçmişini sil, bellek özelliğini sınırla ve “sohbetlerimi model eğitiminde kullan” seçeneğini devre dışı bırak. Unutma: İnternette ücretsiz görünen pek çok araç, paylaştığın verilerle güçlenir. Verini koru, kontrolü elinde tut!",
+		},
+		scenes: []SceneDefinition{
+			{Title: "YAPAY ZEKA SENİ TANIYOR MU?", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SOHBETLERİN PROFİL ÇIKARIYOR!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "HER DETAY DİJİTAL İZ BIRAKIR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "HASSAS VERİ VE BELGE PAYLAŞMA", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MODEL EĞİTİMİ AYARINI KAPAT!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÖZEL HAYATINI KONTROL ALTINA AL", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+		},
+	},
+	{
+		id: "phishing",
 		keywords: []string{
-			"sahte link", "link", "baglanti", "bağlantı", "oltalama", "phishing",
-			"tikla", "tıkla", "https", "kilit simge", "e-posta", "mail", "kargo", "dogrula", "doğrula",
+			"sahte link", "link", "baglanti", "oltalama", "phishing",
+			"tikla", "https", "kilit simge", "e-posta", "mail", "kargo", "dogrula",
 		},
 		titles: map[string]string{
 			StyleHybrid:      "Bu Linke Tıklarsan Ne Olur?",
@@ -515,7 +657,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"instagram", "insta", "sosyal medya", "hesap cal", "hesap çal", "mavi tik", "telif", "dm", "tiktok"},
+		id:       "instagram",
+		keywords: []string{"instagram", "insta", "hesap cal", "mavi tik", "telif ihlali", "tiktok"},
 		titles: map[string]string{
 			StyleHybrid:      "İnstagram Hesabın Tek DM İle Nasıl Gider?",
 			StyleCinematic:   "O DM'ye Tıkladığın Gece Hesabın Nasıl Gider?",
@@ -536,7 +679,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"kripto", "bitcoin", "cuzdan", "cüzdan", "airdrop", "token", "coin", "nft", "seed", "metamask"},
+		id:       "crypto",
+		keywords: []string{"kripto", "bitcoin", "cuzdan", "airdrop", "token", "coin", "nft", "seed", "metamask"},
 		titles: map[string]string{
 			StyleHybrid:      "Kripto Cüzdanın Tek Onayla Nasıl Boşaltılır?",
 			StyleCinematic:   "Bir Airdrop İmzasında Tüm Cüzdan Nasıl Gitti?",
@@ -557,7 +701,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"whatsapp", "sms", "onay kodu", "dogrulama kodu", "doğrulama kodu", "arkadas", "arkadaş"},
+		id:       "whatsapp",
+		keywords: []string{"whatsapp", "onay kodu", "dogrulama kodu", "sms kodu"},
 		titles: map[string]string{
 			StyleHybrid:      "WhatsApp Hesabın Tek SMS Koduyla Nasıl Gider?",
 			StyleCinematic:   "En Yakın Arkadaşından Gelen Mesaj Tuzağı!",
@@ -578,7 +723,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"wifi", "wi-fi", "kafe", "ortak ag", "ortak ağ", "hotspot", "havalimani", "havalimanı", "vpn", "deauth", "evil twin"},
+		id:       "wifi",
+		keywords: []string{"wifi", "wi-fi", "kafe", "ortak ag", "hotspot", "havalimani", "vpn", "deauth", "evil twin"},
 		titles: map[string]string{
 			StyleHybrid:      "Kafe Wi-Fi Ağına Bağlanınca Arkada Ne Olur?",
 			StyleCinematic:   "Ücretsiz Kafe Wi-Fi Tuzağı: Görünmeyen Köprü",
@@ -599,7 +745,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"şifre", "sifre", "parola", "brute", "kaba kuvvet", "sizinti", "sızıntı", "123456", "passkey"},
+		id:       "password",
+		keywords: []string{"sifre", "parola", "brute", "kaba kuvvet", "sizinti", "123456", "passkey"},
 		titles: map[string]string{
 			StyleHybrid:      "Şifren Saniyeler İçinde Nasıl Kırılıyor?",
 			StyleCinematic:   "Aynı Şifre Yüzünden Bütün Hesaplar Nasıl Gitti?",
@@ -620,7 +767,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"deepfake", "yapay zeka", "ses klon", "sahte ses", "sahte video", "sahte arama"},
+		id:       "deepfake",
+		keywords: []string{"deepfake", "ses klon", "sahte ses", "sahte video", "sahte arama", "yapay zeka ses", "sesini klon"},
 		titles: map[string]string{
 			StyleHybrid:      "3 Saniyelik Sesinle Nasıl Dolandırılırsın?",
 			StyleCinematic:   "Arayan Gerçekten Yakının mı, Yapay Zeka mı?",
@@ -641,7 +789,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"crack", "apk", "dosya", "virus", "virüs", "trojan", "fidye", "ransomware", "exe", "indir"},
+		id:       "malware",
+		keywords: []string{"crack", "apk", "virus", "trojan", "fidye", "ransomware", "infostealer", "exe"},
 		titles: map[string]string{
 			StyleHybrid:      "Ücretsiz Crack İndirirken Bilgisayarında Ne Olur?",
 			StyleCinematic:   "O Tek Dosyaya Çift Tıkladığın Saniye!",
@@ -662,7 +811,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"sql", "injection", "veritabani", "veritabanı", "xss", "arka kapi", "arka kapı", "api"},
+		id:       "sqli",
+		keywords: []string{"sql", "injection", "veritabani", "xss", "arka kapi"},
 		titles: map[string]string{
 			StyleHybrid:      "Tek Bir Tırnak İşaretiyle Veritabanı Nasıl Düşer?",
 			StyleCinematic:   "Giriş Formundaki Tek Karakter Tüm Sistemi Açtı!",
@@ -683,7 +833,8 @@ var cyberTopicLibrary = []topicBlueprint{
 		},
 	},
 	{
-		keywords: []string{"qr", "quishing", "usb", "sarj", "şarj", "casus", "kamera", "mikrofon", "izin"},
+		id:       "qr",
+		keywords: []string{"qr", "quishing", "usb", "sarj", "karekod"},
 		titles: map[string]string{
 			StyleHybrid:      "Sokaktaki QR Kodu Okutmadan Önce Dur!",
 			StyleCinematic:   "Otopark QR Koduna Gizlenen Sahte Ödeme Tuzağı!",
@@ -713,6 +864,9 @@ func normalizeMatchText(s string) string {
 		"Ö", "o", "ö", "o",
 		"Ş", "s", "ş", "s",
 		"Ü", "u", "ü", "u",
+		"Â", "a", "â", "a",
+		"Î", "i", "î", "i",
+		"Û", "u", "û", "u",
 	)
 	return strings.ToLower(r.Replace(s))
 }
@@ -735,31 +889,37 @@ func turkishTitle(s string) string {
 }
 
 func generateViaTemplatesWithStyle(prompt string, style string) *ScriptResult {
-	lowerRaw := strings.ToLower(prompt)
 	lowerNorm := normalizeMatchText(prompt)
 
-	for _, bp := range cyberTopicLibrary {
-		for _, kw := range bp.keywords {
-			if strings.Contains(lowerRaw, kw) || strings.Contains(lowerNorm, normalizeMatchText(kw)) {
-				title := bp.titles[style]
-				if title == "" {
-					title = bp.titles[StyleHybrid]
-				}
-				narration := bp.narration[style]
-				if narration == "" {
-					narration = bp.narration[StyleHybrid]
-				}
-				scenes := make([]SceneDefinition, len(bp.scenes))
-				copy(scenes, bp.scenes)
-				return &ScriptResult{
-					Title:     title,
-					Slug:      slugify(title),
-					Style:     style,
-					Engine:    "smart-engine",
-					Narration: narration,
-					Scenes:    normalizeScenes(scenes),
-				}
-			}
+	bestIdx := -1
+	bestScore := 0
+	for i, bp := range cyberTopicLibrary {
+		sc := scoreKeywords(lowerNorm, bp.keywords)
+		if sc > bestScore {
+			bestScore = sc
+			bestIdx = i
+		}
+	}
+
+	if bestIdx >= 0 && bestScore > 0 {
+		bp := cyberTopicLibrary[bestIdx]
+		title := bp.titles[style]
+		if title == "" {
+			title = bp.titles[StyleHybrid]
+		}
+		narration := bp.narration[style]
+		if narration == "" {
+			narration = bp.narration[StyleHybrid]
+		}
+		scenes := make([]SceneDefinition, len(bp.scenes))
+		copy(scenes, bp.scenes)
+		return &ScriptResult{
+			Title:     title,
+			Slug:      slugify(title),
+			Style:     style,
+			Engine:    "smart-engine",
+			Narration: narration,
+			Scenes:    normalizeScenes(scenes),
 		}
 	}
 
@@ -792,7 +952,7 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 			prop2:      "@b1/cyber-database.png",
 		},
 		{
-			keywords:   []string{"kamera", "iot", "akilli ev", "akıllı ev", "router", "modem", "bluetooth"},
+			keywords:   []string{"kamera", "iot", "akilli ev", "router", "modem", "bluetooth"},
 			hookScene:  "EVİNDEKİ CİHAZ SESSİZCE AĞA BAĞLANDI…",
 			attackHint: "kutudan çıktığı gibi bırakılan varsayılan şifreler ve güncellenmeyen yazılımlar yüzünden dışarıdan erişilebilir bir kapı bırakılıyor.",
 			check1:     "Kurulum anında cihazın varsayılan yönetici şifresini mutlaka güçlü ve eşsiz bir parolayla değiştir.",
@@ -803,7 +963,7 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 			prop2:      "@b1/cyber-laptop.png",
 		},
 		{
-			keywords:   []string{"e-devlet", "edevlet", "banka", "kart", "odeme", "ödeme", "iban", "vergi", "ceza", "icra"},
+			keywords:   []string{"e-devlet", "edevlet", "banka", "kart", "odeme", "iban", "vergi", "ceza", "icra"},
 			hookScene:  "TELEFONUNA RESMİ GÖRÜNÜMLÜ BİR BİLDİRİM DÜŞTÜ…",
 			attackHint: "resmi kurum ismi ve panik yaratan bir borç veya iade mesajıyla seni doğrudan sahte doğrulama sayfasına çekmeye çalışıyorlar.",
 			check1:     "Gelen SMS veya e-postadaki bağlantıya dokunmak yerine tarayıcıdan ya da resmi mobil uygulamadan kendin giriş yap.",
@@ -816,10 +976,8 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 	}
 
 	for _, h := range hints {
-		for _, kw := range h.keywords {
-			if strings.Contains(normPrompt, kw) {
-				return h
-			}
+		if containsAnyKeyword(normPrompt, h.keywords) {
+			return h
 		}
 	}
 
@@ -904,6 +1062,56 @@ func buildDynamicScenario(prompt, style string) *ScriptResult {
 	}
 }
 
+// EnsureScenesForScript produces 6 topic-matched scenes derived from the given title and narration.
+func EnsureScenesForScript(title, narration string) []SceneDefinition {
+	sentences := splitSentences(narration)
+	shortTopic := compactSceneTopic(title)
+	if len(sentences) >= 6 {
+		step := float64(len(sentences)) / 6.0
+		colors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#E056FD", "#00FF66", "#00F0FF"}
+		sfxs := []string{"keyboard", "alert", "glitch", "paper", "lock", "chime"}
+		scenes := make([]SceneDefinition, 0, 6)
+		for i := 0; i < 6; i++ {
+			idx := int(float64(i) * step)
+			if idx >= len(sentences) {
+				idx = len(sentences) - 1
+			}
+			headline := buildSceneHeadline(sentences[idx], shortTopic, i)
+			scenes = append(scenes, SceneDefinition{
+				Title: headline,
+				Color: colors[i],
+				SFX:   sfxs[i],
+				Prop:  &SceneProp{Path: pickSmartB1Prop(headline, i), X: 390, Y: 1040, W: 500},
+				Arrow: i == 1 || i == 2,
+			})
+		}
+		return normalizeScenes(scenes)
+	}
+
+	fallback := generateViaTemplatesWithStyle(title+" "+narration, StyleHybrid)
+	if fallback != nil && len(fallback.Scenes) > 0 {
+		return fallback.Scenes
+	}
+	return normalizeScenes(buildDynamicScenario(title, StyleHybrid).Scenes)
+}
+
+func buildSceneHeadline(sentence, topicShort string, idx int) string {
+	cleaned := cleanMarkdownInline(sentence)
+	cleaned = regexp.MustCompile(`^(?:bir|iki|üç|dört|ilk olarak|ikinci olarak|son olarak|peki|ama|çünkü|üstelik|unutma)[,:\s]+`).ReplaceAllString(strings.ToLowerSpecial(unicode.TurkishCase, cleaned), "")
+	cleaned = regexp.MustCompile(`[^\p{L}\p{N}\s]+`).ReplaceAllString(cleaned, " ")
+	words := strings.Fields(cleaned)
+	if len(words) == 0 {
+		if idx == 0 {
+			return topicShort
+		}
+		return fmt.Sprintf("ADIM %d", idx+1)
+	}
+	if len(words) > 4 {
+		words = words[:4]
+	}
+	return strings.ToUpperSpecial(unicode.TurkishCase, strings.Join(words, " "))
+}
+
 // ViralMetadata holds A/B/C test titles, an engaging social media post caption, and viral hashtags.
 type ViralMetadata struct {
 	TitleA      string   `json:"title_a"`
@@ -913,14 +1121,112 @@ type ViralMetadata struct {
 	Hashtags    []string `json:"hashtags"`
 }
 
+func buildViralMetadataPrompt(title, narration string) string {
+	return fmt.Sprintf(`Türkçe Instagram Reels / TikTok / YouTube Shorts videosu için paylaşım paketi hazırla.
+
+Video Başlığı: %q
+Seslendirme Metni: %q
+
+KESİN KURALLAR:
+1. Açıklama, başlıklar ve hashtaglerin TAMAMI yalnızca yukarıdaki Video Başlığı ve Seslendirme Metni'nin gerçek konusuna özel olmalı. Videoda geçmeyen alakasız konulara (ör. videoda anlatılmayan Instagram DM veya Wi-Fi gibi başka senaryolara) KESİNLİKLE kayma!
+2. A/B/C testi için 3 farklı başlık üret:
+   - "title_a": Merak / Şok odaklı başlık ("🚨 " ile başlasın)
+   - "title_b": Uyarı / FOMO odaklı başlık ("⚠️ " ile başlasın)
+   - "title_c": Rehber / Çözüm odaklı başlık ("🛡️ " ile başlasın)
+3. "description": 120-180 kelimelik, emoji içeren, akıcı Türkçe açıklama yaz:
+   - Videonun gerçek konusunu anlatan vurucu bir açılış cümlesi
+   - Seslendirme metnindeki somut risklerin ve korunma adımlarının madde madde özeti
+   - Yorum ve kaydetme çağrısı
+4. "hashtags": Konuyla doğrudan ilgili 15-20 adet temiz Türkçe/global hashtag üret (URL kodlaması %% veya boşluk içermesin).
+5. Instagram 2200 karakter sınırını (description + hashtags) kesinlikle aşma.
+
+Yanıtını SADECE tek bir geçerli JSON objesi olarak ver:
+{
+  "title_a": "🚨 Başlık A",
+  "title_b": "⚠️ Başlık B",
+  "title_c": "🛡️ Başlık C",
+  "description": "Konuya özel açıklama metni...",
+  "hashtags": ["#sibergüvenlik", "#reels", "#keşfet"]
+}`, title, narration)
+}
+
 // GenerateViralMetadata produces high-converting A/B/C titles, caption text, and hashtags.
 func GenerateViralMetadata(title, narration string) ViralMetadata {
-	if !testing.Testing() && os.Getenv("TUBIE_OFFLINE_AI") != "1" {
+	allowLiveAI := !testing.Testing() && os.Getenv("TUBIE_OFFLINE_AI") != "1"
+	if allowLiveAI {
+		if apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); apiKey != "" {
+			if vm, err := generateViralViaGemini(apiKey, title, narration); err == nil && vm != nil {
+				return NormalizeViralMetadata(*vm, title, narration)
+			}
+		}
 		if vm, err := generateViralViaOllama(title, narration); err == nil && vm != nil {
-			return *vm
+			return NormalizeViralMetadata(*vm, title, narration)
+		}
+		if vm, err := generateViralViaG4F(title, narration); err == nil && vm != nil {
+			return NormalizeViralMetadata(*vm, title, narration)
 		}
 	}
-	return generateViralViaTemplates(title, narration)
+	return NormalizeViralMetadata(generateViralViaTemplates(title, narration), title, narration)
+}
+
+func generateViralViaGemini(apiKey, title, narration string) (*ViralMetadata, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	endpoint := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{
+				"parts": []map[string]string{
+					{"text": buildViralMetadataPrompt(title, narration)},
+				},
+			},
+		},
+		"generationConfig": map[string]any{
+			"responseMimeType": "application/json",
+			"temperature":      0.7,
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("gemini status: %d", resp.StatusCode)
+	}
+
+	var gemResp struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&gemResp); err != nil {
+		return nil, err
+	}
+	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("empty gemini response")
+	}
+
+	return parseAndNormalizeViralMetadata(gemResp.Candidates[0].Content.Parts[0].Text)
 }
 
 func generateViralViaOllama(title, narration string) (*ViralMetadata, error) {
@@ -938,31 +1244,12 @@ func generateViralViaOllama(title, narration string) (*ViralMetadata, error) {
 	_ = json.NewDecoder(pingResp.Body).Decode(&tags)
 	modelName := selectOllamaModel(tags.Models)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
-	sysPrompt := fmt.Sprintf(`Sen Instagram Reels ve TikTok viral içerik uzmanısın.
-Video Başlığı: %q
-Seslendirme Metni: %q
-
-Bu video için Instagram paylaşım paketi hazırla.
-1. A/B/C testi için 3 farklı dikkat çekici başlık (Merak, Uyarı, Rehber).
-2. İlgi çekici, emoji dolu, 150-200 kelimelik viral Instagram Reels açıklaması.
-3. 15-20 adet popüler ve konuyla ilgili hashtag.
-Instagram 2200 karakter sınırına kesinlikle uy.
-
-Yanıtını SADECE geçerli bir JSON olarak ver:
-{
-  "title_a": "🚨 Başlık A",
-  "title_b": "⚠️ Başlık B",
-  "title_c": "🛡️ Başlık C",
-  "description": "Açıklama metni...",
-  "hashtags": ["#sibergüvenlik", "#reels", "#keşfet"]
-}`, title, narration)
 
 	reqBody := map[string]any{
 		"model":  modelName,
-		"prompt": sysPrompt,
+		"prompt": buildViralMetadataPrompt(title, narration),
 		"stream": false,
 		"format": "json",
 	}
@@ -996,27 +1283,144 @@ Yanıtını SADECE geçerli bir JSON olarak ver:
 		return nil, err
 	}
 
+	return parseAndNormalizeViralMetadata(ollamaResp.Response)
+}
+
+var hashtagTokenRe = regexp.MustCompile(`^#[0-9a-zA-ZçğıöşüÇĞİÖŞÜ_]+$`)
+
+func parseAndNormalizeViralMetadata(rawJSON string) (*ViralMetadata, error) {
 	var vm ViralMetadata
-	if err := json.Unmarshal([]byte(stripJSONFences(ollamaResp.Response)), &vm); err != nil {
+	if err := json.Unmarshal([]byte(stripJSONFences(rawJSON)), &vm); err != nil {
 		return nil, err
 	}
+	vm.TitleA = cleanMarkdownInline(vm.TitleA)
+	vm.TitleB = cleanMarkdownInline(vm.TitleB)
+	vm.TitleC = cleanMarkdownInline(vm.TitleC)
+	vm.Description = strings.TrimSpace(vm.Description)
 	if vm.TitleA == "" || vm.Description == "" || len(vm.Hashtags) == 0 {
 		return nil, fmt.Errorf("incomplete viral response")
 	}
 	return &vm, nil
 }
 
+// NormalizeViralMetadata sanitizes A/B/C titles, cleans hashtags, and guarantees the 2200-char Instagram cap.
+func NormalizeViralMetadata(vm ViralMetadata, fallbackTitle, narration string) ViralMetadata {
+	cleanBase := strings.TrimSpace(fallbackTitle)
+	if cleanBase == "" {
+		cleanBase = "Dijital Güvenlik Gerçeği"
+	}
+
+	vm.TitleA = strings.TrimSpace(vm.TitleA)
+	vm.TitleB = strings.TrimSpace(vm.TitleB)
+	vm.TitleC = strings.TrimSpace(vm.TitleC)
+	if vm.TitleA == "" {
+		vm.TitleA = fmt.Sprintf("🚨 %s", cleanBase)
+	} else if !strings.HasPrefix(vm.TitleA, "🚨") {
+		vm.TitleA = "🚨 " + strings.TrimLeft(vm.TitleA, "⚠️🛡️🔥 ")
+	}
+	if vm.TitleB == "" {
+		vm.TitleB = fmt.Sprintf("⚠️ %s Hakkında Kritik Uyarı!", cleanBase)
+	} else if !strings.HasPrefix(vm.TitleB, "⚠️") {
+		vm.TitleB = "⚠️ " + strings.TrimLeft(vm.TitleB, "🚨🛡️🔥 ")
+	}
+	if vm.TitleC == "" {
+		vm.TitleC = fmt.Sprintf("🛡️ %s İçin Korunma Rehberi!", cleanBase)
+	} else if !strings.HasPrefix(vm.TitleC, "🛡️") {
+		vm.TitleC = "🛡️ " + strings.TrimLeft(vm.TitleC, "🚨⚠️🔥 ")
+	}
+
+	vm.Description = strings.TrimSpace(vm.Description)
+	if vm.Description == "" {
+		vm.Description = buildDynamicViralMetadata(fallbackTitle, narration).Description
+	}
+
+	seen := make(map[string]bool)
+	cleanedTags := make([]string, 0, len(vm.Hashtags))
+	for _, raw := range vm.Hashtags {
+		t := strings.TrimSpace(raw)
+		if strings.Contains(t, "%") {
+			if dec, err := url.PathUnescape(t); err == nil {
+				t = dec
+			}
+		}
+		t = strings.TrimSpace(strings.ReplaceAll(t, " ", ""))
+		if t == "" {
+			continue
+		}
+		if !strings.HasPrefix(t, "#") {
+			t = "#" + strings.TrimLeft(t, "#")
+		}
+		if !hashtagTokenRe.MatchString(t) {
+			continue
+		}
+		key := normalizeMatchText(t)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		cleanedTags = append(cleanedTags, t)
+	}
+
+	if len(cleanedTags) < 6 {
+		for _, fallbackTag := range extractTopicHashtags(fallbackTitle, narration) {
+			key := normalizeMatchText(fallbackTag)
+			if !seen[key] {
+				seen[key] = true
+				cleanedTags = append(cleanedTags, fallbackTag)
+			}
+			if len(cleanedTags) >= 16 {
+				break
+			}
+		}
+	}
+	vm.Hashtags = cleanedTags
+
+	// Enforce Instagram 2200 rune limit for description + "\n\n" + hashtags
+	for len([]rune(vm.Description+"\n\n"+strings.Join(vm.Hashtags, " "))) > 2200 && len(vm.Hashtags) > 6 {
+		vm.Hashtags = vm.Hashtags[:len(vm.Hashtags)-1]
+	}
+	tagsText := strings.Join(vm.Hashtags, " ")
+	maxDescRunes := 2200 - len([]rune(tagsText)) - 2
+	if maxDescRunes > 80 && len([]rune(vm.Description)) > maxDescRunes {
+		r := []rune(vm.Description)
+		vm.Description = strings.TrimSpace(string(r[:maxDescRunes-1])) + "…"
+	}
+	return vm
+}
+
 // FixedYouTubeTags contains the mandatory, high-converting YouTube tags for cybersecurity videos.
 const FixedYouTubeTags = "hacker,hack,hackers,hacks,atıl samancıoğlu,can değer,mdisec,para kazanma,etik hacker olma kursu,etik hacker,panel,cc,active directory,redteam,blueteam,pentest,penetration test,analist,soc analisti,soc,ioc,iot,bugbounty,bug bount,etik hacker olma,hacker olma kursu,siber tehdit,siber güvenlik,cyber security,cyber sec,bilgi güvenliği,mit,btk,yazılım,bilişim,bilgisayar,network,veri güvenliği,bilişim güvenliği,siyah şapkalı hacker,hackerlık,darkweb,deepweb,osint"
 
-func generateViralViaTemplates(title, narration string) ViralMetadata {
-	lower := strings.ToLower(title + " " + narration)
+type viralTopicTemplate struct {
+	id       string
+	keywords []string
+	meta     ViralMetadata
+}
 
-	if strings.Contains(lower, "sahte link") || strings.Contains(lower, "oltalama") || strings.Contains(lower, "phishing") || strings.Contains(lower, "bu linke") {
-		return ViralMetadata{
-			TitleA:      "🚨 Bu Linke Tıklarsan Ne Olur? (5 Saniyede Sahte Linki Yakala!)",
-			TitleB:      "⚠️ 'Hesabınızı Hemen Doğrulayın' Mesajı Aldınız mı? Sakın Tıklamayın!",
-			TitleC:      "🛡️ Sahte Linkleri ve Oltalama Tuzaklarını Anlamanın 4 Net Yolu!",
+var viralTopicLibrary = []viralTopicTemplate{
+	{
+		id:       "ai-privacy",
+		keywords: []string{"yapay zeka", "chatgpt", "dijital iz", "dijital ayak", "sohbet gecmisi", "model egitimi", "ne kadar taniyor", "profil cikariyor"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Yapay Zeka Sizi İnternette Ne Kadar Tanıyor? (Tahmininizden Çok Daha Fazla!)",
+			TitleB: "⚠️ Yapay Zekayla Sohbet Ederken Bu Bilgileri ASLA Paylaşmayın!",
+			TitleC: "🛡️ Yapay Zeka Araçlarında Kişisel Verilerinizi Korumanın 3 Altın Kuralı!",
+			Description: "Yapay zeka sohbetlerine anlattıklarınız sadece ekranda kalmıyor; hakkınızda detaylı bir dijital profil oluşturuyor olabilir! 🤖🔍\n\nArtık yalnızca sosyal medya paylaşımlarınız değil; yapay zekaya yazdığınız şehir, iş, sağlık ve özel yaşam detayları da veri tabanlarında işlenebiliyor.\n\n⚠️ DİKKAT EDİLMESİ GEREKEN RİSKLER:\n1️⃣ Sohbet Geçmişi ve Hafıza: Önceki konuşmalarınız birleşerek kapsamlı bir kişisel profil oluşturabilir.\n2️⃣ Model Eğitimi: Paylaştığınız hassas metinler ve belgeler sistem eğitiminde kullanılabilir.\n3️⃣ Hesap Ele Geçirme Riski: Açık kalan oturumlarda tüm geçmişiniz tek tıkla görüntülenebilir.\n\n🛡️ KENDİNİZİ KORUMANIN 3 ALTIN KURALI:\n✅ 1. Yapay zekayla konuşurken şifre, kimlik numarası, adres ve banka bilgilerini ASLA paylaşmayın.\n✅ 2. Özel fotoğraflarınızı, belgelerinizi ve başkalarına ait verileri yüklemeden önce iki kez düşünün.\n✅ 3. Kullandığınız araçların veri saklama, sohbet geçmişi ve model eğitimi ayarlarını hemen kapatın.\n\n👇 Siz yapay zekayla kişisel konular konuşuyor musunuz? Yorumlarda paylaşın!\n📌 Videoyu kaydedip sevdiklerinize gönderin, dijital izlerinizi kontrol altında tutun!",
+			Hashtags: []string{
+				"#yapayzeka", "#dijitalgizlilik", "#verigüvenliği", "#sibergüvenlik",
+				"#kişiselveriler", "#yapayzekagizliliği", "#chatgpt", "#gizlilik",
+				"#dijitalayakizi", "#internettegüvenlik", "#teknoloji", "#bilgi",
+				"#siberfarkındalık", "#reels", "#keşfet", "#shorts", "#viral",
+			},
+		},
+	},
+	{
+		id:       "phishing",
+		keywords: []string{"sahte link", "oltalama", "phishing", "bu linke tiklarsan", "kilit simgesi", "sahte baglanti"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Bu Linke Tıklarsan Ne Olur? (5 Saniyede Sahte Linki Yakala!)",
+			TitleB: "⚠️ 'Hesabınızı Hemen Doğrulayın' Mesajı Aldınız mı? Sakın Tıklamayın!",
+			TitleC: "🛡️ Sahte Linkleri ve Oltalama Tuzaklarını Anlamanın 4 Net Yolu!",
 			Description: "Tanıdık bir logo, inandırıcı bir mesaj ve 'Hemen doğrulayın!' baskısı… İşte bütün oltalama (phishing) saldırıları tam olarak böyle başlıyor! 🚨🔗\n\nSaldırganların bütün dijital hayatınıza ulaşmak için ihtiyaç duyduğu tek şey sizin bir anlık dikkatsizliğinizdir.\n\n⚠️ SAHTE LİNKİ 5 SANİYEDE NASIL ANLARSIN?\n1️⃣ Alan Adını İncele: Küçük harf farkları (l yerine I) ve garip uzantılar tuzaktır.\n2️⃣ Göndereni Kontrol Et: Tanıdık kurum adı yazması mesajın gerçekten oradan geldiğini kanıtlamaz.\n3️⃣ Acele Ettirme Manipülasyonu: 'Hesabınız kapatılacak!' baskısına kanıp panikle tıklamayın.\n4️⃣ Kilit Simgesi Yanılgısı: HTTPS ve kilit simgesi sitenin güvenli olduğunu değil, sadece bağlantının şifreli olduğunu gösterir!\n\n🛡️ TIKLAMADAN ÖNCE DUR. DÜŞÜN. DOĞRULA!\n✅ Bağlantıya değil, doğrudan resmi uygulamaya veya siteye kendiniz girin.\n✅ Güçlü parolalar ve Authenticator tabanlı 2FA kullanın.\n\n👇 Bu videoyu kaydet ve 'her şeye tıklayan' arkadaşlarına hemen gönder!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#oltalama", "#phishing", "#sahtelink", "#hacker",
@@ -1024,12 +1428,15 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#dolandırıcılık", "#2fa", "#siberfarkındalık", "#etikahacker",
 				"#internetgüvenliği", "#trendler", "#fyp", "#viral",
 			},
-		}
-	} else if strings.Contains(lower, "instagram") || strings.Contains(lower, "sosyal medya") || strings.Contains(lower, "hesap çal") {
-		return ViralMetadata{
-			TitleA:      "🚨 Instagram Hesabınız 1 Saniyede Nasıl Çalınır? (Sakın Bu Hatayı Yapmayın!)",
-			TitleB:      "⚠️ 'Telif Hakkı İhlali' Mesajı Aldınız mı? Sakın Tıklamayın!",
-			TitleC:      "🛡️ Instagram Hesabınızı Hackerlardan Korumanın 3 Altın Kuralı!",
+		},
+	},
+	{
+		id:       "instagram",
+		keywords: []string{"instagram", "telif ihlali", "mavi tik", "hesap calma", "hesabiniz nasil calinir", "hesabin tek dm"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Instagram Hesabınız 1 Saniyede Nasıl Çalınır? (Sakın Bu Hatayı Yapmayın!)",
+			TitleB: "⚠️ 'Telif Hakkı İhlali' Mesajı Aldınız mı? Sakın Tıklamayın!",
+			TitleC: "🛡️ Instagram Hesabınızı Hackerlardan Korumanın 3 Altın Kuralı!",
 			Description: "Instagram hesabınız tek bir sahte bağlantıyla saniyeler içinde tamamen elinizden gidebilir! 😱\n\nHackerlar artık karmaşık şifre kırmakla uğraşmıyor. Kullanıcı psikolojisini hedef alan sahte DM ve oltalama (phishing) tuzakları kuruyorlar.\n\n⚠️ EN SIK KULLANILAN TUZAKLAR:\n1️⃣ Telif İhlali Bildirimi: Profilinizin kapatılacağını iddia eden sahte DM'ler.\n2️⃣ Mavi Tik / Rozet Bildirimi: Sahte formla şifre toplayan profiller.\n3️⃣ Şüpheli Giriş Uyarısı: Panikle şifre girmenizi isteyen sahte linkler.\n\n🛡️ HESABINIZI KORUMANIN 4 ALTIN KURALI:\n✅ 1. Instagram yetkilileri ASLA DM ile şifre veya link göndermez.\n✅ 2. Bildirimleri sadece Ayarlar > Güvenlik > Instagram E-postaları sekmesinden kontrol edin.\n✅ 3. SMS yerine mutlaka Google Authenticator gibi bir 2FA uygulaması açın.\n✅ 4. Şüpheli linke tıkladıysanız derhal şifrenizi yenileyin ve oturumları kapatın.\n\n👇 Bu tür sahte mesajlarla daha önce karşılaştınız mı? Yorumlarda yazın!\n👥 Videoyu kaydedin ve arkadaşlarınızı uyarın, kimsenin hesabı çalınmasın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#instagramgüvenliği", "#hesapçalma", "#hacker",
@@ -1039,12 +1446,15 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#phishing", "#oltalama", "#instagramreels", "#bilgisayar", "#veri",
 				"#sibertehdit", "#bilişim", "#viral",
 			},
-		}
-	} else if strings.Contains(lower, "wifi") || strings.Contains(lower, "wi-fi") || strings.Contains(lower, "kafe") || strings.Contains(lower, "ağ") {
-		return ViralMetadata{
-			TitleA:      "🚨 Kafe Wi-Fi Ağlarına Bağlananlar DİKKAT! (Bunu Biliyor muydunuz?)",
-			TitleB:      "⚠️ Şifrenizi 10 Saniyede Havada Yakalayabilirler!",
-			TitleC:      "🛡️ Halka Açık Wi-Fi Ağlarında Güvende Kalmanın Tek Yolu!",
+		},
+	},
+	{
+		id:       "wifi",
+		keywords: []string{"wifi", "wi-fi", "kafe wi", "ortak ag", "evil twin", "deauth"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Kafe Wi-Fi Ağlarına Bağlananlar DİKKAT! (Bunu Biliyor muydunuz?)",
+			TitleB: "⚠️ Şifrenizi 10 Saniyede Havada Yakalayabilirler!",
+			TitleC: "🛡️ Halka Açık Wi-Fi Ağlarında Güvende Kalmanın Tek Yolu!",
 			Description: "Gittiğiniz kafede ücretsiz Wi-Fi ağına bağlandığınız an tüm kişisel verileriniz havada izleniyor olabilir! ☕💻\n\nHalka açık, şifresiz kablosuz ağlar siber saldırganlar için en verimli av sahalarıdır. Hackerlar aynı ağa bağlandıktan sonra trafiği kolayca dinleyebilir.\n\n⚠️ KAFELERDEKİ GÖRÜNMEZ TEHLİKELER:\n1️⃣ Evil Twin (Sahte İkiz Ağ): Kafenin adıyla birebir sahte bir Wi-Fi noktası açarlar.\n2️⃣ Deauth Saldırısı: Sizi ağdan düşürürler; tekrar bağlanırken şifreli paketler havada yakalanır.\n3️⃣ Man-in-the-Middle: Girdiğiniz siteler ile cihazınız arasına girip şifreleri izlerler.\n\n🛡️ AÇIK AĞLARDA GÜVENDE KALMANIN ALTIN KURALLARI:\n✅ 1. Ortak Wi-Fi ağlarında asla bankacılık veya hassas işlemler yapmayın.\n✅ 2. Cihazınızda mutlaka güvenilir ve şifreli bir VPN servisi açık olsun.\n✅ 3. Telefonunuzun 'Bilinen ağlara otomatik bağlan' özelliğini kapatın.\n✅ 4. Girdiğiniz web sitelerinde HTTPS kilit simgesini kontrol edin.\n\n👇 Dışarıda kafelerin Wi-Fi ağlarına bağlanıyor musunuz? Yorumlarda buluşalım!\n👥 Videoyu kaydedin ve sevdiklerinizle paylaşın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#wifi", "#ağgüvenliği", "#vpn", "#hacker",
@@ -1053,12 +1463,15 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#deauth", "#network", "#etikahacker", "#veri", "#bilgisayar",
 				"#bilişim", "#sibertehdit", "#trendler", "#fyp", "#viral",
 			},
-		}
-	} else if strings.Contains(lower, "şifre") || strings.Contains(lower, "parola") || strings.Contains(lower, "brute force") {
-		return ViralMetadata{
-			TitleA:      "🚨 Kullandığınız Şifre Kaç Saniyede Kırılır? (Şok Eden Gerçek!)",
-			TitleB:      "⚠️ '123456' veya Doğum Tarihi Kullananlar Hemen Değiştirsin!",
-			TitleC:      "🛡️ Kırılması Yüzyıllar Sürecek Güçlü Şifre Oluşturma Formülü!",
+		},
+	},
+	{
+		id:       "password",
+		keywords: []string{"brute force", "kaba kuvvet", "parola formulu", "sifreniz ne kadar", "sifren saniyeler", "passkey"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Kullandığınız Şifre Kaç Saniyede Kırılır? (Şok Eden Gerçek!)",
+			TitleB: "⚠️ '123456' veya Doğum Tarihi Kullananlar Hemen Değiştirsin!",
+			TitleC: "🛡️ Kırılması Yüzyıllar Sürecek Güçlü Şifre Oluşturma Formülü!",
 			Description: "Kullandığınız şifre gerçekten güvende mi yoksa hackerların kırması sadece birkaç saniye mi sürer? ⏱️🔐\n\nHer gün milyonlarca kullanıcı basit parolalar kullanıyor. Oysa yapay zeka ve brute force araçları saniyede milyarlarca kombinasyon deneyebiliyor!\n\n⚠️ EN BÜYÜK ŞİFRE HATALARI:\n1️⃣ Aynı Parolayı Her Yerde Kullanmak: Bir site sızdığında tüm hesaplarınız ele geçirilir.\n2️⃣ Kişisel Bilgileri Şifre Yapmak: İsim, memleket ve tarihler saniyeler içinde çözülür.\n3️⃣ Kısa Şifreler: 8 karakterli küçük harfli şifre ortalama 5 saniyede kırılır!\n\n🛡️ KIRILMASI YÜZYILLAR SÜRECEK GÜÇLÜ PAROLA FORMÜLÜ:\n✅ 1. En az 14-16 karakter uzunluğunda olmalıdır.\n✅ 2. Büyük harf, küçük harf, rakam ve özel semboller içermelidir.\n✅ 3. Her platform için mutlaka farklı bir şifre kullanın.\n✅ 4. Parolalarınızı bir Parola Yöneticisinde güvenle saklayın.\n\n👇 Şifreniz ne kadar güçlü? Yorumlarda konuşalım!\n👥 Sevdiklerinizi uyarmak için videoyu hemen kaydedip gönderin!",
 			Hashtags: []string{
 				"#parola", "#şifregüvenliği", "#bruteforce", "#sibergüvenlik",
@@ -1067,12 +1480,15 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#passwordmanager", "#verigüvenliği", "#siberfarkındalık",
 				"#trendler", "#fyp", "#viral",
 			},
-		}
-	} else if strings.Contains(lower, "kripto") || strings.Contains(lower, "bitcoin") || strings.Contains(lower, "cüzdan") {
-		return ViralMetadata{
-			TitleA:      "🚨 Kripto Cüzdanınız 1 Tıkla Nasıl Boşaltılır? (Airdrop Tuzağı!)",
-			TitleB:      "⚠️ 'Bedava Coin Kazandınız' Mesajlarına Sakın İnanmayın!",
-			TitleC:      "🛡️ Kripto Paralarınızı Güvende Tutmanın 3 Temel Kuralı!",
+		},
+	},
+	{
+		id:       "crypto",
+		keywords: []string{"kripto", "bitcoin", "cuzdan", "airdrop", "seed phrase", "metamask"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Kripto Cüzdanınız 1 Tıkla Nasıl Boşaltılır? (Airdrop Tuzağı!)",
+			TitleB: "⚠️ 'Bedava Coin Kazandınız' Mesajlarına Sakın İnanmayın!",
+			TitleC: "🛡️ Kripto Paralarınızı Güvende Tutmanın 3 Temel Kuralı!",
 			Description: "Kripto cüzdanınızdaki tüm birikim tek bir sahte onay ile bir saniyede sıfırlanabilir! 💸⚠️\n\nKripto dünyasında hackerlar sahte airdrop siteleri ve Telegram gruplarıyla kullanıcıları tuzağa düşürüyor!\n\n⚠️ EN TEHLİKELİ KRİPTO TUZAKLARI:\n1️⃣ Akıllı Sözleşme İzni (Approve Drainer): Cüzdanı bağlayıp onay verdiğiniz an tokenlarınız transfer edilir.\n2️⃣ Sahte Cüzdan Güncellemesi: DM ile gelen ve güncelleme isteyen sahte linkler.\n3️⃣ Sahte Destek Ekipleri: Size özelden yazıp yardım teklif eden sahte yöneticiler.\n\n🛡️ KRİPTO VARLIKLARINIZI KORUMANIN 4 KURALI:\n✅ 1. Gizli Kurtarma Kelimelerinizi (Seed Phrase) ASLA hiçbir web sitesine yazmayın!\n✅ 2. Hiç kimse durduk yere karşılıksız bedava para dağıtmaz.\n✅ 3. Bilmediğiniz sitelere cüzdan bağlamayın; onayları düzenli iptal edin.\n✅ 4. Yüksek birikimleriniz için mutlaka Donanım Cüzdanı (Cold Wallet) kullanın.\n\n👇 Kripto yatırımı olan arkadaşını hemen etiketle!\n👥 Gönderiyi kaydet, paranı koru!",
 			Hashtags: []string{
 				"#kripto", "#bitcoin", "#ethereum", "#kriptopara", "#kriptogüvenlik",
@@ -1080,12 +1496,15 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#keşfet", "#finans", "#blokzincir", "#bilgi", "#donanımcüzdanı",
 				"#dolandırıcılık", "#coldwallet", "#btc", "#etikahacker", "#fyp", "#viral",
 			},
-		}
-	} else if strings.Contains(lower, "whatsapp") || strings.Contains(lower, "sms") || strings.Contains(lower, "telefon") {
-		return ViralMetadata{
-			TitleA:      "🚨 Arkadaşınızdan 'Kodu Bana At' Mesajı Gelirse Sakın Atmayın!",
-			TitleB:      "⚠️ WhatsApp Hesabınızı Tek Bir SMS Koduyla Çalıyorlar!",
-			TitleC:      "🛡️ WhatsApp'ta İki Adımlı Doğrulama Nasıl Açılır?",
+		},
+	},
+	{
+		id:       "whatsapp",
+		keywords: []string{"whatsapp", "sms onay kodu", "6 haneli", "alti haneli", "pin kodu"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Arkadaşınızdan 'Kodu Bana At' Mesajı Gelirse Sakın Atmayın!",
+			TitleB: "⚠️ WhatsApp Hesabınızı Tek Bir SMS Koduyla Çalıyorlar!",
+			TitleC: "🛡️ WhatsApp'ta İki Adımlı Doğrulama Nasıl Açılır?",
 			Description: "WhatsApp hesabınız aniden kapanabilir ve rehberinizdeki herkese adınıza borç isteme mesajları gidebilir! 📱🚨\n\nSaldırganlar yakın arkadaşlarınızın çalınmış profilleri üzerinden SMS onay kodu hırsızlığı yapıyor.\n\n⚠️ DOLANDIRICILAR NASIL ÇALIŞIYOR?\n1️⃣ Saldırgan yeni bir cihaza telefon numaranızı yazar.\n2️⃣ WhatsApp telefonunuza 6 haneli resmi bir SMS onay kodu yollar.\n3️⃣ Arkadaşınızın profilinden mesaj gelir: 'Kodu yanlışlıkla sana yolladım, bana atar mısın?'\n4️⃣ O kodu verdiğiniz anda hesabınız saldırganın eline geçer!\n\n🛡️ HESABINIZI GERİ DÖNÜLMEZ ŞEKİLDE KORUYUN:\n✅ 1. SMS onay kodunu EN YAKININIZA BİLE asla vermeyin!\n✅ 2. Arkadaşınızdan gelen garip taleplerde kendisini sesli arayıp teyit edin.\n✅ 3. WhatsApp Ayarları > Hesap > İki Adımlı Doğrulama'yı hemen aktif edin.\n✅ 4. Hesabınıza e-posta adresi bağlayarak güvenliği ikiye katlayın.\n\n👇 Bu SMS onay hilesiyle daha önce karşılaştınız mı? Yorumlarda paylaşın!\n👥 Sevdiklerinize gönderin, kimse mağdur olmasın!",
 			Hashtags: []string{
 				"#whatsapp", "#dolandırıcılık", "#sibergüvenlik", "#smstuzağı",
@@ -1093,24 +1512,256 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 				"#bilgi", "#iletişim", "#dikkat", "#siberbilgi", "#etikahacker",
 				"#dijitalgüvenlik", "#telefon", "#trendler", "#fyp", "#viral",
 			},
+		},
+	},
+	{
+		id:       "deepfake",
+		keywords: []string{"deepfake", "ses klon", "sahte ses", "sahte arama"},
+		meta: ViralMetadata{
+			TitleA: "🚨 3 Saniyelik Sesinle Nasıl Dolandırılırsın? (Deepfake Tehlikesi!)",
+			TitleB: "⚠️ Arayan Gerçekten Yakının mı, Yapay Zeka Ses Klonu mu?",
+			TitleC: "🛡️ Yapay Zeka Ses Klonlama Tuzaklarına Karşı 3 Altın Kural!",
+			Description: "Gece yarısı tanıdık bir sesle gelen acil para talebi, aslında 3 saniyelik bir videodan kopyalanmış yapay zeka klonu olabilir! 🎙️⚠️\n\nDolandırıcılar ses tonunuzu ve nefesinizi taklit ederek panik anında soru sormanızı engelliyor.\n\n🛡️ KENDİNİZİ VE AİLENİZİ KORUYUN:\n✅ 1. Telefonda acil para isteyen kişi tanıdık gelse bile hemen kapatıp kayıtlı numarayı kendiniz arayın.\n✅ 2. Ailenizle yalnızca sizin bildiğiniz gizli bir doğrulama kelimesi belirleyin.\n✅ 3. Ses ve yüz netliği yüksek videoları herkese açık paylaşırken iki kez düşünün.\n\n👇 Ailenizle gizli doğrulama kelimesi belirlediniz mi? Yorumlarda yazın!\n📌 Sevdiklerinizi uyarmak için videoyu hemen paylaşın!",
+			Hashtags: []string{
+				"#deepfake", "#sesklonlama", "#yapayzeka", "#sibergüvenlik", "#dolandırıcılık",
+				"#dijitalgüvenlik", "#telefon", "#uyarı", "#teknoloji", "#bilgi",
+				"#siberfarkındalık", "#reels", "#keşfet", "#shorts", "#viral",
+			},
+		},
+	},
+	{
+		id:       "sqli",
+		keywords: []string{"sql injection", "parametrik sorgu", "veritabani", "1=1", "prepared statement"},
+		meta: ViralMetadata{
+			TitleA: "🚨 Tek Bir Tırnak İşaretiyle Tüm Veritabanı Nasıl Düşer?",
+			TitleB: "⚠️ Giriş Formundaki Küçük Hata Tüm Sistemi Ele Geçirtir!",
+			TitleC: "🛡️ SQL Injection Açığını Kökten Önlemenin 3 Kesin Yolu!",
+			Description: "Tek bir tırnak işareti ve basit bir mantık ifadesiyle giriş kontrolünün nasıl atlandığını biliyor musunuz? 💻⚠️\n\nKullanıcı girdileri doğrudan SQL sorgusuna eklendiğinde tüm veritabanı tabloları sızdırılabilir.\n\n🛡️ GELİŞTİRİCİLER İÇİN 3 KESİN ÇÖZÜM:\n✅ 1. Her zaman parametrik sorgular (Prepared Statements) kullanın, string birleştirmeyin.\n✅ 2. Veritabanı kullanıcısına yalnızca en düşük yetkiyi verin.\n✅ 3. Ham SQL hata çıktılarını kullanıcıya göstermeyin.\n\n👇 Güvenli kodlama pratikleriniz neler? Yorumlarda paylaşın!\n📌 Yazılımcı arkadaşlarına gönder, açıkları kapat!",
+			Hashtags: []string{
+				"#sqlinjection", "#sibergüvenlik", "#yazılım", "#webgüvenliği", "#pentest",
+				"#veritabanı", "#kodlama", "#backend", "#güvenlik", "#etikahacker",
+				"#bilgi", "#teknoloji", "#reels", "#keşfet", "#viral",
+			},
+		},
+	},
+}
+
+func generateViralViaTemplates(title, narration string) ViralMetadata {
+	normTitle := normalizeMatchText(title)
+	normNarr := normalizeMatchText(narration)
+
+	// Score templates using weighted matching: title hits weigh 5x more than narration hits
+	// so incidental narration words (like "sosyal medya" inside an AI privacy script) never hijack the topic.
+	bestIdx := -1
+	bestScore := 0
+	for i, tpl := range viralTopicLibrary {
+		titleHits := scoreKeywords(normTitle, tpl.keywords)
+		narrHits := scoreKeywords(normNarr, tpl.keywords)
+		score := titleHits*5 + narrHits
+		if titleHits == 0 && narrHits < 2 {
+			continue
+		}
+		if score > bestScore {
+			bestScore = score
+			bestIdx = i
 		}
 	}
 
-	cleanTitle := strings.TrimSpace(title)
-	if cleanTitle == "" {
-		cleanTitle = "Siber Güvenlik Gerçeği"
+	// If narration has its own distinct custom content and doesn't closely match a canned preset,
+	// synthesize description directly from title + narration while keeping curated titles/hashtags when relevant.
+	if bestIdx >= 0 && bestScore >= 5 {
+		tpl := viralTopicLibrary[bestIdx]
+		if tpl.id == "ai-privacy" && hasCustomExtractableNarration(narration) {
+			dyn := buildDynamicViralMetadata(title, narration)
+			dyn.TitleA = tpl.meta.TitleA
+			dyn.TitleB = tpl.meta.TitleB
+			dyn.TitleC = tpl.meta.TitleC
+			return dyn
+		}
+		return tpl.meta
 	}
+
+	return buildDynamicViralMetadata(title, narration)
+}
+
+func hasCustomExtractableNarration(narration string) bool {
+	sents := splitSentences(narration)
+	return len(sents) >= 4
+}
+
+func splitSentences(text string) []string {
+	cleaned := cleanMarkdownInline(text)
+	if cleaned == "" {
+		return nil
+	}
+	re := regexp.MustCompile(`[.!?…]+\s*`)
+	raw := re.Split(cleaned, -1)
+	out := make([]string, 0, len(raw))
+	for _, s := range raw {
+		s = strings.TrimSpace(s)
+		if len(strings.Fields(s)) >= 3 {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func extractNumberedRules(narration string) []string {
+	re := regexp.MustCompile(`(?i)\b(?:Bir|İki|Üç|Dört|Beş|İlk olarak|İkinci olarak|Üçüncü olarak)\s*[:,\-–]\s*([^.!?]+)`)
+	matches := re.FindAllStringSubmatch(cleanMarkdownInline(narration), -1)
+	rules := make([]string, 0, len(matches))
+	for _, m := range matches {
+		rule := strings.TrimSpace(m[1])
+		if len(strings.Fields(rule)) >= 3 {
+			rules = append(rules, rule)
+		}
+	}
+	return rules
+}
+
+func extractTopicHashtags(title, narration string) []string {
+	normAll := normalizeMatchText(title + " " + narration)
+	type tagRule struct {
+		kw  string
+		tag string
+	}
+	topicTags := []tagRule{
+		{"yapay zeka", "#yapayzeka"},
+		{"chatgpt", "#chatgpt"},
+		{"sohbet", "#yapayzekasohbetleri"},
+		{"gizlilik", "#dijitalgizlilik"},
+		{"kisisel", "#kişiselveriler"},
+		{"veri", "#verigüvenliği"},
+		{"iz", "#dijitalayakizi"},
+		{"profil", "#dijitalprofil"},
+		{"sifre", "#şifregüvenliği"},
+		{"parola", "#parolagüvenliği"},
+		{"oltalama", "#oltalama"},
+		{"phishing", "#phishing"},
+		{"link", "#sahtelink"},
+		{"wifi", "#wifi"},
+		{"wi-fi", "#ağgüvenliği"},
+		{"vpn", "#vpn"},
+		{"kripto", "#kriptogüvenlik"},
+		{"cuzdan", "#cüzdan"},
+		{"instagram", "#instagramgüvenliği"},
+		{"whatsapp", "#whatsapp"},
+		{"deepfake", "#deepfake"},
+		{"sql", "#sqlinjection"},
+		{"qr", "#quishing"},
+		{"fotograf", "#mahremiyet"},
+		{"banka", "#finansgüvenliği"},
+	}
+
+	seen := make(map[string]bool)
+	tags := make([]string, 0, 18)
+	add := func(t string) {
+		k := normalizeMatchText(t)
+		if !seen[k] {
+			seen[k] = true
+			tags = append(tags, t)
+		}
+	}
+
+	for _, tr := range topicTags {
+		if containsKeyword(normAll, tr.kw) {
+			add(tr.tag)
+		}
+	}
+
+	// Add dynamic word tags from title
+	stop := map[string]bool{
+		"nasil": true, "neden": true, "nedir": true, "kadar": true, "sizi": true,
+		"seni": true, "internette": true, "hakkinda": true, "konusunda": true,
+		"bunu": true, "icinde": true, "saniyede": true, "olur": true, "gider": true,
+	}
+	for _, w := range strings.Fields(cleanMarkdownInline(title)) {
+		cleanW := strings.Trim(w, "?!.,:;\"'()[]")
+		normW := normalizeMatchText(cleanW)
+		if len([]rune(normW)) >= 5 && !stop[normW] && hashtagTokenRe.MatchString("#"+strings.ToLowerSpecial(unicode.TurkishCase, cleanW)) {
+			add("#" + strings.ToLowerSpecial(unicode.TurkishCase, cleanW))
+		}
+	}
+
+	baseTags := []string{
+		"#sibergüvenlik", "#dijitalgüvenlik", "#internetgüvenliği", "#siberfarkındalık",
+		"#teknoloji", "#bilgi", "#güvenlik", "#etikahacker", "#siberbilgi",
+		"#reels", "#keşfet", "#shorts", "#fyp", "#viral",
+	}
+	for _, bt := range baseTags {
+		add(bt)
+		if len(tags) >= 18 {
+			break
+		}
+	}
+	return tags
+}
+
+func buildDynamicViralMetadata(title, narration string) ViralMetadata {
+	cleanTitle := cleanMarkdownInline(title)
+	if cleanTitle == "" {
+		cleanTitle = "Dijital Güvenlik Gerçeği"
+	}
+
+	sents := splitSentences(narration)
+	rules := extractNumberedRules(narration)
+
+	hook := cleanTitle
+	summary := ""
+	if len(sents) > 0 {
+		hook = sents[0]
+	}
+	if len(sents) > 1 {
+		limit := 3
+		if len(sents) < limit {
+			limit = len(sents)
+		}
+		summary = strings.Join(sents[1:limit], ". ") + "."
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s 🚨\n\n", hook))
+	if summary != "" {
+		sb.WriteString(summary + "\n\n")
+	}
+
+	if len(rules) > 0 {
+		sb.WriteString("🛡️ KENDİNİ KORUMAK İÇİN NET ADIMLAR:\n")
+		for i, r := range rules {
+			if i >= 4 {
+				break
+			}
+			sb.WriteString(fmt.Sprintf("✅ %d. %s.\n", i+1, r))
+		}
+		sb.WriteString("\n")
+	} else if len(sents) >= 4 {
+		sb.WriteString("🛡️ VİDEODAKİ TEMEL GÜVENLİK ADIMLARI:\n")
+		count := 0
+		for _, s := range sents[2:] {
+			if count >= 3 {
+				break
+			}
+			sb.WriteString(fmt.Sprintf("✅ %s.\n", s))
+			count++
+		}
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("🛡️ DİJİTAL GÜVENLİK KONTROL LİSTESİ:\n")
+		sb.WriteString("✅ 1. Hassas kişisel verilerinizi ve parolalarınızı gereksiz yerlerde paylaşmayın.\n")
+		sb.WriteString("✅ 2. Kullandığınız araçların gizlilik, veri saklama ve güvenlik ayarlarını kontrol edin.\n")
+		sb.WriteString("✅ 3. İki aşamalı doğrulamayı (2FA) aktif tutun.\n\n")
+	}
+
+	sb.WriteString("👇 Siz bu konuda nasıl önlem alıyorsunuz? Yorumlarda paylaşın!\n")
+	sb.WriteString("📌 Videoyu kaydedip sevdiklerinize gönderin, dijital güvenliğinizi koruyun!")
+
+	shortSubject := strings.TrimRight(cleanTitle, "?!.")
 	return ViralMetadata{
-		TitleA:      fmt.Sprintf("🚨 %s: Tek Bir Tıkla Her Şey Nasıl Risk Altına Girer?", cleanTitle),
-		TitleB:      fmt.Sprintf("⚠️ %s Hakkında Bilmeden Yaptığınız Kritik Hata!", cleanTitle),
-		TitleC:      fmt.Sprintf("🛡️ %s Konusunda Kendinizi Korumanın 3 Net Kuralı!", cleanTitle),
-		Description: fmt.Sprintf("%s hakkında herkesin bilmesi gereken siber güvenlik gerçekleri! 🚨\n\nSaldırılar çoğu zaman karmaşık açıklarla değil, aciliyet hissi ve bir anlık dikkatsizlikle başlar.\n\n⚠️ DİJİTAL DÜNYADA DİKKAT EDİLMESİ GEREKENLER:\n1️⃣ Şüpheli bağlantıları ve gönderici adreslerini mutlaka kontrol edin.\n2️⃣ Kaynağından emin olmadığınız dosya ve yetki onaylarından uzak durun.\n3️⃣ Kritik hesaplarınızda mutlaka Authenticator tabanlı 2FA kullanın.\n\n🛡️ KÜÇÜK BİR KONTROL BÜYÜK BİR KAYBI ÖNLER:\n✅ Dur, düşün ve doğrula kuralını alışkanlık haline getirin.\n✅ Güçlü ve her platformda farklı parolalar tercih edin.\n\n👇 Siz bu konuda ne düşünüyorsunuz? Yorumlarda buluşalım!\n👥 Gönderiyi kaydedin ve sevdiklerinizle paylaşın!", cleanTitle),
-		Hashtags: []string{
-			"#sibergüvenlik", "#teknoloji", "#güvenlik", "#hacker",
-			"#bilgi", "#dijitaldünya", "#reels", "#keşfet", "#trendler",
-			"#yazılım", "#bilimveteknoloji", "#önlem", "#farkındalık",
-			"#siberbilgi", "#etikahacker", "#darkweb", "#pentest", "#fyp", "#viral",
-		},
+		TitleA:      fmt.Sprintf("🚨 %s (Bunu Bilmeden Devam Etmeyin!)", shortSubject),
+		TitleB:      fmt.Sprintf("⚠️ %s Konusunda Gözden Kaçan Kritik Tehlike!", shortSubject),
+		TitleC:      fmt.Sprintf("🛡️ %s İçin Etkili Korunma Adımları!", shortSubject),
+		Description: sb.String(),
+		Hashtags:    extractTopicHashtags(cleanTitle, narration),
 	}
 }
 
