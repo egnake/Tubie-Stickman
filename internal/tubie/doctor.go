@@ -77,6 +77,14 @@ func Doctor(root string) int {
 		fmt.Println("ℹ️  OPTIONAL g4f: pip install -U g4f (Bulut yapay zeka senaryo ve açıklama üretimi için)")
 	}
 
+	// Optional faster-whisper acoustic aligner
+	fwCmd := exec.Command(BinaryPath("python"), "-c", "import faster_whisper")
+	if err := fwCmd.Run(); err == nil {
+		fmt.Println("✅ OK faster-whisper (Python): Hazır (Milisaniye hassasiyetinde kelime hizalaması)")
+	} else {
+		fmt.Println("ℹ️  INFO faster-whisper: Kurulu değil (opsiyonel; ses zarfı hizalaması kullanılacak)")
+	}
+
 	// Reference voice
 	sesimWav := filepath.Join(root, "sesim.wav")
 	if fi, err := os.Stat(sesimWav); err == nil && !fi.IsDir() && fi.Size() > 0 {

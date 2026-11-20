@@ -635,23 +635,32 @@ func GroupCaptionCues(timedWords []TimedWord, totalDuration float64) []CaptionCu
 	return sanitized
 }
 
-// FormatSRT converts caption cues into standard SubRip (.srt) subtitle format.
-func FormatSRT(cues []CaptionCue) string {
+func formatSubtitleTimestamp(seconds float64, msSep string) string {
+	totalMs := int(math.Round(math.Max(0, seconds) * 1000))
+	h := totalMs / 3600000
+	m := (totalMs / 60000) % 60
+	s := (totalMs / 1000) % 60
+	ms := totalMs % 1000
+	return fmt.Sprintf("%02d:%02d:%02d%s%03d", h, m, s, msSep, ms)
+}
+
+func formatCueText(cues []CaptionCue, msSep string, header string) string {
 	var sb strings.Builder
+	sb.WriteString(header)
 	for i, c := range cues {
-		stH := int(c.Start / 3600)
-		stM := int(math.Mod(c.Start, 3600) / 60)
-		stS := int(math.Mod(c.Start, 60))
-		stMs := int(math.Mod(c.Start*1000, 1000))
-
-		enH := int(c.End / 3600)
-		enM := int(math.Mod(c.End, 3600) / 60)
-		enS := int(math.Mod(c.End, 60))
-		enMs := int(math.Mod(c.End*1000, 1000))
-
 		sb.WriteString(fmt.Sprintf("%d\n", i+1))
-		sb.WriteString(fmt.Sprintf("%02d:%02d:%02d,%03d --> %02d:%02d:%02d,%03d\n", stH, stM, stS, stMs, enH, enM, enS, enMs))
+		sb.WriteString(fmt.Sprintf("%s --> %s\n", formatSubtitleTimestamp(c.Start, msSep), formatSubtitleTimestamp(c.End, msSep)))
 		sb.WriteString(c.Text + "\n\n")
 	}
 	return sb.String()
+}
+
+// FormatSRT converts caption cues into standard SubRip (.srt) subtitle format.
+func FormatSRT(cues []CaptionCue) string {
+	return formatCueText(cues, ",", "")
+}
+
+// FormatVTT converts caption cues into standard WebVTT (.vtt) subtitle format.
+func FormatVTT(cues []CaptionCue) string {
+	return formatCueText(cues, ".", "WEBVTT\n\n")
 }
