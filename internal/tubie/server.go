@@ -76,7 +76,10 @@ func NewStudioServer(root string, port int) (*StudioServer, error) {
 	mux.HandleFunc(s.prefix, s.handleRoot)
 	mux.HandleFunc(s.prefix+"api/state", s.handleState)
 	mux.HandleFunc(s.prefix+"api/presets", s.handlePresets)
+	mux.HandleFunc(s.prefix+"api/ideas", s.handleIdeas)
 	mux.HandleFunc(s.prefix+"api/ai-generate", s.handleAIGenerate)
+	mux.HandleFunc(s.prefix+"api/viral-analyze", s.handleViralAnalyze)
+	mux.HandleFunc(s.prefix+"api/thumbnail-preview", s.handleThumbnailPreview)
 	mux.HandleFunc(s.prefix+"api/job", s.handleJob)
 	mux.HandleFunc(s.prefix+"api/approve", s.handleApprove)
 	mux.HandleFunc(s.prefix+"api/cancel", s.handleCancel)
@@ -111,6 +114,46 @@ func (s *StudioServer) log(text string) {
 	if len(s.logs) > 300 {
 		s.logs = s.logs[len(s.logs)-300:]
 	}
+}
+
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+	}
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, maxBytes int64, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Geçersiz JSON verisi"})
+		return false
+	}
+	return true
+}
+
+func cloneJobMap(src map[string]any) map[string]any {
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		switch val := v.(type) {
+		case []string:
+			cp := make([]string, len(val))
+			copy(cp, val)
+			dst[k] = cp
+		default:
+			dst[k] = val
+		}
+	}
+	return dst
 }
 
 func (s *StudioServer) securityMiddleware(next http.Handler) http.Handler {
@@ -176,7 +219,10 @@ func (s *StudioServer) serveWebFile(w http.ResponseWriter, r *http.Request, name
 
 func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	jobSnap := cloneJobMap(s.job)
+	logsSnap := make([]map[string]any, len(s.logs))
+	copy(logsSnap, s.logs)
+	s.mu.RUnlock()
 
 	// List files in output directory (both organized subdirectories and legacy root files)
 	outDir := filepath.Join(s.root, "output")
@@ -200,19 +246,38 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 								"file": fmt.Sprintf("output/%s/%s", slug, se.Name()),
 								"size": size,
 							}
-							srtPath := filepath.Join(subDir, base+".srt")
-							if isFile(srtPath) {
+							if isFile(filepath.Join(subDir, base+".srt")) {
 								item["subtitle"] = fmt.Sprintf("output/%s/%s.srt", slug, base)
 							}
-							thumbPath := filepath.Join(subDir, "thumbnail.jpg")
-							if isFile(thumbPath) {
+							if isFile(filepath.Join(subDir, base+".vtt")) {
+								item["vtt"] = fmt.Sprintf("output/%s/%s.vtt", slug, base)
+							}
+							if isFile(filepath.Join(subDir, "thumbnail.jpg")) {
 								item["thumbnail"] = fmt.Sprintf("output/%s/thumbnail.jpg", slug)
+							}
+							if isFile(filepath.Join(subDir, "thumbnail_b.jpg")) {
+								item["thumbnail_b"] = fmt.Sprintf("output/%s/thumbnail_b.jpg", slug)
+							}
+							if isFile(filepath.Join(subDir, "thumbnail_16x9.jpg")) {
+								item["thumbnail_16x9"] = fmt.Sprintf("output/%s/thumbnail_16x9.jpg", slug)
 							}
 							txtPath := filepath.Join(subDir, "aciklama.txt")
 							if isFile(txtPath) {
 								item["description"] = fmt.Sprintf("output/%s/aciklama.txt", slug)
 								if descBytes, err := os.ReadFile(txtPath); err == nil {
 									item["description_text"] = string(descBytes)
+								}
+							}
+							reportPath := filepath.Join(subDir, "viral_report.json")
+							if isFile(reportPath) {
+								if rBytes, err := os.ReadFile(reportPath); err == nil {
+									var vr map[string]any
+									if err := json.Unmarshal(rBytes, &vr); err == nil {
+										item["viral_report"] = vr
+										item["viral_score"] = vr["total_score"]
+										item["viral_grade"] = vr["grade"]
+										item["format"] = vr["format"]
+									}
 								}
 							}
 							outputs = append(outputs, item)
@@ -231,9 +296,11 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 					"file": "output/" + entry.Name(),
 					"size": size,
 				}
-				srtPath := filepath.Join(outDir, base+".srt")
-				if isFile(srtPath) {
+				if isFile(filepath.Join(outDir, base+".srt")) {
 					item["subtitle"] = "output/" + base + ".srt"
+				}
+				if isFile(filepath.Join(outDir, base+".vtt")) {
+					item["vtt"] = "output/" + base + ".vtt"
 				}
 				outputs = append(outputs, item)
 			}
@@ -246,20 +313,26 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 		hasRef = true
 	}
 
-	resp := map[string]any{
-		"job":       s.job,
-		"logs":      s.logs,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"job":       jobSnap,
+		"logs":      logsSnap,
 		"outputs":   outputs,
 		"reference": hasRef,
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(resp)
+	})
 }
 
 func (s *StudioServer) handlePresets(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(PresetList())
+	writeJSON(w, http.StatusOK, PresetList())
+}
+
+func (s *StudioServer) handleIdeas(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":    true,
+		"ideas": TrendingCyberIdeas(),
+	})
 }
 
 func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
@@ -275,13 +348,15 @@ func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 	if len(parts) >= 2 && parts[0] == "output" {
 		filename := parts[len(parts)-1]
 		ext := strings.ToLower(filepath.Ext(filename))
-		if ext == ".mp4" || ext == ".srt" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".wav" || ext == ".txt" {
+		switch ext {
+		case ".mp4", ".srt", ".vtt", ".png", ".jpg", ".jpeg", ".wav", ".txt", ".json":
 			allowed = true
 		}
 	} else if mediaRel == "sesim.wav" {
 		allowed = true
 	} else if len(parts) == 4 && parts[0] == "projects" && parts[2] == "output" {
-		if parts[3] == "preview.mp4" || parts[3] == "live-frame.jpg" {
+		switch parts[3] {
+		case "preview.mp4", "live-frame.jpg", "preview-9x16.jpg", "preview-16x9.jpg":
 			allowed = true
 		}
 	}
@@ -302,47 +377,140 @@ func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	var req struct {
-		Prompt string `json:"prompt"`
-		Style  string `json:"style"`
+		Prompt     string `json:"prompt"`
+		Style      string `json:"style"`
+		LoopEnding bool   `json:"loop_ending"`
 	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"Geçersiz JSON verisi"}`, http.StatusBadRequest)
+	if !decodeLimitedJSON(w, r, 2<<20, &req) {
 		return
 	}
 
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
-		http.Error(w, `{"error":"Lütfen bir konu yazın"}`, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Lütfen bir konu yazın"})
 		return
 	}
 
 	style := NormalizeScriptStyle(req.Style)
-	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor [%s]: %q...", style, prompt))
-	result, err := GenerateScriptWithStyle(prompt, style)
+	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor [%s, loop=%v]: %q...", style, req.LoopEnding, prompt))
+	result, err := GenerateScriptWithOptions(prompt, ScriptOptions{
+		Style:      style,
+		LoopEnding: req.LoopEnding,
+	})
 	if err != nil {
 		s.log(fmt.Sprintf("Yapay zeka hatası: %v", err))
-		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 
 	s.log(fmt.Sprintf("Senaryo hazır (%s · %s): %s (%d sahne)", result.Style, result.Engine, result.Title, len(result.Scenes)))
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":     true,
 		"result": result,
 	})
 }
 
+func (s *StudioServer) handleViralAnalyze(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var req struct {
+		Title      string            `json:"title"`
+		Narration  string            `json:"narration"`
+		Scenes     []SceneDefinition `json:"scenes"`
+		LoopEnding bool              `json:"loop_ending"`
+	}
+	if !decodeLimitedJSON(w, r, 2<<20, &req) {
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	narration := strings.TrimSpace(req.Narration)
+	if title == "" && narration == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Analiz için başlık veya metin gerekli"})
+		return
+	}
+
+	scenes := req.Scenes
+	if len(scenes) == 0 {
+		scenes = EnsureScenesForScript(title, narration)
+	}
+	report := AnalyzeScriptVirality(title, narration, scenes, req.LoopEnding)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"report": report,
+	})
+}
+
+func (s *StudioServer) handleThumbnailPreview(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	var req struct {
+		Title string `json:"title"`
+		Topic string `json:"topic"`
+		Mood  string `json:"mood"`
+	}
+	if !decodeLimitedJSON(w, r, 2<<20, &req) {
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = "SİBER GÜVENLİK UYARISI"
+	}
+	topic := strings.TrimSpace(req.Topic)
+	if topic == "" {
+		topic = title
+	}
+	mood := strings.TrimSpace(req.Mood)
+	if mood == "" {
+		mood = "danger"
+	}
+
+	previewDir := filepath.Join(s.root, "projects", "_thumb_preview", "output")
+	if err := os.MkdirAll(previewDir, 0755); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+
+	out9x16 := filepath.Join(previewDir, "preview-9x16.jpg")
+	if err := GenerateDedicatedThumbnailWithOptions(s.root, title, topic, "", 2, ThumbnailOptions{
+		Aspect:  "9:16",
+		Variant: "a",
+		Mood:    mood,
+	}, out9x16, ""); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("9:16 kapak hatası: %v", err)})
+		return
+	}
+
+	out16x9 := filepath.Join(previewDir, "preview-16x9.jpg")
+	if err := GenerateDedicatedThumbnailWithOptions(s.root, title, topic, "", 2, ThumbnailOptions{
+		Aspect:  "16:9",
+		Variant: "a",
+		Mood:    mood,
+	}, out16x9, ""); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("16:9 kapak hatası: %v", err)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"preview_9x16": "projects/_thumb_preview/output/preview-9x16.jpg",
+		"preview_16x9": "projects/_thumb_preview/output/preview-16x9.jpg",
+		"revision":     time.Now().UnixNano(),
+	})
+}
+
 func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
@@ -352,6 +520,8 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 		Mode       string   `json:"mode"`
 		VoiceStyle string   `json:"voice_style"`
 		BGM        string   `json:"bgm"`
+		Format     string   `json:"format"`
+		LoopEnding bool     `json:"loop_ending"`
 		Custom     *struct {
 			Title     string            `json:"title"`
 			Slug      string            `json:"slug"`
@@ -359,18 +529,13 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 			Scenes    []SceneDefinition `json:"scenes"`
 		} `json:"custom,omitempty"`
 	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"Geçersiz JSON verisi"}`, http.StatusBadRequest)
+	if !decodeLimitedJSON(w, r, 2<<20, &req) {
 		return
 	}
 
 	var customPreset *Preset
 	if req.Custom != nil && strings.TrimSpace(req.Custom.Narration) != "" {
-		slug := req.Custom.Slug
-		if slug == "" {
-			slug = slugify(req.Custom.Title)
-		}
+		slug := sanitizeSlug(req.Custom.Slug, req.Custom.Title)
 		scenes := req.Custom.Scenes
 		if len(scenes) == 0 {
 			scenes = EnsureScenesForScript(req.Custom.Title, req.Custom.Narration)
@@ -387,10 +552,17 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	if s.job["status"] == "running" || s.job["status"] == "approval" {
 		s.mu.Unlock()
-		http.Error(w, `{"error":"Devam eden işlem tamamlanmalı veya iptal edilmeli"}`, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Devam eden işlem tamamlanmalı veya iptal edilmeli"})
 		return
 	}
 
+	// Drain stale approval signals from any earlier cancelled/finished run.
+	select {
+	case <-s.approveChan:
+	default:
+	}
+
+	fmtSpec := ResolveVideoFormat(req.Format)
 	s.cancelCtx, s.cancelFunc = context.WithCancel(context.Background())
 	s.job = map[string]any{
 		"status":      "running",
@@ -398,18 +570,19 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 		"label":       "İşlem başlatılıyor",
 		"action":      req.Action,
 		"voice_style": req.VoiceStyle,
+		"format":      fmtSpec.Name,
+		"loop_ending": req.LoopEnding,
 		"started":     time.Now().Unix(),
 		"results":     []string{},
 	}
 	s.mu.Unlock()
 
-	go s.runJob(req.Action, req.Presets, req.Mode, req.VoiceStyle, req.BGM, customPreset)
+	go s.runJob(req.Action, req.Presets, req.Mode, req.VoiceStyle, req.BGM, fmtSpec.Name, req.LoopEnding, customPreset)
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle, bgm string, customPreset *Preset) {
+func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle, bgm, format string, loopEnding bool, customPreset *Preset) {
 	ctx := s.cancelCtx
 
 	defer func() {
@@ -453,7 +626,7 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 		outWav := filepath.Join(outDir, "test-voice.wav")
 		sampleText := "Merhaba! Klonlanmış sesin artık çok daha hızlı, enerjik ve akıcı."
 		s.log(fmt.Sprintf("Klonlanmış ses testi başlatılıyor (%s)...", voiceStyle))
-		dur, used, err := SynthesizeVoice(sampleText, outWav, "cloned", voiceStyle, s.root)
+		dur, used, err := SynthesizeVoiceContext(ctx, sampleText, outWav, "cloned", voiceStyle, s.root)
 		if err != nil {
 			s.log(fmt.Sprintf("Ses testi hatası: %v", err))
 			s.mu.Lock()
@@ -476,6 +649,8 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 			Mode:       mode,
 			VoiceStyle: voiceStyle,
 			BGM:        bgm,
+			Format:     format,
+			LoopEnding: loopEnding,
 			Reporter: func(ev map[string]any) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
@@ -546,13 +721,19 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 			s.job["slug"] = preset.Slug
 			s.mu.Unlock()
 
-			s.log(fmt.Sprintf("[%d/%d] Üretim başlatılıyor: %s", idx+1, len(jobsToRun), preset.Title))
-			out, err := pipeline.Produce(preset)
+			s.log(fmt.Sprintf("[%d/%d] Üretim başlatılıyor: %s [%s]", idx+1, len(jobsToRun), preset.Title, format))
+			out, err := pipeline.ProduceContext(ctx, preset)
 			if err != nil {
 				s.log(fmt.Sprintf("HATA: %v", err))
 				s.mu.Lock()
-				s.job["status"] = "failed"
-				s.job["label"] = fmt.Sprintf("Hata: %v", err)
+				if ctx.Err() != nil {
+					s.job["status"] = "cancelled"
+					s.job["label"] = "İşlem iptal edildi"
+				} else {
+					s.job["status"] = "failed"
+					s.job["error"] = err.Error()
+					s.job["label"] = fmt.Sprintf("Hata: %v", err)
+				}
 				s.mu.Unlock()
 				return
 			}
@@ -568,15 +749,20 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 }
 
 func (s *StudioServer) handleApprove(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
 	select {
 	case s.approveChan <- struct{}{}:
 	default:
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *StudioServer) handleCancel(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
 	s.mu.Lock()
 	if s.cancelFunc != nil {
 		s.job["status"] = "stopping"
@@ -584,50 +770,49 @@ func (s *StudioServer) handleCancel(w http.ResponseWriter, r *http.Request) {
 		s.cancelFunc()
 	}
 	s.mu.Unlock()
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *StudioServer) handleVoiceUpload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, 50*1024*1024))
 	if err != nil || len(body) == 0 {
-		http.Error(w, `{"error":"Boş veya geçersiz ses verisi"}`, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Boş veya geçersiz ses verisi"})
 		return
 	}
 
 	tempFile, err := os.CreateTemp("", "tubie-upload-*.audio")
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"Temp file error: %v"}`, err), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": fmt.Sprintf("Temp file error: %v", err)})
 		return
 	}
 	defer os.Remove(tempFile.Name())
 
 	if _, err := tempFile.Write(body); err != nil {
 		tempFile.Close()
-		http.Error(w, `{"error":"Yazma hatası"}`, http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "Yazma hatası"})
 		return
 	}
 	tempFile.Close()
 
 	dest := filepath.Join(s.root, "sesim.wav")
 	if err := ConvertReference(tempFile.Name(), dest); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"Ses dönüştürme hatası: %v"}`, err), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("Ses dönüştürme hatası: %v", err)})
 		return
 	}
 
 	s.log("Yeni ses referansı yüklendi: sesim.wav")
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *StudioServer) handleShutdown(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_, _ = w.Write([]byte(`{"ok":true}`))
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 
 	go func() {
 		time.Sleep(500 * time.Millisecond)
