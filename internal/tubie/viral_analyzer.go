@@ -43,7 +43,7 @@ func DetectThreatCategory(text string) string {
 	switch {
 	case containsAnyKeyword(norm, []string{"yapay zeka", "chatgpt", "deepfake", "ses klon", "prompt", "llm", "ajan", "model"}):
 		return "Yapay Zeka & Deepfake"
-	case containsAnyKeyword(norm, []string{"wifi", "wi-fi", "evil twin", "deauth", "vpn", "modem", "router", "bluetooth", "airtag"}):
+	case containsAnyKeyword(norm, []string{"wifi", "wi-fi", "evil twin", "deauth", "vpn", "modem", "router", "bluetooth", "airtag", "iot", "akilli ev", "akilli cihaz", "kamera", "termostat", "priz", "botnet", "mirai"}):
 		return "Ağ, Wi-Fi & Kablosuz"
 	case containsAnyKeyword(norm, []string{"kripto", "bitcoin", "cuzdan", "airdrop", "metamask", "seed", "token", "nft"}):
 		return "Kripto & Web3 Güvenliği"
@@ -181,11 +181,12 @@ func AnalyzeScriptVirality(title, narration string, scenes []SceneDefinition, lo
 	// 4. Pattern Interrupts & Technical Concrete Details (0-15)
 	techScore := 0
 	techTokens := []string{
-		"2fa", "iki asamali", "iki adimli", "authenticator", "vpn", "https", "otp", "passkey",
+		"2fa", "iki asamali", "iki adimli", "authenticator", "vpn", "https", "otp", "passkey", "mfa",
 		"sql", "evil twin", "deauth", "infostealer", "ransomware", "fidye", "phishing", "oltalama",
 		"quishing", "qr", "deepfake", "sim", "cerez", "cookie", "virustotal", "brute force",
 		"kaba kuvvet", "zero-day", "prompt injection", "api", "usb", "approve", "sifre yoneticisi",
 		"parola yoneticisi", "soguk cuzdan", "cold wallet", "parametrik", "pin",
+		"iot", "firmware", "upnp", "vlan", "misafir agi", "varsayilan sifre", "botnet", "mirai", "ddos", "zero trust",
 	}
 	techHits := scoreKeywords(normAll, techTokens)
 	if techHits >= 3 {

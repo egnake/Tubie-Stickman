@@ -67,6 +67,23 @@ def has_bad_markers(text):
         return True
     return False
 
+META_LABEL_RE = re.compile(r"(?i)(?:^|[\s.!?…])(?:efsane|kanca|köprü|final|giriş|açılış|senaryo|açıklama|kapanış|sahne\s*\d+)\s*:")
+FOREIGN_SCRIPT_RE = re.compile(r"[\u0400-\u04FF\u4E00-\u9FFF\u0600-\u06FF\u0900-\u097F]")
+SPACED_PERCENT_RE = re.compile(r"\b\d+\s+%")
+
+def has_duplicate_sentence(text):
+    parts = re.split(r"[.!?…]+", turkish_lower(text))
+    seen = set()
+    for part in parts:
+        words = re.findall(r"[a-zçğıöşü0-9]+", part)
+        if len(words) < 5:
+            continue
+        key = " ".join(words)
+        if key in seen:
+            return True
+        seen.add(key)
+    return False
+
 def turkish_lower(s):
     return (s or "").replace("I", "ı").replace("İ", "i").lower()
 
@@ -116,8 +133,16 @@ def validate_payload(task, data, req):
         scenes = data.get("scenes")
         if not title or len(title) < 6 or turkish_lower(title) == "siber güvenlik senaryosu":
             return False, "invalid title"
+        if FOREIGN_SCRIPT_RE.search(title + " " + narration):
+            return False, "foreign script detected"
+        if META_LABEL_RE.search(narration) or "senaryo yazıyorum" in turkish_lower(narration):
+            return False, "meta label leak in narration"
+        if SPACED_PERCENT_RE.search(narration):
+            return False, "malformed spaced percentage"
+        if has_duplicate_sentence(narration):
+            return False, "duplicate sentence in narration"
         words = narration.split()
-        if len(words) < 60:
+        if len(words) < 75:
             return False, f"narration too short ({len(words)} words)"
         if "**" in narration or "##" in narration:
             return False, "markdown inside narration"
@@ -234,29 +259,28 @@ async def run_cascade(req):
     errors = []
 
     candidates = [
-        ("yqcloud", "Yqcloud", "gpt-4", 18.0, False),
-        ("pollinations", None, "openai", 16.0, False),
+        ("yqcloud", "Yqcloud", "gpt-4", 16.0, False),
     ]
+    if os.environ.get("TUBIE_G4F_ALLOW_POLLINATIONS") == "1":
+        candidates.append(("pollinations", None, "openai", 15.0, False))
     if not no_browser:
-        candidates.append(("chatgpt", "ChatGPT", "auto", 26.0, False))
-    candidates.extend([
-        ("deepai-std", "DeepAI", "standard", 14.0, True),
-        ("deepai-gemma4", "DeepAI", "gemma-4", 14.0, True),
-    ])
+        candidates.append(("chatgpt", "ChatGPT", "auto", 22.0, False))
 
     for label, prov_name, model, t_sec, use_sys in candidates:
         try:
             if label == "pollinations":
-                raw_text = await call_pollinations_direct(user_prompt, t_sec)
+                raw_text = await call_pollinations_direct((sys_prompt + "\n\n" if sys_prompt else "") + user_prompt, t_sec)
                 engine_name = "g4f:Pollinations"
             else:
                 prov = load_g4f_provider(P, prov_name)
                 if prov is None:
                     errors.append(f"{label}: unavailable")
                     continue
-                msgs = [{"role": "user", "content": user_prompt}]
                 if use_sys and sys_prompt:
                     msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}]
+                else:
+                    merged = (sys_prompt + "\n\n" + user_prompt).strip() if sys_prompt else user_prompt
+                    msgs = [{"role": "user", "content": merged}]
                 raw_text = await call_g4f_provider(client, prov, model, msgs, t_sec)
                 engine_name = f"g4f:{prov_name}"
 
@@ -366,7 +390,7 @@ func generateScriptViaG4F(topic string, opts ScriptOptions) (*ScriptResult, erro
 	defer cancel()
 
 	noBrowser := strings.TrimSpace(os.Getenv("TUBIE_G4F_NO_BROWSER")) == "1"
-	sysPrompt := "You are a strict JSON API that writes Turkish cybersecurity short-video scripts. Reply ONLY with one valid JSON object. Never output markdown fences, explanations, or placeholder text."
+	sysPrompt := "Sen ana dili Türkçe olan profesyonel bir siber güvenlik kısa video senaristisin. Yalnızca dilbilgisi kusursuz, doğal Türkçe kullan; uydurma kelime, İngilizce yüzde ('70 %' değil '%70') veya 'Efsane:', 'Kanca:' gibi bölüm etiketleri ASLA yazma. Sadece tek bir geçerli JSON objesi döndür."
 	userPrompt := buildScriptSystemPromptWithOptions(topic, opts)
 
 	resp, err := invokeG4F(ctx, g4fRequest{

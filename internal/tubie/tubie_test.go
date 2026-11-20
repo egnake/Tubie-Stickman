@@ -1073,3 +1073,65 @@ func TestAnalyzeSubcommand(t *testing.T) {
 		t.Fatalf("analyze subcommand failed with exit code %d", code)
 	}
 }
+
+func TestTurkishScriptQualityGateRejectsBrokenLLMOutput(t *testing.T) {
+	brokenPollinations := `Şu an akıllı frizlatma cihazı çekiyor, ama gizli bir siber saldırı nereye gider uzak tutuşsa? O, tek bir uzaktan yönlendirilebilmiş kablosuz anahtarla başlar. Bir: Wi-Fi şifrenizi her 90 günde bir değiştirip güçlü karmaşık hal getirin. Efsane: Bir akıllı termostat, zaten 2019'da mikrovirus cihazını çaldığında 30 milyon akıllı sigortacı ders aldı. 70 % saldırıyı engeller. Şu an akıllı frizlatma cihazı çekiyor, ama gizli bir siber saldırı nereye gider uzak tutuşsa?`
+	if err := tubie.ValidateTurkishScriptQuality("Akıllı Cihazlar", brokenPollinations, nil); err == nil {
+		t.Fatalf("expected ValidateTurkishScriptQuality to reject broken Pollinations narration")
+	}
+
+	samples := []struct {
+		name      string
+		narration string
+	}{
+		{"meta-label", "Kanca: Telefonuna bildirim düştü. Bir: Şifreni hemen değiştir. İki: 2FA aç."},
+		{"cyrillic", "Telefonunda gizli bir güvenlik открыта açığı tespit edildi."},
+		{"spaced-pct", "Bu basit kural saldırıların 95 % oranında önüne geçer."},
+		{"english-flood", "Your smart camera is exposed with weak password and this attack will steal your data."},
+		{"duplicate", "Evindeki akıllı kamera şu an seni gizlice izliyor olabilir. Hemen admin şifresini değiştir. Misafir ağına geçir. Evindeki akıllı kamera şu an seni gizlice izliyor olabilir."},
+	}
+	for _, s := range samples {
+		if err := tubie.ValidateTurkishScriptQuality("IoT Güvenliği", s.narration, nil); err == nil {
+			t.Errorf("sample %q should have failed ValidateTurkishScriptQuality", s.name)
+		}
+	}
+
+	clean := "Evindeki akıllı kamera şu an gizlice seni izliyor olabilir! Bir: Varsayılan admin şifresini kurulumda değiştir. İki: Akıllı cihazları misafir Wi-Fi ağına izole et. Üç: Otomatik firmware güncellemelerini aç ve kaydet!"
+	if err := tubie.ValidateTurkishScriptQuality("IoT Cihaz Riskleri", clean, nil); err != nil {
+		t.Fatalf("expected clean Turkish script to pass, got error: %v", err)
+	}
+}
+
+func TestIoTTopicGenerationAndLoopBridge(t *testing.T) {
+	t.Setenv("TUBIE_OFFLINE_AI", "1")
+	for _, style := range []string{tubie.StyleHybrid, tubie.StyleCinematic, tubie.StyleRedVsBlue} {
+		res, err := tubie.GenerateScriptWithOptions("IoT Cihazlarının Siber Güvenlik Riskleri", tubie.ScriptOptions{
+			Style:      style,
+			LoopEnding: true,
+		})
+		if err != nil {
+			t.Fatalf("style %s failed: %v", style, err)
+		}
+		if res.ViralScore == nil {
+			t.Fatalf("style %s returned nil ViralScore", style)
+		}
+		if res.ViralScore.ThreatCategory != "Ağ, Wi-Fi & Kablosuz" {
+			t.Fatalf("style %s: expected category Ağ, Wi-Fi & Kablosuz, got %q", style, res.ViralScore.ThreatCategory)
+		}
+		if res.ViralScore.TotalScore < 82 {
+			t.Fatalf("style %s: expected ViralScore >= 82, got %d (%+v)", style, res.ViralScore.TotalScore, res.ViralScore)
+		}
+		if !res.ViralScore.LoopReady {
+			t.Fatalf("style %s: expected LoopReady=true, got narration=%q", style, res.Narration)
+		}
+		if strings.Contains(res.Narration, "tıklamadan önce") {
+			t.Fatalf("style %s: IoT loop ending should not say 'tıklamadan önce': %q", style, res.Narration)
+		}
+		if strings.Contains(strings.ToLower(res.Narration), "efsane:") {
+			t.Fatalf("style %s: unexpected meta label in narration: %q", style, res.Narration)
+		}
+		if len(res.ViralScore.Dimensions) >= 5 && res.ViralScore.Dimensions[4].Score < 10 {
+			t.Fatalf("style %s: expected Saveability score >= 10 with Unicode Bir/İki/Üç parser, got %+v", style, res.ViralScore.Dimensions[4])
+		}
+	}
+}

@@ -112,21 +112,28 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 		}
 	}
 
-	// 2. Try local Ollama if alive and responsive
+	// 2. Try OpenAI / Groq API if user explicitly configured OPENAI_API_KEY or GROQ_API_KEY
 	if allowLiveAI {
-		if res, err := generateScriptViaOllamaAtOpts(defaultOllamaBaseURL, trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
+		if res, err := generateViaConfiguredOpenAI(trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
 			return finalize(res), nil
 		}
 	}
 
-	// 3. Try free cloud AI via Python g4f bridge (Yqcloud, Pollinations, ChatGPT, DeepAI)
-	if allowLiveAI {
-		if res, err := generateScriptViaG4F(trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
+	// 3. Try local Ollama only when a model is already warm in memory (or explicitly requested) to avoid 20s cold-start hangs
+	if allowLiveAI && (ollamaHasWarmModel(defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1") {
+		if res, err := generateScriptViaOllamaAtOpts(defaultOllamaBaseURL, trimmed, opts); err == nil && passesLiveAIQualityFloor(res, opts) {
 			return finalize(res), nil
 		}
 	}
 
-	// 4. Built-in high-craft Turkish cybersecurity scenario engine (instant, offline, zero failure)
+	// 4. Try cloud AI via Python g4f bridge (Yqcloud, ChatGPT) gated by strict Turkish quality checks
+	if allowLiveAI {
+		if res, err := generateScriptViaG4F(trimmed, opts); err == nil && passesLiveAIQualityFloor(res, opts) {
+			return finalize(res), nil
+		}
+	}
+
+	// 5. Built-in high-craft Turkish cybersecurity scenario engine (instant, offline, zero failure)
 	return finalize(generateViaTemplatesWithOptions(trimmed, opts)), nil
 }
 
@@ -150,9 +157,9 @@ func selectOllamaModel(models []struct {
 
 	preferred := []string{
 		"qwen2.5:14b",
+		"gemma2:9b",
 		"qwen2.5:7b",
 		"qwen2.5:latest",
-		"gemma2:9b",
 		"llama3.1:8b",
 		"llama3.2:latest",
 		"mistral:latest",
@@ -175,6 +182,24 @@ func selectOllamaModel(models []struct {
 		return models[0].Name
 	}
 	return "qwen2.5:7b"
+}
+
+func ollamaHasWarmModel(baseURL string) bool {
+	base := strings.TrimRight(baseURL, "/")
+	client := &http.Client{Timeout: 300 * time.Millisecond}
+	resp, err := client.Get(base + "/api/ps")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	var ps ollamaTagsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ps); err != nil {
+		return false
+	}
+	return len(ps.Models) > 0
 }
 
 func buildScriptSystemPrompt(topic string, style string) string {
@@ -219,7 +244,7 @@ func buildScriptSystemPromptWithOptions(topic string, opts ScriptOptions) string
 
 	loopRule := `7. Kapanış vurucu ve paylaşmaya/kaydetmeye teşvik eden kısa bir cümleyle bitsin.`
 	if opts.LoopEnding {
-		loopRule = `7. SONSUZ DÖNGÜ (SEAMLESS LOOP) ZORUNLU: Son cümle vedalaşma ("Takipte kal" vb.) İÇERMESİN; cümlenin sonu gramer olarak doğrudan ilk açılış cümlesine akacak şekilde açık bir köprüyle bitsin (ör. "İşte tam da bu yüzden şimdi kendine tekrar sor…").`
+		loopRule = `7. SONSUZ DÖNGÜ (SEAMLESS LOOP): Son cümle vedalaşma ("Takipte kal" vb.) İÇERMESİN ve ilk açılış cümlesini birebir tekrarlama; akışı gramer olarak başa bağlayan doğal bir geçiş cümlesiyle bitsin (ör. "İşte tam da bu yüzden şu gerçeği sakın unutma…").`
 	}
 
 	return fmt.Sprintf(`Türkçe YouTube Shorts / Instagram Reels / TikTok için yüksek izlenme tutma (retention) odaklı siber güvenlik ve dijital gizlilik video senaryosu üret.
@@ -227,14 +252,13 @@ func buildScriptSystemPromptWithOptions(topic string, opts ScriptOptions) string
 KONU: %q
 %s
 
-KALİTE KURALLARI:
+KALİTE VE DİL KURALLARI:
 1. Başlık, seslendirme ve sahnelerin TAMAMI doğrudan yukarıdaki KONU ile ilgili olsun; konu dışına asla çıkma.
-2. Klişe yapay zeka girişleri ("Merhaba", "Bugün sizlerle", "konusu sandığından çok daha kritik") veya yer tutucular ("[İsim]") KULLANMA.
-3. Seslendirme metni ("narration") 105-148 kelime arasında olsun; yalnızca okunacak akıcı konuşma metnini yaz, markdown (** veya ##) veya sahne tarifi ekleme.
-4. Soyut öğüt vermek yerine somut örnekler, sayılar ve 3 maddeli ("Bir: ... İki: ... Üç: ...") uygulanabilir kurallar ver.
-5. Tam olarak 6 sahne planla. Her sahne başlığı 2-5 kelimelik BÜYÜK HARF kısa Türkçe başlık olmalı ("SAHNE 1:" gibi önek KOYMA).
-6. Her sahneye uygun görsel tipini ("visual_type": "notification" | "terminal" | "url_inspect" | "network_mitm" | "password_crack" | "threat_meter" | "checklist" | "versus" | "prop_stage"), atmosferi ("mood": "hook" | "danger" | "breach" | "twist" | "defense" | "cta"), kamerayı ("camera": "punch_in" | "zoom_slow" | "shake" | "glitch_cut" | "wide"), 1-3 kelimelik kısa ekran damgasını ("callout") ve şu varlık yollarından uygun olanını ("prop") seç:
-   "@b1/cyber-laptop.png", "@b1/cyber-skull.png", "@b1/cyber-terminal.png", "@b1/cyber-wifi.png", "@b1/cyber-padlock-unlocked.png", "@b1/cyber-padlock-locked.png", "@b1/cyber-shield.png", "@b1/cyber-bug.png", "@b1/cyber-database.png", "@b1/idea-bulb-crayon.png"
+2. Yalnızca ana dili Türkçe konuşan bir editör doğallığında yaz: uydurma kelimeler, bozuk çeviri ifadeleri veya "70 %%" gibi İngilizce boşluklu yüzdeler YAZMA (daima "%%70", "%%95" biçiminde yaz).
+3. Seslendirme metninin içine ASLA "Efsane:", "Kanca:", "Köprü:", "Final:", "Giriş:", "DUR. DÜŞÜN. DOĞRULA!" gibi basmakalıp bölüm etiketleri ya da yer tutucular ("[İsim]") YAZMA. Klişe ("Merhaba", "Bugün sizlerle") kullanma.
+4. Seslendirme metni ("narration") 105-148 kelime arasında akıcı konuşma metni olsun; markdown (** veya ##) veya tekrarlayan cümleler ekleme.
+5. Soyut öğüt vermek yerine somut örnekler, teknik terimler, sayılar ve 3 maddeli ("Bir: ... İki: ... Üç: ...") uygulanabilir kurallar ver.
+6. Tam olarak 6 sahne planla. Her sahne başlığı 2-5 kelimelik BÜYÜK HARF kısa Türkçe başlık olmalı ("SAHNE 1:" gibi önek KOYMA). Her sahneye uygun visual_type, mood, camera, callout ve @b1/ prop seç.
 %s
 
 Yanıtını SADECE tek bir geçerli JSON objesi olarak ver (markdown veya ek açıklama yazma):
@@ -381,6 +405,193 @@ func generateViaGemini(apiKey, prompt string, opts ScriptOptions) (*ScriptResult
 	return parseAndNormalizeScript(gemResp.Candidates[0].Content.Parts[0].Text, prompt, opts.Style, "gemini")
 }
 
+func generateViaConfiguredOpenAI(prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	var apiKey, baseURL, model, engineName string
+	if k := strings.TrimSpace(os.Getenv("OPENAI_API_KEY")); k != "" {
+		apiKey = k
+		baseURL = "https://api.openai.com/v1/chat/completions"
+		model = "gpt-4o-mini"
+		engineName = "openai"
+	} else if k := strings.TrimSpace(os.Getenv("GROQ_API_KEY")); k != "" {
+		apiKey = k
+		baseURL = "https://api.groq.com/openai/v1/chat/completions"
+		model = "llama-3.3-70b-versatile"
+		engineName = "groq"
+	} else {
+		return nil, fmt.Errorf("no OpenAI-compatible API key configured")
+	}
+	if customURL := strings.TrimSpace(os.Getenv("TUBIE_OPENAI_BASE_URL")); customURL != "" {
+		baseURL = customURL
+	}
+	if customModel := strings.TrimSpace(os.Getenv("TUBIE_OPENAI_MODEL")); customModel != "" {
+		model = customModel
+	}
+	return generateViaOpenAICompatible(apiKey, baseURL, model, engineName, prompt, opts)
+}
+
+func generateViaOpenAICompatible(apiKey, endpoint, model, engineTag, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+	defer cancel()
+
+	reqBody := map[string]any{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": "Sen ana dili Türkçe olan ödüllü bir siber güvenlik kısa video senaristisin. Yalnızca doğal, akıcı Türkçe kullan. Sadece tek bir geçerli JSON objesi döndür."},
+			{"role": "user", "content": buildScriptSystemPromptWithOptions(prompt, opts)},
+		},
+		"temperature":     0.7,
+		"response_format": map[string]string{"type": "json_object"},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s status: %d", engineTag, resp.StatusCode)
+	}
+
+	var parsed struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	if len(parsed.Choices) == 0 || strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
+		return nil, fmt.Errorf("empty %s response", engineTag)
+	}
+	return parseAndNormalizeScript(parsed.Choices[0].Message.Content, prompt, opts.Style, engineTag+":"+model)
+}
+
+var (
+	metaLabelLeakRe  = regexp.MustCompile(`(?:^|[\s.!?…])(?:efsane|kanca|köprü|final|giriş|açılış|senaryo|açıklama|kapanış|sahne\s*\d+)\s*:`)
+	spacedPercentRe  = regexp.MustCompile(`\b\d+\s+%`)
+	englishStopwords = map[string]bool{
+		"the": true, "and": true, "with": true, "your": true, "this": true, "that": true,
+		"from": true, "have": true, "will": true, "would": true, "could": true, "should": true,
+		"about": true, "because": true,
+	}
+)
+
+// ValidateTurkishScriptQuality rejects LLM outputs containing leaked meta labels, non-Turkish scripts,
+// duplicated sentences, malformed English percentages, or English prose leaks.
+func ValidateTurkishScriptQuality(title, narration string, scenes []SceneDefinition) error {
+	combined := strings.TrimSpace(title + " " + narration)
+	if combined == "" {
+		return fmt.Errorf("boş senaryo")
+	}
+	for _, r := range combined {
+		if unicode.Is(unicode.Cyrillic, r) || unicode.Is(unicode.Arabic, r) || unicode.Is(unicode.Han, r) || unicode.Is(unicode.Devanagari, r) {
+			return fmt.Errorf("Türkçe dışı alfabe tespit edildi")
+		}
+	}
+
+	lowNarr := strings.ToLowerSpecial(unicode.TurkishCase, narration)
+	if metaLabelLeakRe.MatchString(lowNarr) || strings.Contains(lowNarr, "senaryo yazıyorum") {
+		return fmt.Errorf("senaryoda yapay zeka bölüm etiketi sızıntısı tespit edildi")
+	}
+	if spacedPercentRe.MatchString(narration) {
+		return fmt.Errorf("hatalı boşluklu yüzde yazımı tespit edildi")
+	}
+
+	engHits := 0
+	for _, w := range strings.Fields(lowNarr) {
+		cleanW := strings.Trim(w, ".,!?;:\"'()[]…")
+		if englishStopwords[cleanW] {
+			engHits++
+		}
+	}
+	if engHits >= 4 {
+		return fmt.Errorf("metin içinde İngilizce cümle kalıntıları tespit edildi")
+	}
+
+	sents := splitSentences(narration)
+	var seenSets [][]string
+	for _, s := range sents {
+		words := ExtractScriptWords(normalizeMatchText(s))
+		if len(words) < 5 {
+			continue
+		}
+		for _, prev := range seenSets {
+			if sentenceWordOverlap(words, prev) >= 0.75 {
+				return fmt.Errorf("metin içinde yinelenen cümle tespit edildi")
+			}
+		}
+		seenSets = append(seenSets, words)
+	}
+
+	allNormWords := ExtractScriptWords(normalizeMatchText(narration))
+	if len(allNormWords) >= 10 {
+		grams := make(map[string]bool)
+		for i := 0; i <= len(allNormWords)-5; i++ {
+			g := strings.Join(allNormWords[i:i+5], " ")
+			if grams[g] {
+				return fmt.Errorf("metin içinde tekrar eden cümle kalıbı tespit edildi")
+			}
+			grams[g] = true
+		}
+	}
+
+	return nil
+}
+
+func sentenceWordOverlap(a, b []string) float64 {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+	setB := make(map[string]bool, len(b))
+	for _, w := range b {
+		setB[w] = true
+	}
+	shared := 0
+	for _, w := range a {
+		if setB[w] {
+			shared++
+		}
+	}
+	maxLen := len(a)
+	if len(b) > maxLen {
+		maxLen = len(b)
+	}
+	return float64(shared) / float64(maxLen)
+}
+
+func passesLiveAIQualityFloor(res *ScriptResult, opts ScriptOptions) bool {
+	if res == nil || len(res.Scenes) < 3 {
+		return false
+	}
+	if err := ValidateTurkishScriptQuality(res.Title, res.Narration, res.Scenes); err != nil {
+		return false
+	}
+	if len(strings.Fields(res.Narration)) < 75 {
+		return false
+	}
+	report := AnalyzeScriptVirality(res.Title, res.Narration, res.Scenes, opts.LoopEnding)
+	if report.TotalScore < 78 {
+		return false
+	}
+	if len(report.Dimensions) > 0 && report.Dimensions[0].Score < 15 {
+		return false
+	}
+	return true
+}
+
 func stripJSONFences(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if strings.HasPrefix(trimmed, "```") {
@@ -515,6 +726,9 @@ func parseAndNormalizeScript(rawJSON, fallbackTopic, style, engine string) (*Scr
 	}
 
 	normalized := normalizeScenesWithContext(scenes, title, narration)
+	if err := ValidateTurkishScriptQuality(title, narration, normalized); err != nil {
+		return nil, err
+	}
 	score := AnalyzeScriptVirality(title, narration, normalized, false)
 	return &ScriptResult{
 		Title:      title,
@@ -1272,16 +1486,16 @@ var cyberTopicLibrary = []topicBlueprint{
 	},
 	{
 		id:       "iot-camera",
-		keywords: []string{"iot", "guvenlik kamerasi", "akilli ev", "modem", "router", "varsayilan sifre"},
+		keywords: []string{"iot", "guvenlik kamerasi", "akilli ev", "akilli cihaz", "nesnelerin interneti", "termostat", "akilli priz", "botnet", "mirai", "modem", "router", "varsayilan sifre"},
 		titles: map[string]string{
-			StyleHybrid:      "Evindeki Güvenlik Kamerası İnternete Açık Olabilir!",
-			StyleCinematic:   "Kutudan Çıktığı Şifreyle Bıraktığın O Kamera!",
-			StyleInformative: "Akıllı Ev ve Modem Güvenliğini Sağlamanın 3 Yolu",
+			StyleHybrid:      "Evindeki Akıllı Cihazlar Gizlice İzleniyor Olabilir!",
+			StyleCinematic:   "Kutudan Çıktığı Şifreyle Bıraktığın O Akıllı Cihaz!",
+			StyleInformative: "IoT ve Akıllı Ev Güvenliğini Sağlamanın 3 Kuralı",
 		},
 		narration: map[string]string{
-			StyleHybrid:      "Evini korumak için taktığın güvenlik kamerası veya akıllı priz, aslında evinin içine açılan bir pencere olabilir! Çünkü pek çok akıllı cihaz kutudan 'admin / 1234' gibi herkesin bildiği varsayılan şifrelerle çıkar ve çoğu kullanıcı bunu hiç değiştirmez. İnternetteki otomatik arama motorları bu açık cihazları saniyeler içinde listeler! Peki ev ağını nasıl zırhlarsın? Bir: Kamera, modem ve tüm akıllı cihazların varsayılan yönetici şifresini kurulum anında uzun bir parolayla değiştir! İki: Akıllı ev cihazlarını telefon ve bilgisayarından ayrı bir misafir ağına bağla. Üç: Cihaz yazılımlarını düzenli güncelle ve uzaktan erişim açıklarını kapat! Evini koruyan cihazlar seni izlemesin. Takipte kal, güvende kal!",
-			StyleCinematic:   "Yeni bir akıllı kamera kurdun ve telefonundan evi izleyebildiğin için için rahat. Ama kurulum sırasında değiştirmeye üşendiğin o varsayılan şifre yüzünden, internetteki tarayıcı botlar cihazını çoktan bulmuş olabilir! Aynı ağda duran bu güvensiz cihaz, evindeki bilgisayar ve telefonlara da sıçrama tahtası kurar. Cihazın yönetici parolasını hemen yenile, IoT cihazları misafir ağına izole et ve yazılım güncellemelerini aç!",
-			StyleInformative: "Akıllı ev ve modem ağını korumanın üç pratik adımı! Bir: Modem ve güvenlik kameralarındaki varsayılan 'admin' şifresini kurulumdan hemen sonra eşsiz bir parolayla değiştir. İki: Tüm IoT cihazlarını misafir Wi-Fi ağına alarak ana cihazlarından ayır. Üç: UPnP özelliğini gereksizse kapat ve aygıt yazılımı güncellemelerini düzenli yap!",
+			StyleHybrid:      "Evindeki akıllı kamera, modem ya da robot süpürge şu an gizlice seni izleyen tek cihaz olmayabilir! Çoğu kullanıcı IoT cihazları kutudan çıktığı 'admin / 1234' gibi varsayılan şifrelerle bırakır. İnternetteki tarayıcı botlar ve Mirai botnet ağları ise açık portlu bu cihazları saniyeler içinde ele geçirip ev ağının tam ortasında bir sıçrama tahtası kurar! Peki evini nasıl güvenceye alırsın? Bir: Kamera, modem ve tüm akıllı cihazların varsayılan şifresini kurulumda güçlü ve eşsiz parolalarla değiştir! İki: IoT cihazlarını telefon ve bilgisayarından izole edip ayrı bir misafir Wi-Fi ağına bağla. Üç: Otomatik firmware güncellemelerini aç ve gereksiz UPnP port yönlendirmesini kapat! Bu videoyu kaydet ve yakınlarına gönder. Takipte kal, güvende kal!",
+			StyleCinematic:   "Gece oturma odandaki akıllı kamera ya da kapı kilidi sessizce internete bağlı duruyor. Her şey normal görünüyor, değil mi? Oysa kurulumda değiştirmeyi unuttuğun varsayılan admin şifresi yüzünden tarayıcı botlar cihazını çoktan tarama listesine ekledi bile! Üstelik ele geçirilen tek bir IoT cihazı sadece seni izlemekle kalmaz; aynı Wi-Fi üzerinden evindeki laptopa ve telefona da gizli kapı açar. Bu tehlikeyi üç hamlede kes: Bir: Cihazların varsayılan parolasını hemen benzersiz hale getir. İki: Akıllı ev ürünlerini ana ağından ayırıp misafir ağına izole et. Üç: Firmware güncellemelerini aktif tut ve gereksiz UPnP ayarını kapat! Videoyu kaydet ve aileni uyar. Takipte kal, güvende kal!",
+			StyleInformative: "Evindeki akıllı cihazları siber saldırılara karşı zırhlayan üç net kural! Bir: Güvenlik kamerası, modem ve tüm IoT cihazlarındaki varsayılan 'admin' şifresini kurulumdan hemen sonra eşsiz güçlü parolayla değiştir. İki: Akıllı televizyon ve sensörleri ana bilgisayarından ayırarak izole bir misafir Wi-Fi veya VLAN ağına bağla. Üç: Cihaz firmware güncellemelerini düzenli uygula ve uzaktan erişim ile UPnP özelliğini kapat; eski yazılım açıklarını botnet ağlarına teslim etme! Bu rehberi kaydet, ev ağını koru!",
 		},
 		scenes: []SceneDefinition{
 			{Title: "AKILLI KAMERA VE MODEM AÇIĞI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
@@ -1375,6 +1589,17 @@ func applyLoopEndingIfRequested(title, narration string, loop bool) string {
 	if !loop || trimmed == "" {
 		return trimmed
 	}
+
+	// Remove trailing near-duplicate echo of the opening sentence if an LLM copied the hook onto the end.
+	sents := splitSentences(trimmed)
+	if len(sents) >= 4 {
+		firstWords := ExtractScriptWords(normalizeMatchText(sents[0]))
+		lastWords := ExtractScriptWords(normalizeMatchText(sents[len(sents)-1]))
+		if len(firstWords) >= 4 && sentenceWordOverlap(firstWords, lastWords) >= 0.65 {
+			trimmed = strings.Join(sents[:len(sents)-1], ". ") + "."
+		}
+	}
+
 	normTail := normalizeMatchText(lastSentenceOf(trimmed))
 	if containsAnyKeyword(normTail, []string{"iste bu yuzden", "tam da bu yuzden", "simdi tekrar", "basa don"}) {
 		return trimmed
@@ -1386,6 +1611,7 @@ func applyLoopEndingIfRequested(title, narration string, loop bool) string {
 		"Takipte kal!",
 		"Güvende kal!",
 		"Kendini koru!",
+		"Abone ol!",
 	}
 	cleaned := trimmed
 	for _, s := range signoffs {
@@ -1396,11 +1622,21 @@ func applyLoopEndingIfRequested(title, narration string, loop bool) string {
 	if cleaned != "" && !strings.HasSuffix(cleaned, ".") && !strings.HasSuffix(cleaned, "!") && !strings.HasSuffix(cleaned, "?") {
 		cleaned += "."
 	}
-	hook := firstSentenceOf(cleaned)
-	if hook != "" && len([]rune(hook)) < 75 {
-		return cleaned + " İşte tam da bu yüzden en başa dönüp şu gerçeği unutma…"
+
+	switch DetectThreatCategory(title + " " + cleaned) {
+	case "Ağ, Wi-Fi & Kablosuz":
+		return cleaned + " İşte tam da bu yüzden evindeki ve cebindeki ağa dönüp şu gerçeği unutma…"
+	case "Oltalama & Sosyal Mühendislik":
+		return cleaned + " İşte tam da bu yüzden bir sonraki bağlantıya dokunmadan önce şu soruyu tekrar sor…"
+	case "Yapay Zeka & Deepfake":
+		return cleaned + " İşte tam da bu yüzden ekranda gördüğün veya duyduğun her şeye inanmadan önce şunu unutma…"
+	case "Kripto & Web3 Güvenliği":
+		return cleaned + " İşte tam da bu yüzden bir sonraki imzayı onaylamadan önce şu gerçeği unutma…"
+	case "Zararlı Yazılım & Cihaz":
+		return cleaned + " İşte tam da bu yüzden yeni bir dosya çalıştırmadan önce şu gerçeği unutma…"
+	default:
+		return cleaned + " İşte tam da bu yüzden dijital güvenliğinde şu gerçeği sakın unutma…"
 	}
-	return cleaned + " İşte bu yüzden bir sonraki tıklamadan önce kendine şu soruyu tekrar sor…"
 }
 
 func adaptTemplateStyleScript(bp topicBlueprint, style string) (string, string) {
@@ -1652,7 +1888,7 @@ func buildDynamicScenarioWithOptions(prompt string, opts ScriptOptions) *ScriptR
 			title = fmt.Sprintf("%s ve Gizli Riskler", prettySubject)
 		}
 		narration = fmt.Sprintf(
-			"%s Peki konu %s olduğunda seni asıl neyin beklediğini hiç düşündün mü? Her şey normal akışında ilerlerken %s Çoğu kullanıcı “Bana bir şey olmaz” diye düşünür; oysa %s Kendini saniyeler içinde korumanın yolu ise çok net: İlk olarak, %s İkinci olarak, %s Son olarak, %s Çünkü dijital güvenliğini korumanın sırrı korkmak değil, saldırı gelmeden bir adım önde durmaktır! Takipte kal, güvende kal!",
+			"%s Peki konu %s olduğunda seni asıl neyin beklediğini hiç düşündün mü? Her şey normal akışında ilerlerken %s Çoğu kullanıcı “Bana bir şey olmaz” diye düşünür; oysa %s Kendini saniyeler içinde korumanın üç net adımı var: Bir: %s İki: %s Üç: %s Bu videoyu kaydet ve yakınlarınla paylaş. Takipte kal, güvende kal!",
 			hint.hookScene, cleanSubject, hint.attackHint, hint.mythHint, hint.check1, hint.check2, hint.defense,
 		)
 	}
@@ -2268,7 +2504,7 @@ func splitSentences(text string) []string {
 }
 
 func extractNumberedRules(narration string) []string {
-	re := regexp.MustCompile(`(?i)\b(?:Bir|İki|Üç|Dört|Beş|İlk olarak|İkinci olarak|Üçüncü olarak)\s*[:,\-–]\s*([^.!?]+)`)
+	re := regexp.MustCompile(`(?i)(?:^|[\s.!?;(])(?:Bir|İki|Üç|Dört|Beş|İlk olarak|İkinci olarak|Üçüncü olarak)\s*[:,\-–]\s*([^.!?]+)`)
 	matches := re.FindAllStringSubmatch(cleanMarkdownInline(narration), -1)
 	rules := make([]string, 0, len(matches))
 	for _, m := range matches {
