@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // ViralDimension scores a single aspect of short-form cybersecurity video retention.
@@ -65,7 +66,7 @@ func firstSentenceOf(text string) string {
 	}
 	for i, r := range cleaned {
 		if r == '.' || r == '!' || r == '?' || r == '…' {
-			part := strings.TrimSpace(cleaned[:i+1])
+			part := strings.TrimSpace(cleaned[:i+utf8.RuneLen(r)])
 			if len([]rune(part)) >= 4 {
 				return part
 			}
@@ -187,6 +188,7 @@ func AnalyzeScriptVirality(title, narration string, scenes []SceneDefinition, lo
 		"kaba kuvvet", "zero-day", "prompt injection", "api", "usb", "approve", "sifre yoneticisi",
 		"parola yoneticisi", "soguk cuzdan", "cold wallet", "parametrik", "pin",
 		"iot", "firmware", "upnp", "vlan", "misafir agi", "varsayilan sifre", "botnet", "mirai", "ddos", "zero trust",
+		"wps", "wpa2", "wpa3", "segmentasyon", "sifreleme", "akilli kamera", "akilli priz", "robot supurge", "sesli asistan", "uzaktan erisim", "guvenlik duvari", "firewall", "port", "ssl", "tls",
 	}
 	techHits := scoreKeywords(normAll, techTokens)
 	if techHits >= 3 {

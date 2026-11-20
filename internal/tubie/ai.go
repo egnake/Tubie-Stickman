@@ -40,14 +40,15 @@ type ScriptOptions struct {
 
 // ScriptResult represents the complete generated script, title, storyboard, and viral score.
 type ScriptResult struct {
-	Title      string            `json:"title"`
-	Slug       string            `json:"slug"`
-	Style      string            `json:"style,omitempty"`
-	Engine     string            `json:"engine,omitempty"`
-	LoopEnding bool              `json:"loop_ending,omitempty"`
-	Narration  string            `json:"narration"`
-	Scenes     []SceneDefinition `json:"scenes"`
-	ViralScore *ViralScoreReport `json:"viral_score,omitempty"`
+	Title          string            `json:"title"`
+	Slug           string            `json:"slug"`
+	Style          string            `json:"style,omitempty"`
+	Engine         string            `json:"engine,omitempty"`
+	FallbackReason string            `json:"fallback_reason,omitempty"`
+	LoopEnding     bool              `json:"loop_ending,omitempty"`
+	Narration      string            `json:"narration"`
+	Scenes         []SceneDefinition `json:"scenes"`
+	ViralScore     *ViralScoreReport `json:"viral_score,omitempty"`
 }
 
 // NormalizeScriptStyle maps arbitrary/UI style values into canonical script styles.
@@ -103,11 +104,15 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 		return res
 	}
 
+	var liveErrors []string
+
 	// 1. Try Gemini API if user explicitly configured GEMINI_API_KEY
 	if allowLiveAI {
 		if apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); apiKey != "" {
 			if res, err := generateViaGemini(apiKey, trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
 				return finalize(res), nil
+			} else if err != nil {
+				liveErrors = append(liveErrors, "gemini: "+err.Error())
 			}
 		}
 	}
@@ -116,25 +121,43 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 	if allowLiveAI {
 		if res, err := generateViaConfiguredOpenAI(trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
 			return finalize(res), nil
+		} else if err != nil && !strings.Contains(err.Error(), "no OpenAI-compatible") {
+			liveErrors = append(liveErrors, "openai: "+err.Error())
 		}
 	}
 
 	// 3. Try local Ollama only when a model is already warm in memory (or explicitly requested) to avoid 20s cold-start hangs
 	if allowLiveAI && (ollamaHasWarmModel(defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1") {
-		if res, err := generateScriptViaOllamaAtOpts(defaultOllamaBaseURL, trimmed, opts); err == nil && passesLiveAIQualityFloor(res, opts) {
-			return finalize(res), nil
+		if res, err := generateScriptViaOllamaAtOpts(defaultOllamaBaseURL, trimmed, opts); err == nil {
+			if ok, reason := passesLiveAIQualityFloor(trimmed, res); ok {
+				return finalize(res), nil
+			} else {
+				liveErrors = append(liveErrors, "ollama rejected: "+reason)
+			}
+		} else {
+			liveErrors = append(liveErrors, "ollama: "+err.Error())
 		}
 	}
 
-	// 4. Try cloud AI via Python g4f bridge (Yqcloud, ChatGPT) gated by strict Turkish quality checks
+	// 4. Try cloud AI via Python g4f bridge (ChatGPT first, then Yqcloud) gated by Turkish fluency & topic relevance
 	if allowLiveAI {
-		if res, err := generateScriptViaG4F(trimmed, opts); err == nil && passesLiveAIQualityFloor(res, opts) {
-			return finalize(res), nil
+		if res, err := generateScriptViaG4F(trimmed, opts); err == nil {
+			if ok, reason := passesLiveAIQualityFloor(trimmed, res); ok {
+				return finalize(res), nil
+			} else {
+				liveErrors = append(liveErrors, "g4f rejected: "+reason)
+			}
+		} else {
+			liveErrors = append(liveErrors, err.Error())
 		}
 	}
 
 	// 5. Built-in high-craft Turkish cybersecurity scenario engine (instant, offline, zero failure)
-	return finalize(generateViaTemplatesWithOptions(trimmed, opts)), nil
+	fallback := finalize(generateViaTemplatesWithOptions(trimmed, opts))
+	if len(liveErrors) > 0 && fallback != nil {
+		fallback.FallbackReason = strings.Join(liveErrors, " | ")
+	}
+	return fallback, nil
 }
 
 type ollamaTagsResponse struct {
@@ -238,8 +261,8 @@ func buildScriptSystemPromptWithOptions(topic string, opts ScriptOptions) string
 		styleDirective = `SEÇİLEN TARZ: SİNEMATİK + BİLGİ AKIŞI (HİBRİT)
 - İLK 3 SANİYE (SİNEMATİK KANCA): İzleyiciyi tam konunun ortasına çeken canlı bir sahne veya merak uyandıran soruyla başla.
 - KÖPRÜ: Tek cümleyle soruna veya riskin nasıl oluştuğuna bağla.
-- BİLGİ AKIŞI: 3 somut, teknik olarak doğru ve hemen uygulanabilir korunma adımı + bir efsane yıkıcı gerçek ver.
-- FİNAL VURUŞ: Kısa, vurucu bir uyarı ("DUR. DÜŞÜN. DOĞRULA!") ve akıcı kapanış.`
+- BİLGİ AKIŞI: Konuya doğrudan özel 3 somut, teknik olarak doğru ve hemen uygulanabilir korunma adımı + çarpıcı bir gerçek ver.
+- FİNAL VURUŞ: Kısa, akılda kalıcı bir kapanış ve kaydetme/paylaşma dürtüsü.`
 	}
 
 	loopRule := `7. Kapanış vurucu ve paylaşmaya/kaydetmeye teşvik eden kısa bir cümleyle bitsin.`
@@ -258,7 +281,7 @@ KALİTE VE DİL KURALLARI:
 3. Seslendirme metninin içine ASLA "Efsane:", "Kanca:", "Köprü:", "Final:", "Giriş:", "DUR. DÜŞÜN. DOĞRULA!" gibi basmakalıp bölüm etiketleri ya da yer tutucular ("[İsim]") YAZMA. Klişe ("Merhaba", "Bugün sizlerle") kullanma.
 4. Seslendirme metni ("narration") 105-148 kelime arasında akıcı konuşma metni olsun; markdown (** veya ##) veya tekrarlayan cümleler ekleme.
 5. Soyut öğüt vermek yerine somut örnekler, teknik terimler, sayılar ve 3 maddeli ("Bir: ... İki: ... Üç: ...") uygulanabilir kurallar ver.
-6. Tam olarak 6 sahne planla. Her sahne başlığı 2-5 kelimelik BÜYÜK HARF kısa Türkçe başlık olmalı ("SAHNE 1:" gibi önek KOYMA). Her sahneye uygun visual_type, mood, camera, callout ve @b1/ prop seç.
+6. Tam olarak 6 sahne planla. Her sahne başlığı 2-5 kelimelik BÜYÜK HARF kısa Türkçe başlık olmalı ("SAHNE 1:" gibi önek KOYMA). Her sahneye uygun visual_type, mood, camera, callout, @b1/ prop ve doğrudan bu konuya özel kısa "visual_data" ekle (ör. notification için {"sender","body","badge"}, terminal için {"header","lines":[...]}, checklist için {"items":[...]}, versus için {"leftTitle","leftText","rightTitle","rightText"}).
 %s
 
 Yanıtını SADECE tek bir geçerli JSON objesi olarak ver (markdown veya ek açıklama yazma):
@@ -572,24 +595,72 @@ func sentenceWordOverlap(a, b []string) float64 {
 	return float64(shared) / float64(maxLen)
 }
 
-func passesLiveAIQualityFloor(res *ScriptResult, opts ScriptOptions) bool {
+func isScriptOnTopic(prompt, candidate string) bool {
+	normPrompt := normalizeMatchText(prompt)
+	normCand := normalizeMatchText(candidate)
+	stop := map[string]bool{
+		"nasil": true, "neden": true, "nedir": true, "neler": true, "hakkinda": true, "konusunda": true,
+		"siber": true, "guvenlik": true, "guvenligi": true, "tehdit": true, "tehditler": true, "risk": true,
+		"riskleri": true, "tuzagi": true, "tuzaklari": true, "korunma": true, "rehberi": true, "video": true,
+		"destekli": true, "cihazlarinda": true, "cihazlarinin": true, "uzerine": true, "icin": true,
+	}
+	shortTech := map[string]bool{"iot": true, "vpn": true, "2fa": true, "sql": true, "xss": true, "qr": true, "usb": true, "ai": true, "llm": true, "api": true, "dns": true, "sms": true, "sim": true, "otp": true}
+	synMap := map[string][]string{
+		"iot":   {"iot", "akilli cihaz", "akilli ev", "kamera", "termostat", "sensor", "priz", "robot", "nesnelerin interneti"},
+		"yapay": {"yapay zeka", "ai", "model", "algoritma", "asistan"},
+		"ai":    {"yapay zeka", "ai", "model", "algoritma"},
+		"2fa":   {"2fa", "iki asamali", "iki adimli", "authenticator"},
+		"qr":    {"qr", "karekod", "quishing"},
+	}
+
+	rawWords := ExtractScriptWords(normPrompt)
+	checked := 0
+	hits := 0
+	for _, w := range rawWords {
+		lw := strings.ToLower(w)
+		if stop[lw] || (len([]rune(lw)) < 4 && !shortTech[lw]) {
+			continue
+		}
+		checked++
+		matched := false
+		if syns, ok := synMap[lw]; ok {
+			if containsAnyKeyword(normCand, syns) {
+				matched = true
+			}
+		}
+		if !matched {
+			stem := lw
+			if r := []rune(lw); len(r) > 5 {
+				stem = string(r[:5])
+			}
+			if strings.Contains(normCand, stem) {
+				matched = true
+			}
+		}
+		if matched {
+			hits++
+		}
+	}
+	if checked == 0 {
+		return true
+	}
+	return hits > 0
+}
+
+func passesLiveAIQualityFloor(prompt string, res *ScriptResult) (bool, string) {
 	if res == nil || len(res.Scenes) < 3 {
-		return false
+		return false, "insufficient scenes"
 	}
 	if err := ValidateTurkishScriptQuality(res.Title, res.Narration, res.Scenes); err != nil {
-		return false
+		return false, err.Error()
 	}
-	if len(strings.Fields(res.Narration)) < 75 {
-		return false
+	if len(strings.Fields(res.Narration)) < 60 {
+		return false, "narration too short"
 	}
-	report := AnalyzeScriptVirality(res.Title, res.Narration, res.Scenes, opts.LoopEnding)
-	if report.TotalScore < 78 {
-		return false
+	if !isScriptOnTopic(prompt, res.Title+" "+res.Narration) {
+		return false, "off-topic narration"
 	}
-	if len(report.Dimensions) > 0 && report.Dimensions[0].Score < 15 {
-		return false
-	}
-	return true
+	return true, ""
 }
 
 func stripJSONFences(raw string) string {
@@ -822,6 +893,11 @@ func inferSceneVisuals(sc SceneDefinition, idx, total int, title, narration stri
 		sc.Camera = strings.ToLower(strings.TrimSpace(sc.Camera))
 	}
 
+	normAll := normalizeMatchText(title + " " + sc.Title + " " + narration)
+	isIoT := containsAnyKeyword(normAll, []string{"iot", "akilli cihaz", "akilli ev", "kamera", "termostat", "robot supurge", "akilli priz", "modem", "router", "mirai", "botnet"})
+	isAI := containsAnyKeyword(normAll, []string{"yapay zeka", "prompt", "llm", "chatgpt", "sesli asistan"})
+	isWifi := containsAnyKeyword(normAll, []string{"wifi", "wi-fi", "evil twin", "deauth", "ortak ag", "kafe"})
+
 	vt := strings.ToLower(strings.TrimSpace(sc.VisualType))
 	if !validVisualTypes[vt] {
 		switch {
@@ -831,9 +907,13 @@ func inferSceneVisuals(sc SceneDefinition, idx, total int, title, narration stri
 			vt = "url_inspect"
 		case idx <= 3 && containsAnyKeyword(normScene, []string{"wifi", "wi-fi", "ag", "trafik", "bluetooth", "ikiz", "mitm", "paket", "usb", "sarj"}):
 			vt = "network_mitm"
+		case idx == 1 && (isIoT || isWifi):
+			vt = "network_mitm"
 		case idx <= 3 && containsAnyKeyword(normScene, []string{"sifre", "parola", "deneme", "brute", "kaba kuvvet", "karakter", "123456"}):
 			vt = "password_crack"
 		case idx <= 3 && containsAnyKeyword(normScene, []string{"terminal", "kod", "sql", "cerez", "cookie", "oturum", "infostealer", "crack", "apk", "fidye", "ransomware", "prompt", "eklenti", "dark web"}):
+			vt = "terminal"
+		case idx == 2 && (isIoT || isAI):
 			vt = "terminal"
 		case idx == 3:
 			vt = "threat_meter"
@@ -853,9 +933,27 @@ func inferSceneVisuals(sc SceneDefinition, idx, total int, title, narration stri
 	if strings.TrimSpace(sc.Callout) == "" {
 		switch sc.VisualType {
 		case "notification":
-			sc.Callout = "SAHTE BİLDİRİM!"
+			switch {
+			case isIoT && isAI:
+				sc.Callout = "AI + IOT ALARMI!"
+			case isIoT:
+				sc.Callout = "IOT CİHAZ ALARMI!"
+			case isWifi:
+				sc.Callout = "AĞ GÜVENLİK UYARISI!"
+			case isAI:
+				sc.Callout = "YAPAY ZEKA UYARISI!"
+			default:
+				sc.Callout = "SAHTE BİLDİRİM!"
+			}
 		case "url_inspect":
-			sc.Callout = "HARFE DİKKAT!"
+			switch {
+			case isIoT:
+				sc.Callout = "AÇIK PORT & AĞ RİSKİ!"
+			case isAI:
+				sc.Callout = "GİZLİ VERİ AKIŞI!"
+			default:
+				sc.Callout = "HARFE DİKKAT!"
+			}
 		case "network_mitm":
 			sc.Callout = "TRAFİK İZLENİYOR!"
 		case "password_crack":
@@ -873,8 +971,15 @@ func inferSceneVisuals(sc SceneDefinition, idx, total int, title, narration stri
 		}
 	}
 
+	defaults := buildDefaultVisualData(sc.VisualType, sc.Title, title, narration)
 	if sc.VisualData == nil {
-		sc.VisualData = buildDefaultVisualData(sc.VisualType, sc.Title, title, narration)
+		sc.VisualData = defaults
+	} else {
+		for k, v := range defaults {
+			if existing, ok := sc.VisualData[k]; !ok || existing == nil || existing == "" {
+				sc.VisualData[k] = v
+			}
+		}
 	}
 	return sc
 }
@@ -882,96 +987,208 @@ func inferSceneVisuals(sc SceneDefinition, idx, total int, title, narration stri
 func buildDefaultVisualData(visualType, sceneTitle, videoTitle, narration string) map[string]any {
 	norm := normalizeMatchText(videoTitle + " " + sceneTitle + " " + narration)
 	rules := extractNumberedRules(narration)
+	isIoT := containsAnyKeyword(norm, []string{"iot", "akilli cihaz", "akilli ev", "kamera", "termostat", "robot supurge", "akilli priz", "modem", "router", "mirai", "botnet"})
+	isAI := containsAnyKeyword(norm, []string{"yapay zeka", "prompt", "llm", "chatgpt", "sesli asistan"})
+	isWifi := containsAnyKeyword(norm, []string{"wifi", "wi-fi", "evil twin", "deauth", "ortak ag", "kafe"})
+
+	shortSubject := strings.TrimSpace(videoTitle)
+	if shortSubject == "" {
+		shortSubject = strings.TrimSpace(sceneTitle)
+	}
+	if len([]rune(shortSubject)) > 52 {
+		shortSubject = string([]rune(shortSubject)[:49]) + "…"
+	}
+
 	switch visualType {
 	case "notification":
-		sender := "Güvenlik Merkezi"
-		body := "Hesabınızda şüpheli işlem! 15 dk içinde doğrulayın."
-		badge := "ACİL UYARI"
+		sender := "Siber Güvenlik Analizi"
+		body := shortSubject
+		if body == "" {
+			body = "Ağınızda ve cihazlarınızda kritik güvenlik açığı tespit edildi!"
+		}
+		badge := "KRİTİK UYARI"
 		switch {
+		case isIoT && isAI:
+			sender = "Akıllı Ev & AI Hub"
+			body = "AI destekli kamera/asistan bilinmeyen bir sunucuya veri aktarıyor!"
+			badge = "AI + IOT ALARMI"
+		case isIoT:
+			sender = "Akıllı Ev Hub · Ağ Uyarısı"
+			body = "Bilinmeyen IP'den kamera ve akıllı cihaza giriş denemesi!"
+			badge = "IOT ALARMI"
+		case isWifi:
+			sender = "Wi-Fi Ağ Bildirimi"
+			body = "Otomatik bağlanıldı: Free_Cafe_WiFi (Şifresiz Ortak Ağ)"
+			badge = "AĞ RİSKİ"
 		case containsKeyword(norm, "instagram"):
 			sender = "Instagram Destek (?)"
 			body = "Telif hakkı ihlali! Hesabınız 24 saatte silinecek."
+			badge = "SAHTE DM"
 		case containsKeyword(norm, "whatsapp"):
 			sender = "Yakın Arkadaş (Ele Geçirilmiş)"
 			body = "Kanka 6 haneli SMS kodunu yanlışlıkla sana attım!"
+			badge = "SMS TUZAĞI"
 		case containsAnyKeyword(norm, []string{"e-devlet", "edevlet", "banka", "vergi"}):
 			sender = "E-Devlet / İade (?)"
 			body = "Son gün! Ödemenizi almak için bağlantıya tıklayın."
+			badge = "SAHTE SMS"
 		case containsKeyword(norm, "deepfake"):
 			sender = "Gizli Arama · Tanıdık Ses"
 			body = "Kaza yaptım, hemen şu hesaba acil para gönder!"
+			badge = "SES KLONU"
 		case containsKeyword(norm, "kripto"):
 			sender = "Resmi Airdrop (!)"
 			body = "1000$ ödülünü almak için cüzdanını hemen bağla!"
+			badge = "CÜZDAN RİSKİ"
+		case containsAnyKeyword(norm, []string{"bluetooth", "airtag"}):
+			sender = "Yakın Mesafe Sinyali"
+			body = "Bilinmeyen bir takip cihazı seninle hareket ediyor!"
+			badge = "BLE UYARI"
+		case isAI:
+			sender = "AI Asistan · Veri Akışı"
+			body = "Sohbet geçmişi ve belgeler dış modelle paylaşılıyor!"
+			badge = "VERİ RİSKİ"
+		case containsAnyKeyword(norm, []string{"oltalama", "phishing", "sahte link"}):
+			sender = "Güvenlik Merkezi (?)"
+			body = "Hesabınızda şüpheli işlem! 15 dk içinde doğrulayın."
+			badge = "ACİL UYARI"
 		}
 		return map[string]any{"sender": sender, "body": body, "badge": badge}
 
 	case "url_inspect":
-		fakeURL := "https://hesap-dogru1ama.com/giris"
-		realURL := "resmi-uygulama.com"
-		if containsKeyword(norm, "instagram") {
+		fakeURL := "https://sahte-dogrulama.net/panel"
+		realURL := "resmi-kaynak.com"
+		stamp := "KAYNAĞI DOĞRULA!"
+		switch {
+		case isIoT:
+			fakeURL = "http://192.168.1.1/admin (admin:1234)"
+			realURL = "WPA3 + Misafir Ağı + Eşsiz Parola"
+			stamp = "AÇIK PORT!"
+		case isAI && !containsAnyKeyword(norm, []string{"instagram", "e-devlet", "banka"}):
+			fakeURL = "prompt://gizli-talimat-enjekte"
+			realURL = "İzole Veri + İnsan Onayı"
+			stamp = "GİZLİ KOMUT!"
+		case containsKeyword(norm, "instagram"):
 			fakeURL = "https://lnstagram-destek.com"
 			realURL = "instagram.com"
-		} else if containsAnyKeyword(norm, []string{"e-devlet", "edevlet", "banka"}) {
+			stamp = "HTTPS ≠ GÜVENLİ!"
+		case containsAnyKeyword(norm, []string{"e-devlet", "edevlet", "banka"}):
 			fakeURL = "https://turk1ye-iade.net"
 			realURL = "turkiye.gov.tr"
-		} else if containsKeyword(norm, "qr") {
+			stamp = "SAHTE KLON!"
+		case containsKeyword(norm, "qr"):
 			fakeURL = "https://odeme-qr-kontrol.vip"
 			realURL = "resmi-odeme.com"
+			stamp = "SAHTE QR!"
+		case containsKeyword(norm, "sql"):
+			fakeURL = "user: admin' OR 1=1 --"
+			realURL = "Parametrik Sorgu (Prepared)"
+			stamp = "SQL INJECTION!"
 		}
-		return map[string]any{"fakeUrl": fakeURL, "realUrl": realURL, "stamp": "HTTPS ≠ GÜVENLİ!"}
+		return map[string]any{"fakeUrl": fakeURL, "realUrl": realURL, "stamp": stamp}
 
 	case "terminal":
+		header := "soc@analyst:~/monitor"
 		lines := []string{
-			"$ scan --target active_session",
-			"[+] Extracting cookies & tokens...",
-			"[!] AUTH BYPASSED // DATA EXFIL",
-			">>> 100% VERİ ELE GEÇİRİLDİ",
+			"$ inspect --target active_surface",
+			"[+] Checking open permissions & ports...",
+			"[!] UNPROTECTED ENDPOINT DETECTED",
+			">>> ACİL GÜVENLİK ÖNLEMİ GEREKLİ",
 		}
-		if containsKeyword(norm, "sql") {
+		switch {
+		case isIoT && isAI:
+			header = "redteam@iot-ai:~/scan"
+			lines = []string{
+				"$ scan-lan --devices smart_cam,assistant",
+				"[+] Found AI-IoT node (default firmware)",
+				"[!] Hijacking voice/video telemetry stream",
+				">>> AKILLI CİHAZ KONTROLÜ ELE GEÇTİ!",
+			}
+		case isIoT:
+			header = "shodan@scanner:~/iot"
+			lines = []string{
+				"$ scan --ports 23,554,8080 192.168.1.0/24",
+				"[+] SmartCam login: admin / 1234",
+				"[!] Pivoting to local Wi-Fi devices...",
+				">>> EV AĞI BOTNET RİSKİ ALTINDA!",
+			}
+		case isWifi:
+			header = "aircrack@kali:~/capture"
+			lines = []string{
+				"$ aireplay-ng --deauth 10 -a AP",
+				"[+] Evil Twin hotspot broadcasting...",
+				"[!] Capturing client traffic & tokens",
+				">>> ORTAK AĞ TRAFİĞİ İZLENİYOR!",
+			}
+		case containsKeyword(norm, "sql"):
+			header = "sqlmap@kali:~/audit"
 			lines = []string{
 				"$ POST /login user=' OR 1=1 --",
 				"[+] SQL syntax injected!",
 				"[!] ADMIN SESSION GRANTED",
 				">>> DUMPING USERS_TABLE...",
 			}
-		} else if containsAnyKeyword(norm, []string{"crack", "infostealer", "apk"}) {
+		case containsAnyKeyword(norm, []string{"crack", "infostealer", "apk"}):
+			header = "malware@sandbox:~/trace"
 			lines = []string{
 				"$ ./setup_crack.exe --silent",
 				"[!] Defender disabled by user",
 				"[+] Reading Chrome Login Data...",
 				">>> PASSWORDS + COOKIES SENT!",
 			}
-		} else if containsAnyKeyword(norm, []string{"prompt", "llm", "yapay zeka"}) {
+		case isAI:
+			header = "ai-sec@audit:~/prompt"
 			lines = []string{
 				"$ read_doc('hidden_prompt.pdf')",
 				"[!] IGNORE PREVIOUS INSTRUCTIONS",
 				"[+] Exfiltrating private memory...",
-				">>> API KEY LEAKED!",
+				">>> ÖZEL VERİ SIZDIRILDI!",
 			}
 		}
-		return map[string]any{"header": "kali@redteam:~/exploit", "lines": lines}
+		return map[string]any{"header": header, "lines": lines}
 
 	case "network_mitm":
+		if isIoT {
+			return map[string]any{
+				"left":    "AKILLI CİHAZ",
+				"middle":  "BOTNET / SALDIRGAN",
+				"right":   "EV AĞIN",
+				"packets": []string{"ADMIN ŞİFRE", "GÖRÜNTÜ", "LAN ERİŞİM"},
+			}
+		}
+		if isAI {
+			return map[string]any{
+				"left":    "KULLANICI",
+				"middle":  "AI MODELİ / AJAN",
+				"right":   "DIŞ SUNUCU",
+				"packets": []string{"SOHBET", "BELGE", "API VERİSİ"},
+			}
+		}
 		return map[string]any{
 			"left":    "CİHAZIN",
-			"middle":  "SAHTE AĞ",
+			"middle":  "SALDIRGAN / AĞ",
 			"right":   "SUNUCU",
-			"packets": []string{"ŞİFRE", "OTP", "ÇEREZ"},
+			"packets": []string{"ŞİFRE", "OTP", "OTURUM"},
 		}
 
 	case "password_crack":
 		return map[string]any{
-			"weak":     "ahmet1998",
+			"weak":     "admin1234",
 			"weakTime": "0.4 SANİYE!",
 			"strong":   "K4p1!Mavi#92Z",
 			"rate":     "4.82M DENEME/SN",
 		}
 
 	case "threat_meter":
+		label := "KRİTİK SİBER RİSK"
+		if isIoT {
+			label = "AÇIK IOT CİHAZ RİSKİ"
+		} else if isAI {
+			label = "VERİ & MODEL RİSKİ"
+		}
 		return map[string]any{
-			"level": 96,
-			"label": "KRİTİK SİBER RİSK",
+			"level": 94,
+			"label": label,
 			"safe":  false,
 		}
 
@@ -986,22 +1203,62 @@ func buildDefaultVisualData(visualType, sceneTitle, videoTitle, narration string
 				break
 			}
 		}
-		for len(items) < 3 {
-			defaults := []string{
-				"Linke değil, resmi uygulamaya gir",
-				"Authenticator tabanlı 2FA aç",
-				"Her hesapta eşsiz güçlü parola kur",
+		var defaults []string
+		switch {
+		case isIoT:
+			defaults = []string{
+				"Varsayılan admin şifresini değiştir",
+				"IoT cihazları misafir ağına izole et",
+				"Firmware güncelle ve UPnP/WPS kapat",
 			}
+		case isAI:
+			defaults = []string{
+				"Hassas verini yapay zekaya yazma",
+				"Sohbet geçmişi & eğitim iznini kapat",
+				"Kritik işlemlerde insan onayı tut",
+			}
+		default:
+			defaults = []string{
+				"Kaynağı resmi uygulamadan doğrula",
+				"Authenticator tabanlı 2FA aç",
+				"Yazılımları ve parolaları güncel tut",
+			}
+		}
+		for len(items) < 3 {
 			items = append(items, defaults[len(items)])
 		}
 		return map[string]any{"items": items}
 
 	case "versus":
-		return map[string]any{
-			"leftTitle":  "RİSKLİ DAVRANIŞ",
-			"leftText":   "Panikle tıkla & aynı şifreyi kullan",
-			"rightTitle": "SİBER KALKAN",
-			"rightText":  "Dur, doğrula & 2FA/Passkey aç",
+		switch {
+		case isIoT:
+			return map[string]any{
+				"leftTitle":  "VARSAYILAN AYAR",
+				"leftText":   "admin/1234, eski firmware & ortak ağ",
+				"rightTitle": "ZIRHLI EV AĞI",
+				"rightText":  "Eşsiz parola, misafir Wi-Fi & WPA3",
+			}
+		case isAI:
+			return map[string]any{
+				"leftTitle":  "KONTROLSÜZ PAYLAŞIM",
+				"leftText":   "Sınırsız izin & gizli veri aktarımı",
+				"rightTitle": "BİLİNÇLİ AI KULLANIMI",
+				"rightText":  "Veri izolasyonu, gizlilik & onay",
+			}
+		case isWifi:
+			return map[string]any{
+				"leftTitle":  "ŞİFRESİZ ORTAK AĞ",
+				"leftText":   "Otomatik bağlan & hassas giriş",
+				"rightTitle": "MOBİL VERİ + VPN",
+				"rightText":  "Uçtan uca şifreli güvenli bağlantı",
+			}
+		default:
+			return map[string]any{
+				"leftTitle":  "RİSKLİ ALIŞKANLIK",
+				"leftText":   "Doğrulamadan onayla & eski şifre kullan",
+				"rightTitle": "AKTİF SİBER KALKAN",
+				"rightText":  "Kontrol et, güncelle & 2FA/Passkey aç",
+			}
 		}
 	}
 	return map[string]any{"label": sceneTitle}
@@ -1567,12 +1824,35 @@ func normalizeMatchText(s string) string {
 	return strings.ToLower(r.Replace(s))
 }
 
+var canonicalTechTerms = map[string]string{
+	"iot": "IoT", "ai": "AI", "wi-fi": "Wi-Fi", "wifi": "Wi-Fi", "vpn": "VPN",
+	"2fa": "2FA", "mfa": "MFA", "sql": "SQL", "qr": "QR", "sms": "SMS",
+	"sim": "SIM", "usb": "USB", "llm": "LLM", "api": "API", "pdf": "PDF",
+	"apk": "APK", "https": "HTTPS", "http": "HTTP", "otp": "OTP", "pin": "PIN",
+	"vlan": "VLAN", "upnp": "UPnP", "wps": "WPS", "wpa2": "WPA2", "wpa3": "WPA3",
+	"dm": "DM", "ddos": "DDoS", "mitm": "MITM", "xss": "XSS", "dns": "DNS",
+	"ssh": "SSH", "url": "URL", "ip": "IP", "ios": "iOS", "nfc": "NFC",
+	"soc": "SOC", "edr": "EDR", "e-devlet": "e-Devlet",
+}
+
 func turkishTitle(s string) string {
 	words := strings.Fields(strings.TrimSpace(s))
 	if len(words) == 0 {
 		return ""
 	}
 	for i, w := range words {
+		cleanCore := strings.Trim(w, ".,!?:;()\"'")
+		if canon, ok := canonicalTechTerms[strings.ToLower(cleanCore)]; ok {
+			words[i] = strings.Replace(w, cleanCore, canon, 1)
+			continue
+		}
+		if idx := strings.IndexAny(w, "'’"); idx > 0 {
+			prefix := w[:idx]
+			if canon, ok := canonicalTechTerms[strings.ToLower(prefix)]; ok {
+				words[i] = canon + strings.ToLowerSpecial(unicode.TurkishCase, w[idx:])
+				continue
+			}
+		}
 		runes := []rune(w)
 		first := strings.ToUpperSpecial(unicode.TurkishCase, string(runes[0]))
 		rest := ""
@@ -1619,6 +1899,11 @@ func applyLoopEndingIfRequested(title, narration string, loop bool) string {
 			cleaned = strings.TrimSpace(strings.TrimSuffix(cleaned, s))
 		}
 	}
+	// Strip dangling trailing conjunctions left by LLM ellipsis endings (e.g. "...parçasıdır ve...")
+	trailingConjRe := regexp.MustCompile(`(?i)\s+(?:ve|ama|fakat|ancak|çünkü|ki|ya da|veya)[.…,\s]*$`)
+	cleaned = strings.TrimSpace(trailingConjRe.ReplaceAllString(cleaned, ""))
+	cleaned = strings.TrimRight(cleaned, "…")
+	cleaned = strings.TrimSpace(cleaned)
 	if cleaned != "" && !strings.HasSuffix(cleaned, ".") && !strings.HasSuffix(cleaned, "!") && !strings.HasSuffix(cleaned, "?") {
 		cleaned += "."
 	}
@@ -1709,17 +1994,24 @@ func generateViaTemplatesWithOptions(prompt string, opts ScriptOptions) *ScriptR
 	style := NormalizeScriptStyle(opts.Style)
 	lowerNorm := normalizeMatchText(prompt)
 
-	bestIdx := -1
-	bestScore := 0
+	bestIdx, secondIdx := -1, -1
+	bestScore, secondScore := 0, 0
 	for i, bp := range cyberTopicLibrary {
 		sc := scoreKeywords(lowerNorm, bp.keywords)
 		if sc > bestScore {
-			bestScore = sc
-			bestIdx = i
+			secondScore, secondIdx = bestScore, bestIdx
+			bestScore, bestIdx = sc, i
+		} else if sc > secondScore {
+			secondScore, secondIdx = sc, i
 		}
 	}
+	_ = secondIdx
 
-	if bestIdx >= 0 && bestScore > 0 {
+	// Only use a static canned template when one single domain clearly dominates the prompt.
+	// Multi-concept prompts (e.g. "Yapay Zekâ Destekli IoT Cihazlarında Siber Tehdit" matching both AI and IoT)
+	// must NEVER be hijacked into a single narrow static template — route them to the dynamic builder instead.
+	useTemplate := bestIdx >= 0 && ((bestScore >= 2 && bestScore > secondScore) || (bestScore == 1 && secondScore == 0))
+	if useTemplate {
 		bp := cyberTopicLibrary[bestIdx]
 		title, narration := adaptTemplateStyleScript(bp, style)
 		if opts.LoopEnding {
@@ -1757,10 +2049,24 @@ type dynamicDomainHint struct {
 }
 
 func detectDomainHint(normPrompt string) dynamicDomainHint {
+	if containsAnyKeyword(normPrompt, []string{"yapay zeka", "ai", "llm", "asistan"}) &&
+		containsAnyKeyword(normPrompt, []string{"iot", "akilli cihaz", "akilli ev", "kamera", "termostat", "sensor", "robot", "priz"}) {
+		return dynamicDomainHint{
+			hookScene:  "Evindeki akıllı cihaz şu an seni dinliyor ve davranışlarını öğreniyor olabilir!",
+			attackHint: "yapay zekâ destekli akıllı kameralar, sesli asistanlar ve ev sensörleri; varsayılan şifre açıkları ve bulut veri akışları üzerinden saldırganlara çift katmanlı bir kapı açıyor.",
+			check1:     "Varsayılan yönetici parolasını değiştir ve ses/görüntü verilerinin bulut eğitimine gönderilmesini kapat.",
+			check2:     "Tüm yapay zekâlı IoT cihazlarını telefonundan ayırıp ayrı bir misafir Wi-Fi veya VLAN ağına taşı.",
+			mythHint:   "“Akıllı cihazım sadece evimde çalışıyor” düşüncesi yanlıştır; eski firmware ve açık kamera akışları tüm ev ağını hedefe çevirir.",
+			defense:    "Otomatik firmware güncellemelerini aç, UPnP ve WPS'i kapat, cihaz hesabında 2FA kullan.",
+			prop1:      "@b1/cyber-wifi.png",
+			prop2:      "@b1/cyber-database.png",
+		}
+	}
+
 	hints := []dynamicDomainHint{
 		{
 			keywords:   []string{"llm", "prompt", "chatgpt", "yapay zeka", "ai", "ajan", "agent", "model"},
-			hookScene:  "MASUM BİR KOMUT GİBİ GÖRÜNÜYOR…",
+			hookScene:  "Masum bir komut gibi görünüyor ama arka planda işler bambaşka!",
 			attackHint: "görünmez bir yönlendirme metni ya da gizli veri sızdırma komutuyla modelin kuralları devre dışı bırakılmaya çalışılıyor.",
 			check1:     "Dış kaynaklardan gelen metin, belge ve web içeriklerini asla doğrudan güvenilir sistem talimatı gibi işleme.",
 			check2:     "Araç ve veri erişim yetkilerini yalnızca o an gereken en dar kapsamla sınırla.",
@@ -1771,7 +2077,7 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 		},
 		{
 			keywords:   []string{"kamera", "iot", "akilli ev", "router", "modem", "bluetooth"},
-			hookScene:  "EVİNDEKİ CİHAZ SESSİZCE AĞA BAĞLANDI…",
+			hookScene:  "Evindeki akıllı cihaz sessizce dış ağa bağlandı, haberin var mı?",
 			attackHint: "kutudan çıktığı gibi bırakılan varsayılan şifreler ve güncellenmeyen yazılımlar yüzünden dışarıdan erişilebilir bir kapı bırakılıyor.",
 			check1:     "Kurulum anında cihazın varsayılan yönetici şifresini mutlaka güçlü ve eşsiz bir parolayla değiştir.",
 			check2:     "Akıllı cihazlarını ana bilgisayar ve telefonlarının bulunduğu ağdan ayırıp ayrı bir misafir ağına al.",
@@ -1782,7 +2088,7 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 		},
 		{
 			keywords:   []string{"e-devlet", "edevlet", "banka", "kart", "odeme", "iban", "vergi", "ceza", "icra"},
-			hookScene:  "TELEFONUNA RESMİ GÖRÜNÜMLÜ BİR BİLDİRİM DÜŞTÜ…",
+			hookScene:  "Telefonuna resmi görünümlü bir bildirim düştü, hemen tıklayacak mısın?",
 			attackHint: "resmi kurum ismi ve panik yaratan bir borç veya iade mesajıyla seni doğrudan sahte doğrulama sayfasına çekmeye çalışıyorlar.",
 			check1:     "Gelen SMS veya e-postadaki bağlantıya dokunmak yerine tarayıcıdan ya da resmi mobil uygulamadan kendin giriş yap.",
 			check2:     "Acele etmeni isteyen “Bugün son gün” veya “Hemen öde” ifadelerinin psikolojik baskı taktiği olduğunu unutma.",
@@ -1800,7 +2106,7 @@ func detectDomainHint(normPrompt string) dynamicDomainHint {
 	}
 
 	return dynamicDomainHint{
-		hookScene:  "HER ŞEY NORMAL GÖRÜNÜYOR… TA Kİ O DETAYA KADAR!",
+		hookScene:  "Her şey normal görünüyor… ta ki o küçük detaya kadar!",
 		attackHint: "ilk bakışta masum görünen küçük bir açık ya da dikkatsiz bir onay adımı, arka planda tüm erişim zincirini tetikleyebiliyor.",
 		check1:     "Kaynağı ve göndereni doğrulamadan hiçbir bağlantıyı, dosyayı veya yetki isteğini varsayılan olarak kabul etme.",
 		check2:     "Seni hızlanmaya zorlayan “hemen onayla” ya da “tek tıkla geç” yönlendirmelerinde mutlaka birkaç saniye dur ve kontrol et.",
@@ -2027,8 +2333,10 @@ func GenerateViralMetadata(title, narration string) ViralMetadata {
 				return NormalizeViralMetadata(*vm, title, narration)
 			}
 		}
-		if vm, err := generateViralViaOllama(title, narration); err == nil && vm != nil {
-			return NormalizeViralMetadata(*vm, title, narration)
+		if ollamaHasWarmModel(defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1" {
+			if vm, err := generateViralViaOllama(title, narration); err == nil && vm != nil {
+				return NormalizeViralMetadata(*vm, title, narration)
+			}
 		}
 		if vm, err := generateViralViaG4F(title, narration); err == nil && vm != nil {
 			return NormalizeViralMetadata(*vm, title, narration)
@@ -2464,18 +2772,13 @@ func generateViralViaTemplates(title, narration string) ViralMetadata {
 		}
 	}
 
-	// If narration has its own distinct custom content and doesn't closely match a canned preset,
-	// synthesize description directly from title + narration while keeping curated titles/hashtags when relevant.
+	// Whenever the video has real multi-sentence narration, synthesize metadata directly from the actual
+	// title and narration so static templates can never contradict or hijack custom AI videos.
+	if hasCustomExtractableNarration(narration) {
+		return buildDynamicViralMetadata(title, narration)
+	}
 	if bestIdx >= 0 && bestScore >= 5 {
-		tpl := viralTopicLibrary[bestIdx]
-		if tpl.id == "ai-privacy" && hasCustomExtractableNarration(narration) {
-			dyn := buildDynamicViralMetadata(title, narration)
-			dyn.TitleA = tpl.meta.TitleA
-			dyn.TitleB = tpl.meta.TitleB
-			dyn.TitleC = tpl.meta.TitleC
-			return dyn
-		}
-		return tpl.meta
+		return viralTopicLibrary[bestIdx].meta
 	}
 
 	return buildDynamicViralMetadata(title, narration)
@@ -2717,6 +3020,7 @@ func slugify(text string) string {
 	r := strings.NewReplacer(
 		"ç", "c", "ğ", "g", "ı", "i", "ö", "o", "ş", "s", "ü", "u",
 		"Ç", "c", "Ğ", "g", "İ", "i", "Ö", "o", "Ş", "s", "Ü", "u",
+		"â", "a", "Â", "a", "î", "i", "Î", "i", "û", "u", "Û", "u",
 	)
 	normalized := r.Replace(lower)
 	re := regexp.MustCompile(`[^a-z0-9]+`)

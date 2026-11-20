@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const g4fRunnerTimeout = 65 * time.Second
+const g4fRunnerTimeout = 55 * time.Second
 
 // g4fBridgeScript queries free cloud LLM providers via Python's g4f library.
 // Input and output use UTF-8/ASCII-safe JSON over stdin/stdout so Windows codepages
@@ -85,7 +85,18 @@ def has_duplicate_sentence(text):
     return False
 
 def turkish_lower(s):
-    return (s or "").replace("I", "ı").replace("İ", "i").lower()
+    return (
+        (s or "")
+        .replace("I", "ı")
+        .replace("İ", "i")
+        .replace("Â", "a")
+        .replace("â", "a")
+        .replace("Î", "i")
+        .replace("î", "i")
+        .replace("Û", "u")
+        .replace("û", "u")
+        .lower()
+    )
 
 def extract_topic_tokens(text):
     stop = {
@@ -110,6 +121,7 @@ def check_relevance(reference_text, candidate_text):
         "vpn": ("vpn", "şifreli tünel", "ortak ağ"),
         "qr": ("qr", "karekod", "quishing"),
         "otp": ("tek kullanımlık", "onay kodu", "otp"),
+        "iot": ("iot", "akıllı cihaz", "akıllı ev", "kamera", "termostat", "sensör", "nesnelerin interneti"),
     }
     for tok in tokens:
         if tok in synonyms:
@@ -142,7 +154,7 @@ def validate_payload(task, data, req):
         if has_duplicate_sentence(narration):
             return False, "duplicate sentence in narration"
         words = narration.split()
-        if len(words) < 75:
+        if len(words) < 65:
             return False, f"narration too short ({len(words)} words)"
         if "**" in narration or "##" in narration:
             return False, "markdown inside narration"
@@ -150,10 +162,12 @@ def validate_payload(task, data, req):
             return False, "insufficient scenes"
         valid_scenes = 0
         for sc in scenes:
-            if isinstance(sc, dict) and str(sc.get("title") or "").strip():
-                valid_scenes += 1
+            if isinstance(sc, dict):
+                st = str(sc.get("title") or "").strip()
+                if st and not re.match(r"^sahne\s*\d+$", turkish_lower(st)):
+                    valid_scenes += 1
         if valid_scenes < 4:
-            return False, "incomplete scenes"
+            return False, "incomplete or placeholder scenes"
         if not check_relevance(req.get("topic", ""), title + " " + narration):
             return False, "off-topic script"
         return True, ""
@@ -258,44 +272,54 @@ async def run_cascade(req):
     client = AsyncClient()
     errors = []
 
-    candidates = [
-        ("yqcloud", "Yqcloud", "gpt-4", 16.0, False),
-    ]
-    if os.environ.get("TUBIE_G4F_ALLOW_POLLINATIONS") == "1":
-        candidates.append(("pollinations", None, "openai", 15.0, False))
+    candidates = []
     if not no_browser:
-        candidates.append(("chatgpt", "ChatGPT", "auto", 22.0, False))
+        candidates.append(("chatgpt", "ChatGPT", "auto", 20.0, False, 2))
+    candidates.append(("cloudflare", "Cloudflare", "llama-3.3-70b", 14.0, False, 1))
+    candidates.append(("yqcloud", "Yqcloud", "gpt-4", 10.0, False, 1))
+    if os.environ.get("TUBIE_G4F_ALLOW_POLLINATIONS") == "1":
+        candidates.append(("pollinations", None, "openai", 14.0, False, 1))
 
-    for label, prov_name, model, t_sec, use_sys in candidates:
-        try:
-            if label == "pollinations":
-                raw_text = await call_pollinations_direct((sys_prompt + "\n\n" if sys_prompt else "") + user_prompt, t_sec)
-                engine_name = "g4f:Pollinations"
-            else:
-                prov = load_g4f_provider(P, prov_name)
-                if prov is None:
-                    errors.append(f"{label}: unavailable")
-                    continue
-                if use_sys and sys_prompt:
-                    msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}]
+    for label, prov_name, model, t_sec, use_sys, max_attempts in candidates:
+        for attempt in range(max_attempts):
+            try:
+                if label == "pollinations":
+                    raw_text = await call_pollinations_direct((sys_prompt + "\n\n" if sys_prompt else "") + user_prompt, t_sec)
+                    engine_name = "g4f:Pollinations"
                 else:
-                    merged = (sys_prompt + "\n\n" + user_prompt).strip() if sys_prompt else user_prompt
-                    msgs = [{"role": "user", "content": merged}]
-                raw_text = await call_g4f_provider(client, prov, model, msgs, t_sec)
-                engine_name = f"g4f:{prov_name}"
+                    prov = load_g4f_provider(P, prov_name)
+                    if prov is None:
+                        errors.append(f"{label}: unavailable")
+                        break
+                    if use_sys and sys_prompt:
+                        msgs = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}]
+                    else:
+                        merged = (sys_prompt + "\n\n" + user_prompt).strip() if sys_prompt else user_prompt
+                        msgs = [{"role": "user", "content": merged}]
+                    attempt_client = client if attempt == 0 else AsyncClient()
+                    raw_text = await call_g4f_provider(attempt_client, prov, model, msgs, t_sec)
+                    engine_name = f"g4f:{prov_name}"
 
-            cleaned = strip_json_fences(raw_text)
-            parsed = json.loads(cleaned)
-            ok, reason = validate_payload(task, parsed, req)
-            if ok:
-                return {
-                    "ok": True,
-                    "engine": engine_name,
-                    "json": json.dumps(parsed, ensure_ascii=False),
-                }
-            errors.append(f"{label}: rejected ({reason})")
-        except Exception as e:
-            errors.append(f"{label}: {type(e).__name__}: {str(e)[:100]}")
+                cleaned = strip_json_fences(raw_text)
+                if not cleaned:
+                    raise ValueError("empty response")
+                parsed = json.loads(cleaned)
+                ok, reason = validate_payload(task, parsed, req)
+                if ok:
+                    return {
+                        "ok": True,
+                        "engine": engine_name,
+                        "json": json.dumps(parsed, ensure_ascii=False),
+                    }
+                errors.append(f"{label}: rejected ({reason})")
+                break
+            except Exception as e:
+                is_timeout = isinstance(e, (asyncio.TimeoutError, TimeoutError))
+                if not is_timeout and attempt + 1 < max_attempts:
+                    await asyncio.sleep(0.8)
+                    continue
+                errors.append(f"{label}: {type(e).__name__}: {str(e)[:100]}")
+                break
 
     return {"ok": False, "error": "; ".join(errors)}
 
@@ -310,6 +334,7 @@ def main():
         result = {"ok": False, "error": f"{type(e).__name__}: {e}"}
     orig_stdout.write(json.dumps(result, ensure_ascii=True))
     orig_stdout.flush()
+    os._exit(0)
 
 if __name__ == "__main__":
     main()
@@ -364,6 +389,7 @@ func invokeG4F(ctx context.Context, req g4fRequest) (*g4fResponse, error) {
 
 	cmd := exec.CommandContext(ctx, resolvePythonBinary(), "-c", g4fBridgeScript)
 	cmd.Dir = os.TempDir()
+	cmd.WaitDelay = 3 * time.Second
 	cmd.Stdin = bytes.NewReader(payload)
 	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
 

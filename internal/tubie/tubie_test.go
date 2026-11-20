@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"tubie-stickman/internal/tubie"
+	"unicode/utf8"
 )
 
 func TestFindRoot(t *testing.T) {
@@ -1133,5 +1134,80 @@ func TestIoTTopicGenerationAndLoopBridge(t *testing.T) {
 		if len(res.ViralScore.Dimensions) >= 5 && res.ViralScore.Dimensions[4].Score < 10 {
 			t.Fatalf("style %s: expected Saveability score >= 10 with Unicode Bir/İki/Üç parser, got %+v", style, res.ViralScore.Dimensions[4])
 		}
+	}
+}
+
+func TestHybridAITopicDoesNotHijackToStaticAIPrivacy(t *testing.T) {
+	t.Setenv("TUBIE_OFFLINE_AI", "1")
+	prompt := "Yapay Zekâ Destekli IoT Cihazlarında Siber Tehdit"
+	res, err := tubie.GenerateScriptWithOptions(prompt, tubie.ScriptOptions{
+		Style:      tubie.StyleHybrid,
+		LoopEnding: true,
+	})
+	if err != nil {
+		t.Fatalf("GenerateScriptWithOptions failed: %v", err)
+	}
+	if strings.Contains(strings.ToLower(res.Title), "ne kadar tanıyor") {
+		t.Fatalf("hybrid AI+IoT prompt was hijacked to static AI-privacy template: title=%q", res.Title)
+	}
+	lowNarr := strings.ToLower(res.Narration)
+	if !strings.Contains(lowNarr, "iot") || !strings.Contains(lowNarr, "yapay zek") {
+		t.Fatalf("expected hybrid AI+IoT narration to cover both AI and IoT, got: %s", res.Narration)
+	}
+	if err := tubie.ValidateTurkishScriptQuality(res.Title, res.Narration, res.Scenes); err != nil {
+		t.Fatalf("generated script failed quality gate: %v", err)
+	}
+	if !strings.Contains(res.Title, "IoT") {
+		t.Fatalf("expected title to preserve canonical acronym IoT, got %q", res.Title)
+	}
+	if !strings.Contains(res.Slug, "zeka") {
+		t.Fatalf("expected slug to normalize circumflex â -> a (zeka), got %q", res.Slug)
+	}
+	if res.ViralScore == nil || !utf8.ValidString(res.ViralScore.HookSentence) || strings.ContainsRune(res.ViralScore.HookSentence, '\uFFFD') {
+		t.Fatalf("corrupted UTF-8 in HookSentence: %+v", res.ViralScore)
+	}
+	for i, sc := range res.Scenes {
+		if sc.Callout == "SAHTE BİLDİRİM!" || sc.Callout == "HARFE DİKKAT!" {
+			t.Fatalf("scene %d used phishing-only callout %q on AI+IoT topic", i, sc.Callout)
+		}
+		raw, _ := json.Marshal(sc.VisualData)
+		s := strings.ToLower(string(raw))
+		if strings.Contains(s, "hesap-dogru1ama.com") || strings.Contains(s, "15 dk içinde doğrulayın") || strings.Contains(s, "panikle tıkla") {
+			t.Fatalf("scene %d leaked hardcoded phishing visual_data onto AI+IoT topic: %s", i, string(raw))
+		}
+	}
+
+	// Regression check: multi-byte ellipsis '…' in first sentence must never slice mid-rune.
+	ellipsisReport := tubie.AnalyzeScriptVirality("Test", "Evindeki cihaz seni dinliyor… İkinci cümle burada.", nil, false)
+	if !utf8.ValidString(ellipsisReport.HookSentence) || strings.ContainsRune(ellipsisReport.HookSentence, '\uFFFD') {
+		t.Fatalf("firstSentenceOf corrupted UTF-8 ellipsis: %q", ellipsisReport.HookSentence)
+	}
+	if !strings.HasSuffix(ellipsisReport.HookSentence, "…") {
+		t.Fatalf("expected HookSentence to preserve full ellipsis rune, got %q", ellipsisReport.HookSentence)
+	}
+}
+
+func TestLoopEndingStripsTrailingConjunctionAndEcho(t *testing.T) {
+	t.Setenv("TUBIE_OFFLINE_AI", "1")
+	res, err := tubie.GenerateScriptWithOptions("IoT Cihazlarının Siber Güvenlik Riskleri", tubie.ScriptOptions{
+		Style:      tubie.StyleHybrid,
+		LoopEnding: true,
+	})
+	if err != nil {
+		t.Fatalf("failed generating IoT loop script: %v", err)
+	}
+	if strings.Contains(res.Narration, "ve... İşte") || strings.Contains(res.Narration, "ve… İşte") {
+		t.Fatalf("dangling conjunction before loop bridge: %q", res.Narration)
+	}
+	// Also verify viral metadata on custom AI+IoT video never hijacks to unrelated static description
+	vm := tubie.GenerateViralMetadata(
+		"Yapay Zekâ Destekli IoT Cihazlarında Siber Tehdit",
+		"Evindeki akıllı kamera ve sesli asistan internete bağlı. Bir: Varsayılan admin şifresini değiştir. İki: Akıllı cihazları misafir ağına izole et. Üç: Firmware güncellemelerini aç ve UPnP kapat.",
+	)
+	if strings.Contains(strings.ToLower(vm.Description), "instagram") || strings.Contains(strings.ToLower(vm.Description), "telif hakkı") {
+		t.Fatalf("viral metadata hijacked custom IoT video: %s", vm.Description)
+	}
+	if !strings.Contains(strings.ToLower(vm.Description), "misafir") {
+		t.Fatalf("expected viral metadata description to reflect actual narration rules, got: %s", vm.Description)
 	}
 }

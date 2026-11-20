@@ -408,6 +408,9 @@ func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if result.FallbackReason != "" {
+		s.log(fmt.Sprintf("Bilgi: Canlı AI yerine yerleşik motor kullanıldı (%s)", result.FallbackReason))
+	}
 	s.log(fmt.Sprintf("Senaryo hazır (%s · %s): %s (%d sahne)", result.Style, result.Engine, result.Title, len(result.Scenes)))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":     true,
