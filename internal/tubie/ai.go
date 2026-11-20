@@ -2607,9 +2607,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "ai-privacy",
 		keywords: []string{"yapay zeka", "chatgpt", "dijital iz", "dijital ayak", "sohbet gecmisi", "model egitimi", "ne kadar taniyor", "profil cikariyor"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Yapay Zeka Sizi İnternette Ne Kadar Tanıyor? (Tahmininizden Çok Daha Fazla!)",
-			TitleB: "⚠️ Yapay Zekayla Sohbet Ederken Bu Bilgileri ASLA Paylaşmayın!",
-			TitleC: "🛡️ Yapay Zeka Araçlarında Kişisel Verilerinizi Korumanın 3 Altın Kuralı!",
+			TitleA:      "🚨 Yapay Zeka Sizi İnternette Ne Kadar Tanıyor? (Tahmininizden Çok Daha Fazla!)",
+			TitleB:      "⚠️ Yapay Zekayla Sohbet Ederken Bu Bilgileri ASLA Paylaşmayın!",
+			TitleC:      "🛡️ Yapay Zeka Araçlarında Kişisel Verilerinizi Korumanın 3 Altın Kuralı!",
 			Description: "Yapay zeka sohbetlerine anlattıklarınız sadece ekranda kalmıyor; hakkınızda detaylı bir dijital profil oluşturuyor olabilir! 🤖🔍\n\nArtık yalnızca sosyal medya paylaşımlarınız değil; yapay zekaya yazdığınız şehir, iş, sağlık ve özel yaşam detayları da veri tabanlarında işlenebiliyor.\n\n⚠️ DİKKAT EDİLMESİ GEREKEN RİSKLER:\n1️⃣ Sohbet Geçmişi ve Hafıza: Önceki konuşmalarınız birleşerek kapsamlı bir kişisel profil oluşturabilir.\n2️⃣ Model Eğitimi: Paylaştığınız hassas metinler ve belgeler sistem eğitiminde kullanılabilir.\n3️⃣ Hesap Ele Geçirme Riski: Açık kalan oturumlarda tüm geçmişiniz tek tıkla görüntülenebilir.\n\n🛡️ KENDİNİZİ KORUMANIN 3 ALTIN KURALI:\n✅ 1. Yapay zekayla konuşurken şifre, kimlik numarası, adres ve banka bilgilerini ASLA paylaşmayın.\n✅ 2. Özel fotoğraflarınızı, belgelerinizi ve başkalarına ait verileri yüklemeden önce iki kez düşünün.\n✅ 3. Kullandığınız araçların veri saklama, sohbet geçmişi ve model eğitimi ayarlarını hemen kapatın.\n\n👇 Siz yapay zekayla kişisel konular konuşuyor musunuz? Yorumlarda paylaşın!\n📌 Videoyu kaydedip sevdiklerinize gönderin, dijital izlerinizi kontrol altında tutun!",
 			Hashtags: []string{
 				"#yapayzeka", "#dijitalgizlilik", "#verigüvenliği", "#sibergüvenlik",
@@ -2623,9 +2623,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "phishing",
 		keywords: []string{"sahte link", "oltalama", "phishing", "bu linke tiklarsan", "kilit simgesi", "sahte baglanti"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Bu Linke Tıklarsan Ne Olur? (5 Saniyede Sahte Linki Yakala!)",
-			TitleB: "⚠️ 'Hesabınızı Hemen Doğrulayın' Mesajı Aldınız mı? Sakın Tıklamayın!",
-			TitleC: "🛡️ Sahte Linkleri ve Oltalama Tuzaklarını Anlamanın 4 Net Yolu!",
+			TitleA:      "🚨 Bu Linke Tıklarsan Ne Olur? (5 Saniyede Sahte Linki Yakala!)",
+			TitleB:      "⚠️ 'Hesabınızı Hemen Doğrulayın' Mesajı Aldınız mı? Sakın Tıklamayın!",
+			TitleC:      "🛡️ Sahte Linkleri ve Oltalama Tuzaklarını Anlamanın 4 Net Yolu!",
 			Description: "Tanıdık bir logo, inandırıcı bir mesaj ve 'Hemen doğrulayın!' baskısı… İşte bütün oltalama (phishing) saldırıları tam olarak böyle başlıyor! 🚨🔗\n\nSaldırganların bütün dijital hayatınıza ulaşmak için ihtiyaç duyduğu tek şey sizin bir anlık dikkatsizliğinizdir.\n\n⚠️ SAHTE LİNKİ 5 SANİYEDE NASIL ANLARSIN?\n1️⃣ Alan Adını İncele: Küçük harf farkları (l yerine I) ve garip uzantılar tuzaktır.\n2️⃣ Göndereni Kontrol Et: Tanıdık kurum adı yazması mesajın gerçekten oradan geldiğini kanıtlamaz.\n3️⃣ Acele Ettirme Manipülasyonu: 'Hesabınız kapatılacak!' baskısına kanıp panikle tıklamayın.\n4️⃣ Kilit Simgesi Yanılgısı: HTTPS ve kilit simgesi sitenin güvenli olduğunu değil, sadece bağlantının şifreli olduğunu gösterir!\n\n🛡️ TIKLAMADAN ÖNCE DUR. DÜŞÜN. DOĞRULA!\n✅ Bağlantıya değil, doğrudan resmi uygulamaya veya siteye kendiniz girin.\n✅ Güçlü parolalar ve Authenticator tabanlı 2FA kullanın.\n\n👇 Bu videoyu kaydet ve 'her şeye tıklayan' arkadaşlarına hemen gönder!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#oltalama", "#phishing", "#sahtelink", "#hacker",
@@ -2639,9 +2639,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "instagram",
 		keywords: []string{"instagram", "telif ihlali", "mavi tik", "hesap calma", "hesabiniz nasil calinir", "hesabin tek dm"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Instagram Hesabınız 1 Saniyede Nasıl Çalınır? (Sakın Bu Hatayı Yapmayın!)",
-			TitleB: "⚠️ 'Telif Hakkı İhlali' Mesajı Aldınız mı? Sakın Tıklamayın!",
-			TitleC: "🛡️ Instagram Hesabınızı Hackerlardan Korumanın 3 Altın Kuralı!",
+			TitleA:      "🚨 Instagram Hesabınız 1 Saniyede Nasıl Çalınır? (Sakın Bu Hatayı Yapmayın!)",
+			TitleB:      "⚠️ 'Telif Hakkı İhlali' Mesajı Aldınız mı? Sakın Tıklamayın!",
+			TitleC:      "🛡️ Instagram Hesabınızı Hackerlardan Korumanın 3 Altın Kuralı!",
 			Description: "Instagram hesabınız tek bir sahte bağlantıyla saniyeler içinde tamamen elinizden gidebilir! 😱\n\nHackerlar artık karmaşık şifre kırmakla uğraşmıyor. Kullanıcı psikolojisini hedef alan sahte DM ve oltalama (phishing) tuzakları kuruyorlar.\n\n⚠️ EN SIK KULLANILAN TUZAKLAR:\n1️⃣ Telif İhlali Bildirimi: Profilinizin kapatılacağını iddia eden sahte DM'ler.\n2️⃣ Mavi Tik / Rozet Bildirimi: Sahte formla şifre toplayan profiller.\n3️⃣ Şüpheli Giriş Uyarısı: Panikle şifre girmenizi isteyen sahte linkler.\n\n🛡️ HESABINIZI KORUMANIN 4 ALTIN KURALI:\n✅ 1. Instagram yetkilileri ASLA DM ile şifre veya link göndermez.\n✅ 2. Bildirimleri sadece Ayarlar > Güvenlik > Instagram E-postaları sekmesinden kontrol edin.\n✅ 3. SMS yerine mutlaka Google Authenticator gibi bir 2FA uygulaması açın.\n✅ 4. Şüpheli linke tıkladıysanız derhal şifrenizi yenileyin ve oturumları kapatın.\n\n👇 Bu tür sahte mesajlarla daha önce karşılaştınız mı? Yorumlarda yazın!\n👥 Videoyu kaydedin ve arkadaşlarınızı uyarın, kimsenin hesabı çalınmasın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#instagramgüvenliği", "#hesapçalma", "#hacker",
@@ -2657,9 +2657,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "wifi",
 		keywords: []string{"wifi", "wi-fi", "kafe wi", "ortak ag", "evil twin", "deauth"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Kafe Wi-Fi Ağlarına Bağlananlar DİKKAT! (Bunu Biliyor muydunuz?)",
-			TitleB: "⚠️ Şifrenizi 10 Saniyede Havada Yakalayabilirler!",
-			TitleC: "🛡️ Halka Açık Wi-Fi Ağlarında Güvende Kalmanın Tek Yolu!",
+			TitleA:      "🚨 Kafe Wi-Fi Ağlarına Bağlananlar DİKKAT! (Bunu Biliyor muydunuz?)",
+			TitleB:      "⚠️ Şifrenizi 10 Saniyede Havada Yakalayabilirler!",
+			TitleC:      "🛡️ Halka Açık Wi-Fi Ağlarında Güvende Kalmanın Tek Yolu!",
 			Description: "Gittiğiniz kafede ücretsiz Wi-Fi ağına bağlandığınız an tüm kişisel verileriniz havada izleniyor olabilir! ☕💻\n\nHalka açık, şifresiz kablosuz ağlar siber saldırganlar için en verimli av sahalarıdır. Hackerlar aynı ağa bağlandıktan sonra trafiği kolayca dinleyebilir.\n\n⚠️ KAFELERDEKİ GÖRÜNMEZ TEHLİKELER:\n1️⃣ Evil Twin (Sahte İkiz Ağ): Kafenin adıyla birebir sahte bir Wi-Fi noktası açarlar.\n2️⃣ Deauth Saldırısı: Sizi ağdan düşürürler; tekrar bağlanırken şifreli paketler havada yakalanır.\n3️⃣ Man-in-the-Middle: Girdiğiniz siteler ile cihazınız arasına girip şifreleri izlerler.\n\n🛡️ AÇIK AĞLARDA GÜVENDE KALMANIN ALTIN KURALLARI:\n✅ 1. Ortak Wi-Fi ağlarında asla bankacılık veya hassas işlemler yapmayın.\n✅ 2. Cihazınızda mutlaka güvenilir ve şifreli bir VPN servisi açık olsun.\n✅ 3. Telefonunuzun 'Bilinen ağlara otomatik bağlan' özelliğini kapatın.\n✅ 4. Girdiğiniz web sitelerinde HTTPS kilit simgesini kontrol edin.\n\n👇 Dışarıda kafelerin Wi-Fi ağlarına bağlanıyor musunuz? Yorumlarda buluşalım!\n👥 Videoyu kaydedin ve sevdiklerinizle paylaşın!",
 			Hashtags: []string{
 				"#sibergüvenlik", "#wifi", "#ağgüvenliği", "#vpn", "#hacker",
@@ -2674,9 +2674,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "password",
 		keywords: []string{"brute force", "kaba kuvvet", "parola formulu", "sifreniz ne kadar", "sifren saniyeler", "passkey"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Kullandığınız Şifre Kaç Saniyede Kırılır? (Şok Eden Gerçek!)",
-			TitleB: "⚠️ '123456' veya Doğum Tarihi Kullananlar Hemen Değiştirsin!",
-			TitleC: "🛡️ Kırılması Yüzyıllar Sürecek Güçlü Şifre Oluşturma Formülü!",
+			TitleA:      "🚨 Kullandığınız Şifre Kaç Saniyede Kırılır? (Şok Eden Gerçek!)",
+			TitleB:      "⚠️ '123456' veya Doğum Tarihi Kullananlar Hemen Değiştirsin!",
+			TitleC:      "🛡️ Kırılması Yüzyıllar Sürecek Güçlü Şifre Oluşturma Formülü!",
 			Description: "Kullandığınız şifre gerçekten güvende mi yoksa hackerların kırması sadece birkaç saniye mi sürer? ⏱️🔐\n\nHer gün milyonlarca kullanıcı basit parolalar kullanıyor. Oysa yapay zeka ve brute force araçları saniyede milyarlarca kombinasyon deneyebiliyor!\n\n⚠️ EN BÜYÜK ŞİFRE HATALARI:\n1️⃣ Aynı Parolayı Her Yerde Kullanmak: Bir site sızdığında tüm hesaplarınız ele geçirilir.\n2️⃣ Kişisel Bilgileri Şifre Yapmak: İsim, memleket ve tarihler saniyeler içinde çözülür.\n3️⃣ Kısa Şifreler: 8 karakterli küçük harfli şifre ortalama 5 saniyede kırılır!\n\n🛡️ KIRILMASI YÜZYILLAR SÜRECEK GÜÇLÜ PAROLA FORMÜLÜ:\n✅ 1. En az 14-16 karakter uzunluğunda olmalıdır.\n✅ 2. Büyük harf, küçük harf, rakam ve özel semboller içermelidir.\n✅ 3. Her platform için mutlaka farklı bir şifre kullanın.\n✅ 4. Parolalarınızı bir Parola Yöneticisinde güvenle saklayın.\n\n👇 Şifreniz ne kadar güçlü? Yorumlarda konuşalım!\n👥 Sevdiklerinizi uyarmak için videoyu hemen kaydedip gönderin!",
 			Hashtags: []string{
 				"#parola", "#şifregüvenliği", "#bruteforce", "#sibergüvenlik",
@@ -2691,9 +2691,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "crypto",
 		keywords: []string{"kripto", "bitcoin", "cuzdan", "airdrop", "seed phrase", "metamask"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Kripto Cüzdanınız 1 Tıkla Nasıl Boşaltılır? (Airdrop Tuzağı!)",
-			TitleB: "⚠️ 'Bedava Coin Kazandınız' Mesajlarına Sakın İnanmayın!",
-			TitleC: "🛡️ Kripto Paralarınızı Güvende Tutmanın 3 Temel Kuralı!",
+			TitleA:      "🚨 Kripto Cüzdanınız 1 Tıkla Nasıl Boşaltılır? (Airdrop Tuzağı!)",
+			TitleB:      "⚠️ 'Bedava Coin Kazandınız' Mesajlarına Sakın İnanmayın!",
+			TitleC:      "🛡️ Kripto Paralarınızı Güvende Tutmanın 3 Temel Kuralı!",
 			Description: "Kripto cüzdanınızdaki tüm birikim tek bir sahte onay ile bir saniyede sıfırlanabilir! 💸⚠️\n\nKripto dünyasında hackerlar sahte airdrop siteleri ve Telegram gruplarıyla kullanıcıları tuzağa düşürüyor!\n\n⚠️ EN TEHLİKELİ KRİPTO TUZAKLARI:\n1️⃣ Akıllı Sözleşme İzni (Approve Drainer): Cüzdanı bağlayıp onay verdiğiniz an tokenlarınız transfer edilir.\n2️⃣ Sahte Cüzdan Güncellemesi: DM ile gelen ve güncelleme isteyen sahte linkler.\n3️⃣ Sahte Destek Ekipleri: Size özelden yazıp yardım teklif eden sahte yöneticiler.\n\n🛡️ KRİPTO VARLIKLARINIZI KORUMANIN 4 KURALI:\n✅ 1. Gizli Kurtarma Kelimelerinizi (Seed Phrase) ASLA hiçbir web sitesine yazmayın!\n✅ 2. Hiç kimse durduk yere karşılıksız bedava para dağıtmaz.\n✅ 3. Bilmediğiniz sitelere cüzdan bağlamayın; onayları düzenli iptal edin.\n✅ 4. Yüksek birikimleriniz için mutlaka Donanım Cüzdanı (Cold Wallet) kullanın.\n\n👇 Kripto yatırımı olan arkadaşını hemen etiketle!\n👥 Gönderiyi kaydet, paranı koru!",
 			Hashtags: []string{
 				"#kripto", "#bitcoin", "#ethereum", "#kriptopara", "#kriptogüvenlik",
@@ -2707,9 +2707,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "whatsapp",
 		keywords: []string{"whatsapp", "sms onay kodu", "6 haneli", "alti haneli", "pin kodu"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Arkadaşınızdan 'Kodu Bana At' Mesajı Gelirse Sakın Atmayın!",
-			TitleB: "⚠️ WhatsApp Hesabınızı Tek Bir SMS Koduyla Çalıyorlar!",
-			TitleC: "🛡️ WhatsApp'ta İki Adımlı Doğrulama Nasıl Açılır?",
+			TitleA:      "🚨 Arkadaşınızdan 'Kodu Bana At' Mesajı Gelirse Sakın Atmayın!",
+			TitleB:      "⚠️ WhatsApp Hesabınızı Tek Bir SMS Koduyla Çalıyorlar!",
+			TitleC:      "🛡️ WhatsApp'ta İki Adımlı Doğrulama Nasıl Açılır?",
 			Description: "WhatsApp hesabınız aniden kapanabilir ve rehberinizdeki herkese adınıza borç isteme mesajları gidebilir! 📱🚨\n\nSaldırganlar yakın arkadaşlarınızın çalınmış profilleri üzerinden SMS onay kodu hırsızlığı yapıyor.\n\n⚠️ DOLANDIRICILAR NASIL ÇALIŞIYOR?\n1️⃣ Saldırgan yeni bir cihaza telefon numaranızı yazar.\n2️⃣ WhatsApp telefonunuza 6 haneli resmi bir SMS onay kodu yollar.\n3️⃣ Arkadaşınızın profilinden mesaj gelir: 'Kodu yanlışlıkla sana yolladım, bana atar mısın?'\n4️⃣ O kodu verdiğiniz anda hesabınız saldırganın eline geçer!\n\n🛡️ HESABINIZI GERİ DÖNÜLMEZ ŞEKİLDE KORUYUN:\n✅ 1. SMS onay kodunu EN YAKININIZA BİLE asla vermeyin!\n✅ 2. Arkadaşınızdan gelen garip taleplerde kendisini sesli arayıp teyit edin.\n✅ 3. WhatsApp Ayarları > Hesap > İki Adımlı Doğrulama'yı hemen aktif edin.\n✅ 4. Hesabınıza e-posta adresi bağlayarak güvenliği ikiye katlayın.\n\n👇 Bu SMS onay hilesiyle daha önce karşılaştınız mı? Yorumlarda paylaşın!\n👥 Sevdiklerinize gönderin, kimse mağdur olmasın!",
 			Hashtags: []string{
 				"#whatsapp", "#dolandırıcılık", "#sibergüvenlik", "#smstuzağı",
@@ -2723,9 +2723,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "deepfake",
 		keywords: []string{"deepfake", "ses klon", "sahte ses", "sahte arama"},
 		meta: ViralMetadata{
-			TitleA: "🚨 3 Saniyelik Sesinle Nasıl Dolandırılırsın? (Deepfake Tehlikesi!)",
-			TitleB: "⚠️ Arayan Gerçekten Yakının mı, Yapay Zeka Ses Klonu mu?",
-			TitleC: "🛡️ Yapay Zeka Ses Klonlama Tuzaklarına Karşı 3 Altın Kural!",
+			TitleA:      "🚨 3 Saniyelik Sesinle Nasıl Dolandırılırsın? (Deepfake Tehlikesi!)",
+			TitleB:      "⚠️ Arayan Gerçekten Yakının mı, Yapay Zeka Ses Klonu mu?",
+			TitleC:      "🛡️ Yapay Zeka Ses Klonlama Tuzaklarına Karşı 3 Altın Kural!",
 			Description: "Gece yarısı tanıdık bir sesle gelen acil para talebi, aslında 3 saniyelik bir videodan kopyalanmış yapay zeka klonu olabilir! 🎙️⚠️\n\nDolandırıcılar ses tonunuzu ve nefesinizi taklit ederek panik anında soru sormanızı engelliyor.\n\n🛡️ KENDİNİZİ VE AİLENİZİ KORUYUN:\n✅ 1. Telefonda acil para isteyen kişi tanıdık gelse bile hemen kapatıp kayıtlı numarayı kendiniz arayın.\n✅ 2. Ailenizle yalnızca sizin bildiğiniz gizli bir doğrulama kelimesi belirleyin.\n✅ 3. Ses ve yüz netliği yüksek videoları herkese açık paylaşırken iki kez düşünün.\n\n👇 Ailenizle gizli doğrulama kelimesi belirlediniz mi? Yorumlarda yazın!\n📌 Sevdiklerinizi uyarmak için videoyu hemen paylaşın!",
 			Hashtags: []string{
 				"#deepfake", "#sesklonlama", "#yapayzeka", "#sibergüvenlik", "#dolandırıcılık",
@@ -2738,9 +2738,9 @@ var viralTopicLibrary = []viralTopicTemplate{
 		id:       "sqli",
 		keywords: []string{"sql injection", "parametrik sorgu", "veritabani", "1=1", "prepared statement"},
 		meta: ViralMetadata{
-			TitleA: "🚨 Tek Bir Tırnak İşaretiyle Tüm Veritabanı Nasıl Düşer?",
-			TitleB: "⚠️ Giriş Formundaki Küçük Hata Tüm Sistemi Ele Geçirtir!",
-			TitleC: "🛡️ SQL Injection Açığını Kökten Önlemenin 3 Kesin Yolu!",
+			TitleA:      "🚨 Tek Bir Tırnak İşaretiyle Tüm Veritabanı Nasıl Düşer?",
+			TitleB:      "⚠️ Giriş Formundaki Küçük Hata Tüm Sistemi Ele Geçirtir!",
+			TitleC:      "🛡️ SQL Injection Açığını Kökten Önlemenin 3 Kesin Yolu!",
 			Description: "Tek bir tırnak işareti ve basit bir mantık ifadesiyle giriş kontrolünün nasıl atlandığını biliyor musunuz? 💻⚠️\n\nKullanıcı girdileri doğrudan SQL sorgusuna eklendiğinde tüm veritabanı tabloları sızdırılabilir.\n\n🛡️ GELİŞTİRİCİLER İÇİN 3 KESİN ÇÖZÜM:\n✅ 1. Her zaman parametrik sorgular (Prepared Statements) kullanın, string birleştirmeyin.\n✅ 2. Veritabanı kullanıcısına yalnızca en düşük yetkiyi verin.\n✅ 3. Ham SQL hata çıktılarını kullanıcıya göstermeyin.\n\n👇 Güvenli kodlama pratikleriniz neler? Yorumlarda paylaşın!\n📌 Yazılımcı arkadaşlarına gönder, açıkları kapat!",
 			Hashtags: []string{
 				"#sqlinjection", "#sibergüvenlik", "#yazılım", "#webgüvenliği", "#pentest",
