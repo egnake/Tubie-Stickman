@@ -44,44 +44,148 @@ type SceneDefinition struct {
 	VisualData map[string]any  `json:"visual_data,omitempty"`
 }
 
+// StoryboardOptions configures aspect-aware layout and acoustic scene synchronization.
+type StoryboardOptions struct {
+	Width      int
+	Height     int
+	TimedWords []TimedWord
+	Narration  string
+}
+
+// ComputeSceneBoundaries aligns scene cut timestamps with real sentence/word boundaries when available.
+func ComputeSceneBoundaries(scenes []SceneDefinition, timedWords []TimedWord, narration string, totalDuration float64) []float64 {
+	numScenes := len(scenes)
+	bounds := make([]float64, numScenes+1)
+	if numScenes == 0 {
+		return bounds
+	}
+	bounds[0] = 0.0
+	bounds[numScenes] = totalDuration
+	if numScenes == 1 || totalDuration <= 0.5 {
+		return bounds
+	}
+
+	minSpan := math.Min(0.45, (totalDuration/float64(numScenes))*0.60)
+	if minSpan <= 0.05 {
+		minSpan = 0.05
+	}
+
+	usedAcoustic := false
+	if len(timedWords) >= numScenes*2 {
+		sents := splitSentences(narration)
+		wordBoundaries := make([]int, 0, len(sents)+1)
+		if len(sents) >= numScenes {
+			cumWords := 0
+			sentEnds := make([]int, len(sents))
+			for i, s := range sents {
+				cumWords += len(ExtractScriptWords(s))
+				sentEnds[i] = cumWords
+			}
+			totalScriptWords := sentEnds[len(sentEnds)-1]
+			if totalScriptWords > 0 {
+				for k := 1; k < numScenes; k++ {
+					targetSentIdx := int(math.Round(float64(k)*float64(len(sents))/float64(numScenes))) - 1
+					if targetSentIdx < 0 {
+						targetSentIdx = 0
+					}
+					if targetSentIdx >= len(sentEnds) {
+						targetSentIdx = len(sentEnds) - 1
+					}
+					wIdx := int(math.Round(float64(sentEnds[targetSentIdx]) * float64(len(timedWords)) / float64(totalScriptWords)))
+					if wIdx < 1 {
+						wIdx = 1
+					}
+					if wIdx >= len(timedWords) {
+						wIdx = len(timedWords) - 1
+					}
+					wordBoundaries = append(wordBoundaries, wIdx)
+				}
+			}
+		} else {
+			for k := 1; k < numScenes; k++ {
+				wIdx := int(math.Round(float64(k) * float64(len(timedWords)) / float64(numScenes)))
+				if wIdx < 1 {
+					wIdx = 1
+				}
+				if wIdx >= len(timedWords) {
+					wIdx = len(timedWords) - 1
+				}
+				wordBoundaries = append(wordBoundaries, wIdx)
+			}
+		}
+
+		if len(wordBoundaries) == numScenes-1 {
+			for k := 1; k < numScenes; k++ {
+				wIdx := wordBoundaries[k-1]
+				cut := (timedWords[wIdx-1].End + timedWords[wIdx].Start) / 2.0
+				minAllowed := bounds[k-1] + minSpan
+				maxAllowed := totalDuration - float64(numScenes-k)*minSpan
+				if cut < minAllowed {
+					cut = minAllowed
+				}
+				if cut > maxAllowed {
+					cut = maxAllowed
+				}
+				bounds[k] = math.Round(cut*1000) / 1000
+			}
+			usedAcoustic = true
+		}
+	}
+
+	if !usedAcoustic {
+		sceneDur := totalDuration / float64(numScenes)
+		for k := 1; k < numScenes; k++ {
+			t := math.Round(float64(k)*sceneDur*1000) / 1000
+			minAllowed := bounds[k-1] + minSpan
+			maxAllowed := totalDuration - float64(numScenes-k)*minSpan
+			if t < minAllowed {
+				t = minAllowed
+			}
+			if t > maxAllowed {
+				t = maxAllowed
+			}
+			bounds[k] = t
+		}
+	}
+
+	return bounds
+}
+
 // BuildStoryboard compiles high-level scene definitions into rich autopilot shots with micro-acting and cyber staging.
 func BuildStoryboard(scenes []SceneDefinition, totalDuration float64) []map[string]any {
+	return BuildStoryboardWithOptions(scenes, totalDuration, StoryboardOptions{Width: 720, Height: 1280})
+}
+
+// BuildStoryboardWithOptions compiles scenes into aspect-aware, acoustically synced procedural cyber shots.
+func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64, opts StoryboardOptions) []map[string]any {
 	if len(scenes) == 0 {
 		return []map[string]any{}
 	}
+	if opts.Width <= 0 || opts.Height <= 0 {
+		opts.Width, opts.Height = 720, 1280
+	}
+	isLandscape := opts.Width > opts.Height
 
 	numScenes := len(scenes)
-	sceneDur := totalDuration / float64(numScenes)
+	bounds := ComputeSceneBoundaries(scenes, opts.TimedWords, opts.Narration, totalDuration)
 	shots := make([]map[string]any, 0, numScenes)
 
-	availableProps := []string{
-		"@b1/cyber-laptop.png",
-		"@b1/cyber-skull.png",
-		"@b1/cyber-shield.png",
-		"@b1/cyber-terminal.png",
-		"@b1/cyber-wifi.png",
-		"@b1/cyber-padlock-unlocked.png",
-		"@b1/cyber-padlock-locked.png",
-		"@b1/idea-bulb-crayon.png",
-	}
-
-	currStart := 0.0
-	for idx, sc := range scenes {
-		start := currStart
-		end := math.Round(float64(idx+1)*sceneDur*1000) / 1000
-		if idx == numScenes-1 || end > totalDuration {
-			end = totalDuration
-		}
+	for idx, rawSc := range scenes {
+		sc := inferSceneVisuals(rawSc, idx, numScenes, "", opts.Narration)
+		start := bounds[idx]
+		end := bounds[idx+1]
 		if end <= start {
 			end = start + 0.5
 		}
-		currStart = end
 		rawSpan := end - start
 		shotLen := math.Floor(rawSpan*1000) / 1000
 		if shotLen <= 0.05 {
 			shotLen = rawSpan
 		}
-		tSwitch := math.Floor(math.Min(shotLen*0.42, 1.8)*1000) / 1000
+		tSwitch := math.Floor(math.Min(shotLen*0.44, 1.85)*1000) / 1000
+		if tSwitch >= shotLen-0.08 {
+			tSwitch = math.Floor(shotLen*0.45*1000) / 1000
+		}
 
 		titleText := strings.ToUpper(strings.TrimSpace(sc.Title))
 		if titleText == "" {
@@ -94,89 +198,90 @@ func BuildStoryboard(scenes []SceneDefinition, totalDuration float64) []map[stri
 			titleColor = colors[idx%len(colors)]
 		}
 
-		layers := make([]map[string]any, 0)
+		layers := make([]map[string]any, 0, 10)
 
-		// 1. Cyber Security HUD Header Badge
+		// Coordinates adapt cleanly to 9:16 Portrait (1280x2275) vs 16:9 Landscape (1280x720)
+		hudY, titleX, titleY, titleW, titleSize := 112, 72, 165, 1136, 56
+		underlineY, pillX, pillY, pillSize := 288, 640, 336, 22
+		if isLandscape {
+			hudY, titleX, titleY, titleW, titleSize = 72, 54, 102, 1172, 42
+			underlineY, pillX, pillY, pillSize = 154, 960, 72, 18
+		}
+
+		// 1. Cyber Security HUD Header Badge (immediately visible at t=0.0 — zero blank frames)
 		hudText, hudColor := getHUDBadge(idx, titleText)
 		layers = append(layers, map[string]any{
 			"type":  "text",
 			"text":  hudText,
-			"x":     80,
-			"y":     110,
-			"w":     1120,
-			"size":  30,
+			"x":     titleX,
+			"y":     hudY,
+			"w":     titleW,
+			"size":  26,
 			"bold":  true,
 			"color": hudColor,
-			"keys": []map[string]any{
-				{"t": 0.0, "alpha": 0.0},
-				{"t": math.Round(math.Min(0.15, shotLen*0.3)*1000) / 1000, "alpha": 1.0},
-			},
+			"keys": buildSnappyAppearKeys(titleX, hudY, 0, shotLen),
 		})
 
-		// 2. Main Scene Title Text
-		tFade := math.Min(0.2, shotLen*0.4)
+		// 2. Main Scene Title Text (instant punch-in, never starts invisible)
 		layers = append(layers, map[string]any{
 			"type":  "text",
 			"text":  titleText,
-			"x":     80,
-			"y":     185,
-			"w":     1120,
-			"size":  62,
+			"x":     titleX,
+			"y":     titleY,
+			"w":     titleW,
+			"size":  titleSize,
 			"bold":  true,
 			"color": titleColor,
-			"keys": []map[string]any{
-				{"t": 0.0, "alpha": 0.0},
-				{"t": math.Round(tFade*1000) / 1000, "alpha": 1.0},
-			},
+			"keys":  buildSnappySlideKeys(titleX, titleY, titleY+8, shotLen),
 		})
 
 		// 3. Neon Underline Accent
 		if sc.Underline || idx%2 == 0 {
-			lineW := len(titleText) * 34
-			if lineW < 380 {
-				lineW = 380
+			lineW := len([]rune(titleText)) * 31
+			if isLandscape {
+				lineW = len([]rune(titleText)) * 22
+			}
+			if lineW < 340 {
+				lineW = 340
 			}
 			if lineW > 1020 {
 				lineW = 1020
 			}
-			tUnderline := math.Min(0.38, shotLen*0.75)
+			tUnderline := math.Floor(math.Min(0.28, shotLen*0.70)*1000) / 1000
+			if tUnderline < 0.02 {
+				tUnderline = shotLen * 0.5
+			}
 			layers = append(layers, map[string]any{
 				"type":      "underline",
-				"x":         80,
-				"y":         275,
+				"x":         titleX,
+				"y":         underlineY,
 				"w":         lineW,
 				"color":     titleColor,
-				"lineWidth": 8,
-				"keys": []map[string]any{
-					{"t": 0.05, "progress": 0.0},
-					{"t": math.Round(tUnderline*1000) / 1000, "progress": 1.0},
-				},
+				"lineWidth": 7,
+				"keys": buildProgressKeys(0.0, tUnderline, 0.25, 1.0, shotLen),
 			})
 		}
 
 		// 4. Dynamic Cyber Status Pill Badge
 		pillText, pillColor := getStatusPill(idx, titleText)
-		tPill1 := math.Min(0.18, shotLen*0.32)
-		tPill2 := math.Min(0.32, shotLen*0.60)
-		layers = append(layers, map[string]any{
-			"type":   "text",
-			"text":   pillText,
-			"x":      640,
-			"y":      340,
-			"w":      960,
-			"size":   24,
-			"bold":   true,
-			"color":  pillColor,
-			"badge":  pillColor,
-			"center": true,
-			"keys": []map[string]any{
-				{"t": 0.0, "alpha": 0.0, "y": 355},
-				{"t": math.Round(tPill1*1000) / 1000, "alpha": 1.0, "y": 335},
-				{"t": math.Round(tPill2*1000) / 1000, "alpha": 1.0, "y": 340},
-			},
-		})
+		pillLayer := map[string]any{
+			"type":  "text",
+			"text":  pillText,
+			"x":     pillX,
+			"y":     pillY,
+			"w":     860,
+			"size":  pillSize,
+			"bold":  true,
+			"color": pillColor,
+			"badge": pillColor,
+			"keys":  buildSnappySlideKeys(pillX, pillY, pillY+6, shotLen),
+		}
+		if !isLandscape {
+			pillLayer["center"] = true
+		}
+		layers = append(layers, pillLayer)
 
-		// 5. Stickman Actors with Mid-Scene Micro-Acting and Aura Lighting
+		// 5. Procedural Cyber Stickman & Hooded Hacker Actors
 		if len(sc.Stickmen) > 0 {
 			for sIdx, sm := range sc.Stickmen {
 				baseX := sm.X
@@ -197,7 +302,6 @@ func BuildStoryboard(scenes []SceneDefinition, totalDuration float64) []map[stri
 				if sm.To > 0 && sm.To > sm.From {
 					span = sm.To - sm.From
 				}
-
 				keys := buildActorKeyframes(sm.Action, baseX, baseY, baseW, tStart, span)
 				layer := map[string]any{
 					"type": "pose",
@@ -217,385 +321,306 @@ func BuildStoryboard(scenes []SceneDefinition, totalDuration float64) []map[stri
 				layers = append(layers, layer)
 			}
 		} else {
-			// Automated high-engagement micro-acting based on narrative beats
-			switch idx {
-			case 0:
-				// Scene 1: Victim browsing casually, then startled jump as hacker lurks
-				// Victim Phase 1 (0 -> tSwitch): Suspicious browsing (pose 2)
-				vKeys1 := buildActorKeyframes("lean", 140, 640, 500, 0.0, tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 2,
-					"x":    140,
-					"y":    640,
-					"w":    500,
-					"aura": "cyan",
-					"to":   tSwitch,
-					"keys": vKeys1,
-				})
-				// Victim Phase 2 (tSwitch -> shotLen): Shocked panic scream (pose 1)!
-				vKeys2 := buildActorKeyframes("jump", 140, 640, 520, tSwitch, shotLen-tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 1,
-					"x":    140,
-					"y":    640,
-					"w":    520,
-					"aura": "cyan",
-					"from": tSwitch,
-					"keys": vKeys2,
-				})
-				// Alarm reaction exclamation mark above victim
-				if tSwitch+0.08 < shotLen {
-					tEx1 := math.Round(math.Min(tSwitch+0.12, shotLen*0.80)*1000) / 1000
-					tEx2 := math.Round(math.Min(tSwitch+0.25, shotLen)*1000) / 1000
-					exKeys := []map[string]any{
-						{"t": tSwitch, "alpha": 0.0, "y": 595},
-					}
-					if tEx1 > tSwitch {
-						exKeys = append(exKeys, map[string]any{"t": tEx1, "alpha": 1.0, "y": 555})
-					}
-					if tEx2 > tEx1 && tEx2 > tSwitch {
-						exKeys = append(exKeys, map[string]any{"t": tEx2, "alpha": 1.0, "y": 570})
-					}
-					layers = append(layers, map[string]any{
-						"type":  "text",
-						"text":  "!!",
-						"x":     320,
-						"y":     570,
-						"w":     200,
-						"size":  64,
-						"bold":  true,
-						"color": "#FFE500",
-						"from":  tSwitch,
-						"keys":  exKeys,
-					})
+			layers = append(layers, buildProceduralCyberActors(sc, idx, shotLen, tSwitch, isLandscape)...)
+		}
+
+		// 6. Live Animated Cyber Widget (or staged prop)
+		layers = append(layers, buildCyberWidgetLayer(sc, shotLen, isLandscape))
+
+		// 7. Pattern-Interrupt Callout Stamp (pops cleanly at tSwitch on shots long enough)
+		if sc.Callout != "" && shotLen >= 0.85 {
+			cStart := tSwitch
+			if cStart <= 0.05 {
+				cStart = math.Floor(shotLen*0.35*1000) / 1000
+			}
+			if cStart < shotLen-0.12 {
+				cx, cy, cw, csize := 440, 425, 400, 36
+				if isLandscape {
+					cx, cy, cw, csize = 80, 178, 380, 26
 				}
-				// Lurking Hacker (tSwitch -> shotLen): Peeking from right (pose 0)
-				hKeys := buildActorKeyframes("peek", 640, 620, 500, tSwitch, shotLen-tSwitch)
 				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    640,
-					"y":    620,
-					"w":    500,
-					"aura": "red",
-					"from": tSwitch,
-					"keys": hKeys,
-				})
-
-			case 1:
-				// Scene 2: Victim clicking fake link, then full panic as trap springs
-				// Victim Phase 1: Leaning into screen typing
-				vKeys1 := buildActorKeyframes("lean", 140, 640, 500, 0.0, tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    140,
-					"y":    640,
-					"w":    500,
-					"aura": "cyan",
-					"to":   tSwitch,
-					"keys": vKeys1,
-				})
-				// Victim Phase 2: Trap sprung, panic shake (pose 1)!
-				vKeys2 := buildActorKeyframes("panic", 140, 640, 520, tSwitch, shotLen-tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 1,
-					"x":    140,
-					"y":    640,
-					"w":    520,
-					"aura": "cyan",
-					"from": tSwitch,
-					"keys": vKeys2,
-				})
-				// Panic exclamation
-				if tSwitch+0.08 < shotLen {
-					tEx1 := math.Round(math.Min(tSwitch+0.12, shotLen*0.80)*1000) / 1000
-					tEx2 := math.Round(math.Min(tSwitch+0.25, shotLen)*1000) / 1000
-					exKeys := []map[string]any{
-						{"t": tSwitch, "alpha": 0.0, "y": 595},
-					}
-					if tEx1 > tSwitch {
-						exKeys = append(exKeys, map[string]any{"t": tEx1, "alpha": 1.0, "y": 555})
-					}
-					if tEx2 > tEx1 && tEx2 > tSwitch {
-						exKeys = append(exKeys, map[string]any{"t": tEx2, "alpha": 1.0, "y": 570})
-					}
-					layers = append(layers, map[string]any{
-						"type":  "text",
-						"text":  "!!",
-						"x":     320,
-						"y":     570,
-						"w":     200,
-						"size":  64,
-						"bold":  true,
-						"color": "#FF3B30",
-						"from":  tSwitch,
-						"keys":  exKeys,
-					})
-				}
-				// Hacker celebrating right side
-				hKeys := buildActorKeyframes("bounce", 640, 620, 500, tSwitch, shotLen-tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    640,
-					"y":    620,
-					"w":    500,
-					"aura": "red",
-					"from": tSwitch,
-					"keys": hKeys,
-				})
-
-			case 2:
-				// Scene 3: Chaos breach! Victim running, hacker punching keyboard
-				vKeys := buildActorKeyframes("run", 140, 640, 520, 0.0, shotLen)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 1,
-					"x":    140,
-					"y":    640,
-					"w":    520,
-					"aura": "cyan",
-					"keys": vKeys,
-				})
-				hKeys := buildActorKeyframes("punch", 640, 620, 520, 0.0, shotLen)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    640,
-					"y":    620,
-					"w":    520,
-					"aura": "red",
-					"keys": hKeys,
-				})
-
-			case 3:
-				// Scene 4: Reality check / insight - Victim confused, then has epiphany
-				vKeys1 := buildActorKeyframes("shake", 380, 640, 520, 0.0, tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 2,
-					"x":    380,
-					"y":    640,
-					"w":    520,
-					"aura": "cyan",
-					"to":   tSwitch,
-					"keys": vKeys1,
-				})
-				vKeys2 := buildActorKeyframes("bounce", 380, 640, 520, tSwitch, shotLen-tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    380,
-					"y":    640,
-					"w":    520,
-					"aura": "cyan",
-					"from": tSwitch,
-					"keys": vKeys2,
-				})
-
-			case 4:
-				// Scene 5: Defense 2FA - User prepares, then raises the shield in hero pose
-				vKeys1 := buildActorKeyframes("lean", 380, 640, 520, 0.0, tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 2,
-					"x":    380,
-					"y":    640,
-					"w":    520,
-					"aura": "green",
-					"to":   tSwitch,
-					"keys": vKeys1,
-				})
-				vKeys2 := buildActorKeyframes("punch", 380, 620, 540, tSwitch, shotLen-tSwitch)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    380,
-					"y":    620,
-					"w":    540,
-					"aura": "green",
-					"from": tSwitch,
-					"keys": vKeys2,
-				})
-
-			default:
-				// Scene 6: Victory & Viral CTA - Dual celebrating stickmen
-				cKeys1 := buildActorKeyframes("bounce", 160, 640, 500, 0.0, shotLen)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    160,
-					"y":    640,
-					"w":    500,
-					"aura": "cyan",
-					"keys": cKeys1,
-				})
-				cKeys2 := buildActorKeyframes("jump", 620, 640, 500, 0.0, shotLen)
-				layers = append(layers, map[string]any{
-					"type": "pose",
-					"pose": 0,
-					"x":    620,
-					"y":    640,
-					"w":    500,
-					"aura": "green",
-					"keys": cKeys2,
+					"type":  "cyber_callout",
+					"text":  sc.Callout,
+					"x":     cx,
+					"y":     cy,
+					"w":     cw,
+					"size":  csize,
+					"color": titleColor,
+					"from":  cStart,
 				})
 			}
 		}
 
-		// 6. Multi-Prop Staging (Aligned directly with characters & glowing + breathing)
-		prop := sc.Prop
-		if prop == nil {
-			prop = &SceneProp{
-				Path: availableProps[idx%len(availableProps)],
-				X:    390,
-				Y:    1060,
-				W:    500,
+		// 8. Optional Threat Direction Arrow on danger/breach scenes
+		if sc.Arrow || sc.Mood == "danger" || sc.Mood == "breach" {
+			ax, ay, aw := 340, 480, 600
+			if isLandscape {
+				ax, ay, aw = 180, 215, 220
 			}
-		}
-		tProp1 := math.Round(math.Min(0.20, shotLen*0.35)*1000) / 1000
-		tProp2 := math.Round(math.Min(0.35, shotLen*0.65)*1000) / 1000
-		propGlow := "cyan"
-		if idx == 1 || idx == 2 {
-			propGlow = "red"
-		} else if idx == 3 {
-			propGlow = "yellow"
-		} else if idx == 4 {
-			propGlow = "green"
-		}
-		propKeys := []map[string]any{
-			{"t": 0.0, "w": 80, "alpha": 0.0, "angle": 0.0},
-		}
-		lastPropT := 0.0
-		if tProp1 > lastPropT {
-			propKeys = append(propKeys, map[string]any{"t": tProp1, "w": prop.W + 45, "alpha": 1.0, "angle": 0.05})
-			lastPropT = tProp1
-		}
-		if tProp2 > lastPropT {
-			propKeys = append(propKeys, map[string]any{"t": tProp2, "w": prop.W, "alpha": 1.0, "angle": 0.0})
-			lastPropT = tProp2
-		}
-		// Subtle centered terminal hover/breathing pulse for the remainder of the shot
-		pCur := lastPropT + 0.75
-		pTog := false
-		for pCur < shotLen-0.15 {
-			rp := math.Round(pCur*1000) / 1000
-			if rp > lastPropT {
-				pw := prop.W + 12
-				px := prop.X - 6
-				py := prop.Y - 6
-				if pTog {
-					pw = prop.W
-					px = prop.X
-					py = prop.Y
-				}
-				propKeys = append(propKeys, map[string]any{
-					"t": rp,
-					"x": px,
-					"y": py,
-					"w": pw,
-				})
-				lastPropT = rp
-			}
-			pTog = !pTog
-			pCur += 0.75
-		}
-		layers = append(layers, map[string]any{
-			"type": "image",
-			"path": prop.Path,
-			"x":    prop.X,
-			"y":    prop.Y,
-			"w":    prop.W,
-			"glow": propGlow,
-			"keys": propKeys,
-		})
-
-		// Secondary Prop (Staged support asset with glow & zero-G hover)
-		secProp := getSecondaryProp(idx, prop.Path)
-		if secProp != nil && tSwitch+0.25 < shotLen {
-			secT1 := math.Round(math.Min(tSwitch+0.16, shotLen*0.75)*1000) / 1000
-			secT2 := math.Round(math.Min(tSwitch+0.32, shotLen*0.92)*1000) / 1000
-			secGlow := "cyan"
-			if idx == 1 || idx == 2 {
-				secGlow = "red"
-			} else if idx == 4 {
-				secGlow = "green"
-			}
-			secKeys := []map[string]any{
-				{"t": tSwitch, "w": 50, "alpha": 0.0, "angle": 0.0},
-			}
-			lastSecT := tSwitch
-			if secT1 > lastSecT {
-				secKeys = append(secKeys, map[string]any{"t": secT1, "w": secProp.W + 30, "alpha": 1.0, "angle": -0.06})
-				lastSecT = secT1
-			}
-			if secT2 > lastSecT {
-				secKeys = append(secKeys, map[string]any{"t": secT2, "w": secProp.W, "alpha": 1.0, "angle": 0.0})
-				lastSecT = secT2
-			}
-			sCur := lastSecT + 0.65
-			sTog := false
-			for sCur < shotLen-0.15 {
-				rs := math.Round(sCur*1000) / 1000
-				if rs > lastSecT {
-					sy := secProp.Y - 12
-					sAng := 0.04
-					if sTog {
-						sy = secProp.Y + 4
-						sAng = -0.04
-					}
-					secKeys = append(secKeys, map[string]any{
-						"t":     rs,
-						"y":     sy,
-						"angle": sAng,
-					})
-					lastSecT = rs
-				}
-				sTog = !sTog
-				sCur += 0.65
-			}
-			secLayer := map[string]any{
-				"type": "image",
-				"path": secProp.Path,
-				"x":    secProp.X,
-				"y":    secProp.Y,
-				"w":    secProp.W,
-				"glow": secGlow,
-				"from": tSwitch,
-				"keys": secKeys,
-			}
-			layers = append(layers, secLayer)
-		}
-
-		// 7. Threat Direction Arrow (Arcing cleanly above actors and !! alert)
-		if sc.Arrow || idx == 1 || idx == 2 {
-			tArrow := math.Min(0.42, shotLen*0.65)
+			tArrow := math.Floor(math.Min(0.38, shotLen*0.65)*1000) / 1000
 			layers = append(layers, map[string]any{
 				"type":      "arrow",
-				"x":         340,
-				"y":         510,
-				"w":         600,
-				"color":     "#FF3B30",
+				"x":         ax,
+				"y":         ay,
+				"w":         aw,
+				"color":     "#FF3B4E",
 				"lineWidth": 5,
-				"keys": []map[string]any{
-					{"t": 0.0, "progress": 0.0},
-					{"t": math.Round(tArrow*1000) / 1000, "progress": 1.0},
-				},
+				"keys":      buildProgressKeys(0.0, tArrow, 0.0, 1.0, shotLen),
 			})
 		}
 
 		shots = append(shots, map[string]any{
 			"start":  start,
 			"end":    end,
+			"mood":   sc.Mood,
+			"camera": sc.Camera,
 			"layers": layers,
 		})
 	}
 
 	return shots
+}
+
+func buildSnappyAppearKeys(x, y int, startT, shotLen float64) []map[string]any {
+	rt0 := math.Floor(startT*1000) / 1000
+	rt1 := math.Floor(math.Min(startT+0.12, shotLen*0.5)*1000) / 1000
+	keys := []map[string]any{
+		{"t": rt0, "x": x, "y": y, "alpha": 0.85},
+	}
+	if rt1 > rt0 && rt1 <= shotLen {
+		keys = append(keys, map[string]any{"t": rt1, "x": x, "y": y, "alpha": 1.0})
+	}
+	return keys
+}
+
+func buildSnappySlideKeys(x, targetY, startY int, shotLen float64) []map[string]any {
+	rt1 := math.Floor(math.Min(0.14, shotLen*0.45)*1000) / 1000
+	keys := []map[string]any{
+		{"t": 0.0, "x": x, "y": startY, "alpha": 0.85},
+	}
+	if rt1 > 0.0 && rt1 <= shotLen {
+		keys = append(keys, map[string]any{"t": rt1, "x": x, "y": targetY, "alpha": 1.0})
+	}
+	return keys
+}
+
+func buildProgressKeys(t0, t1, p0, p1, shotLen float64) []map[string]any {
+	rt0 := math.Floor(t0*1000) / 1000
+	rt1 := math.Floor(t1*1000) / 1000
+	if rt1 > shotLen {
+		rt1 = math.Floor(shotLen*1000) / 1000
+	}
+	keys := []map[string]any{{"t": rt0, "progress": p0}}
+	if rt1 > rt0 {
+		keys = append(keys, map[string]any{"t": rt1, "progress": p1})
+	}
+	return keys
+}
+
+func buildProceduralCyberActors(sc SceneDefinition, idx int, shotLen, tSwitch float64, isLandscape bool) []map[string]any {
+	// Portrait coordinates (1280x2275 plane) vs Landscape coordinates (1280x720 plane)
+	vx, vy, vw, vh := 130, 445, 420, 510
+	hx, hy, hw, hh := 710, 425, 440, 530
+	cx, cy, cw, ch := 415, 435, 450, 520
+	if isLandscape {
+		vx, vy, vw, vh = 40, 195, 250, 355
+		hx, hy, hw, hh = 275, 185, 265, 365
+		cx, cy, cw, ch = 145, 185, 275, 365
+	}
+
+	canSplit := shotLen >= 0.75 && tSwitch > 0.12 && tSwitch < shotLen-0.12
+	layers := make([]map[string]any, 0, 4)
+
+	switch sc.Mood {
+	case "hook":
+		if canSplit {
+			layers = append(layers,
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "idle_browse",
+					"x": vx, "y": vy, "w": vw, "h": vh, "to": tSwitch,
+					"keys": buildMotionKeys(vx, vy, vw, 0, tSwitch, "lean"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "shocked",
+					"x": vx, "y": vy, "w": vw, "h": vh, "from": tSwitch,
+					"keys": buildMotionKeys(vx, vy, vw, tSwitch, shotLen-tSwitch, "jump"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "hacker", "pose": "hacker_lurk",
+					"x": hx, "y": hy, "w": hw, "h": hh, "from": tSwitch,
+					"keys": buildMotionKeys(hx, hy, hw, tSwitch, shotLen-tSwitch, "peek"),
+				},
+			)
+		} else {
+			layers = append(layers, map[string]any{
+				"type": "cyber_actor", "role": "victim", "pose": "shocked",
+				"x": cx, "y": cy, "w": cw, "h": ch,
+				"keys": buildMotionKeys(cx, cy, cw, 0, shotLen, "bounce"),
+			})
+		}
+
+	case "danger":
+		if canSplit {
+			layers = append(layers,
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "typing",
+					"x": vx, "y": vy, "w": vw, "h": vh, "to": tSwitch,
+					"keys": buildMotionKeys(vx, vy, vw, 0, tSwitch, "lean"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "shocked",
+					"x": vx, "y": vy, "w": vw, "h": vh, "from": tSwitch,
+					"keys": buildMotionKeys(vx, vy, vw, tSwitch, shotLen-tSwitch, "panic"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "hacker", "pose": "hacker_strike",
+					"x": hx, "y": hy, "w": hw, "h": hh,
+					"keys": buildMotionKeys(hx, hy, hw, 0, shotLen, "punch"),
+				},
+			)
+		} else {
+			layers = append(layers,
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "shocked",
+					"x": vx, "y": vy, "w": vw, "h": vh,
+					"keys": buildMotionKeys(vx, vy, vw, 0, shotLen, "panic"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "hacker", "pose": "hacker_strike",
+					"x": hx, "y": hy, "w": hw, "h": hh,
+					"keys": buildMotionKeys(hx, hy, hw, 0, shotLen, "punch"),
+				},
+			)
+		}
+
+	case "breach":
+		layers = append(layers,
+			map[string]any{
+				"type": "cyber_actor", "role": "victim", "pose": "panic_run",
+				"x": vx, "y": vy, "w": vw, "h": vh,
+				"keys": buildMotionKeys(vx, vy, vw, 0, shotLen, "run"),
+			},
+			map[string]any{
+				"type": "cyber_actor", "role": "hacker", "pose": "hacker_strike",
+				"x": hx, "y": hy, "w": hw, "h": hh,
+				"keys": buildMotionKeys(hx, hy, hw, 0, shotLen, "punch"),
+			},
+		)
+
+	case "twist":
+		if canSplit {
+			layers = append(layers,
+				map[string]any{
+					"type": "cyber_actor", "role": "victim", "pose": "thinking",
+					"x": cx, "y": cy, "w": cw, "h": ch, "to": tSwitch,
+					"keys": buildMotionKeys(cx, cy, cw, 0, tSwitch, "shake"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "hero", "pose": "pointing",
+					"x": cx, "y": cy, "w": cw, "h": ch, "from": tSwitch,
+					"keys": buildMotionKeys(cx, cy, cw, tSwitch, shotLen-tSwitch, "bounce"),
+				},
+			)
+		} else {
+			layers = append(layers, map[string]any{
+				"type": "cyber_actor", "role": "victim", "pose": "thinking",
+				"x": cx, "y": cy, "w": cw, "h": ch,
+				"keys": buildMotionKeys(cx, cy, cw, 0, shotLen, "shake"),
+			})
+		}
+
+	case "defense":
+		if canSplit {
+			layers = append(layers,
+				map[string]any{
+					"type": "cyber_actor", "role": "hero", "pose": "pointing",
+					"x": cx, "y": cy, "w": cw, "h": ch, "to": tSwitch,
+					"keys": buildMotionKeys(cx, cy, cw, 0, tSwitch, "lean"),
+				},
+				map[string]any{
+					"type": "cyber_actor", "role": "hero", "pose": "shield_hero",
+					"x": cx, "y": cy, "w": cw, "h": ch, "from": tSwitch,
+					"keys": buildMotionKeys(cx, cy, cw, tSwitch, shotLen-tSwitch, "jump"),
+				},
+			)
+		} else {
+			layers = append(layers, map[string]any{
+				"type": "cyber_actor", "role": "hero", "pose": "shield_hero",
+				"x": cx, "y": cy, "w": cw, "h": ch,
+				"keys": buildMotionKeys(cx, cy, cw, 0, shotLen, "bounce"),
+			})
+		}
+
+	default: // "cta"
+		layers = append(layers,
+			map[string]any{
+				"type": "cyber_actor", "role": "hero", "pose": "shield_hero",
+				"x": vx, "y": vy, "w": vw, "h": vh,
+				"keys": buildMotionKeys(vx, vy, vw, 0, shotLen, "bounce"),
+			},
+			map[string]any{
+				"type": "cyber_actor", "role": "hero", "pose": "celebrate",
+				"x": hx, "y": hy, "w": hw, "h": hh,
+				"keys": buildMotionKeys(hx, hy, hw, 0, shotLen, "jump"),
+			},
+		)
+	}
+	return layers
+}
+
+func buildMotionKeys(baseX, baseY, baseW int, tStart, span float64, action string) []map[string]any {
+	keys := buildActorKeyframes(action, baseX, baseY, baseW, tStart, span)
+	// Never begin a primary actor at alpha=0 on opening frame t=0.0; clamp alpha >= 0.9 on t==0
+	if len(keys) > 0 {
+		if tVal, ok := keys[0]["t"].(float64); ok && tVal == 0.0 {
+			if a, hasA := keys[0]["alpha"].(float64); hasA && a < 0.85 {
+				keys[0]["alpha"] = 0.90
+			}
+		}
+	}
+	return keys
+}
+
+func buildCyberWidgetLayer(sc SceneDefinition, shotLen float64, isLandscape bool) map[string]any {
+	wx, wy, ww, wh := 70, 1020, 1140, 520
+	if isLandscape {
+		wx, wy, ww, wh = 565, 175, 670, 375
+	}
+
+	if sc.VisualType == "prop_stage" && sc.Prop != nil && sc.Prop.Path != "" {
+		pw := 460
+		px := 410
+		py := 1050
+		if isLandscape {
+			pw = 340
+			px = 730
+			py = 195
+		}
+		return map[string]any{
+			"type": "image",
+			"path": sc.Prop.Path,
+			"x":    px,
+			"y":    py,
+			"w":    pw,
+			"glow": "cyan",
+			"keys": buildSnappySlideKeys(px, py, py+16, shotLen),
+		}
+	}
+
+	kind := sc.VisualType
+	if !validVisualTypes[kind] || kind == "prop_stage" {
+		kind = "terminal"
+	}
+	return map[string]any{
+		"type": "cyber_widget",
+		"kind": kind,
+		"x":    wx,
+		"y":    wy,
+		"w":    ww,
+		"h":    wh,
+		"data": sc.VisualData,
+		"keys": buildSnappySlideKeys(wx, wy, wy+18, shotLen),
+	}
 }
 
 func getHUDBadge(idx int, title string) (string, string) {
@@ -670,36 +695,6 @@ func getStatusPill(idx int, title string) (string, string) {
 	}
 }
 
-func getSecondaryProp(idx int, primaryPath string) *SceneProp {
-	var prop *SceneProp
-	switch idx {
-	case 0:
-		prop = &SceneProp{Path: "@b1/cyber-wifi.png", X: 960, Y: 1135, W: 230}
-	case 1:
-		prop = &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 90, Y: 1090, W: 240}
-	case 2:
-		prop = &SceneProp{Path: "@b1/cyber-bug.png", X: 90, Y: 1090, W: 240}
-	case 3:
-		prop = &SceneProp{Path: "@b1/cyber-database.png", X: 960, Y: 1125, W: 230}
-	case 4:
-		prop = &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 90, Y: 1090, W: 240}
-	case 5:
-		prop = &SceneProp{Path: "@b1/cyber-shield.png", X: 960, Y: 1125, W: 240}
-	default:
-		prop = &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 960, Y: 1125, W: 230}
-	}
-	if prop.Path == primaryPath {
-		if primaryPath != "@b1/cyber-skull.png" && idx < 3 {
-			prop.Path = "@b1/cyber-skull.png"
-		} else if primaryPath != "@b1/cyber-database.png" {
-			prop.Path = "@b1/cyber-database.png"
-		} else {
-			prop.Path = "@b1/cyber-shield.png"
-		}
-	}
-	return prop
-}
-
 func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span float64) []map[string]any {
 	t0 := math.Floor(tStart*1000) / 1000
 	maxSpan := span
@@ -728,28 +723,26 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 
 	switch action {
 	case "panic":
-		// Initial violent shock jump and shudder
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
-		addKey(t0+0.08, map[string]any{"x": baseX - 30, "y": baseY - 20, "w": baseW + 15, "angle": -0.14})
-		addKey(t0+0.16, map[string]any{"x": baseX + 30, "y": baseY - 5, "w": baseW + 10, "angle": 0.14})
-		addKey(t0+0.24, map[string]any{"x": baseX - 18, "y": baseY - 12, "w": baseW, "angle": -0.09})
-		addKey(t0+0.32, map[string]any{"x": baseX + 18, "y": baseY, "w": baseW, "angle": 0.09})
+		addKey(t0+0.08, map[string]any{"x": baseX - 24, "y": baseY - 16, "w": baseW + 12, "angle": -0.10})
+		addKey(t0+0.16, map[string]any{"x": baseX + 24, "y": baseY - 4, "w": baseW + 8, "angle": 0.10})
+		addKey(t0+0.24, map[string]any{"x": baseX - 14, "y": baseY - 10, "w": baseW, "angle": -0.06})
+		addKey(t0+0.32, map[string]any{"x": baseX + 14, "y": baseY, "w": baseW, "angle": 0.06})
 		addKey(t0+0.40, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
 
-		// Continuous high-tension nervous tremor throughout the scene
-		step := 0.14
+		step := 0.16
 		cur := t0 + 0.40 + step
 		toggle := false
 		for cur < maxT-0.05 {
-			jitterX := baseX + 8
-			jitterAngle := 0.04
+			jitterX := baseX + 7
+			jitterAngle := 0.03
 			if toggle {
-				jitterX = baseX - 8
-				jitterAngle = -0.04
+				jitterX = baseX - 7
+				jitterAngle = -0.03
 			}
 			addKey(cur, map[string]any{
 				"x":     jitterX,
-				"y":     baseY + int(math.Sin(cur*15.0)*5.0),
+				"y":     baseY + int(math.Sin(cur*15.0)*4.0),
 				"w":     baseW,
 				"angle": jitterAngle,
 			})
@@ -759,18 +752,17 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
 
 	case "shake":
-		// Head-shaking in disbelief, then settling into agitated contemplation
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
-		addKey(t0+0.08, map[string]any{"x": baseX - 16, "y": baseY, "w": baseW})
-		addKey(t0+0.16, map[string]any{"x": baseX + 16, "y": baseY, "w": baseW})
-		addKey(t0+0.24, map[string]any{"x": baseX - 10, "y": baseY, "w": baseW})
-		addKey(t0+0.32, map[string]any{"x": baseX + 10, "y": baseY, "w": baseW})
+		addKey(t0+0.08, map[string]any{"x": baseX - 14, "y": baseY, "w": baseW})
+		addKey(t0+0.16, map[string]any{"x": baseX + 14, "y": baseY, "w": baseW})
+		addKey(t0+0.24, map[string]any{"x": baseX - 9, "y": baseY, "w": baseW})
+		addKey(t0+0.32, map[string]any{"x": baseX + 9, "y": baseY, "w": baseW})
 		addKey(t0+0.40, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
-		step := 0.40
+		step := 0.42
 		cur := t0 + 0.40 + step
 		for cur < maxT-0.05 {
-			addKey(cur, map[string]any{"x": baseX, "y": baseY - 12, "w": baseW + 6})
+			addKey(cur, map[string]any{"x": baseX, "y": baseY - 10, "w": baseW + 5})
 			if cur+step*0.5 < maxT-0.05 {
 				addKey(cur+step*0.5, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 			}
@@ -779,17 +771,16 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
 	case "jump":
-		// High-impact dramatic leap with squash and stretch, followed by dynamic posture
-		t1 := math.Min(0.20, maxSpan*0.40)
-		t2 := math.Min(0.36, maxSpan*0.70)
-		addKey(t0, map[string]any{"x": baseX, "y": baseY + 180, "w": baseW - 20, "alpha": 0.0})
-		addKey(t0+t1, map[string]any{"x": baseX, "y": baseY - 45, "w": baseW + 20, "alpha": 1.0})
+		t1 := math.Min(0.18, maxSpan*0.40)
+		t2 := math.Min(0.34, maxSpan*0.70)
+		addKey(t0, map[string]any{"x": baseX, "y": baseY + 60, "w": baseW - 14, "alpha": 0.9})
+		addKey(t0+t1, map[string]any{"x": baseX, "y": baseY - 32, "w": baseW + 16, "alpha": 1.0})
 		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "alpha": 1.0})
 
 		step := 0.42
 		cur := t0 + t2 + step
 		for cur < maxT-0.05 {
-			addKey(cur, map[string]any{"x": baseX, "y": baseY - 16, "w": baseW + 8})
+			addKey(cur, map[string]any{"x": baseX, "y": baseY - 14, "w": baseW + 6})
 			if cur+step*0.5 < maxT-0.05 {
 				addKey(cur+step*0.5, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 			}
@@ -798,26 +789,25 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "alpha": 1.0})
 
 	case "run":
-		// Sprints urgently into frame, keeping energetic movement
-		t1 := math.Min(0.22, maxSpan*0.40)
-		t2 := math.Min(0.42, maxSpan*0.75)
-		addKey(t0, map[string]any{"x": baseX - 220, "y": baseY, "w": baseW, "angle": 0.14, "alpha": 0.0})
-		addKey(t0+t1, map[string]any{"x": baseX - 60, "y": baseY - 28, "w": baseW, "angle": 0.09, "alpha": 1.0})
+		t1 := math.Min(0.20, maxSpan*0.40)
+		t2 := math.Min(0.40, maxSpan*0.75)
+		addKey(t0, map[string]any{"x": baseX - 90, "y": baseY, "w": baseW, "angle": 0.10, "alpha": 0.9})
+		addKey(t0+t1, map[string]any{"x": baseX - 30, "y": baseY - 20, "w": baseW, "angle": 0.06, "alpha": 1.0})
 		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0, "alpha": 1.0})
 
 		step := 0.35
 		cur := t0 + t2 + step
 		toggle := false
 		for cur < maxT-0.05 {
-			swayX := baseX + 14
+			swayX := baseX + 12
 			if toggle {
-				swayX = baseX - 14
+				swayX = baseX - 12
 			}
 			addKey(cur, map[string]any{
 				"x":     swayX,
-				"y":     baseY - 14,
+				"y":     baseY - 12,
 				"w":     baseW,
-				"angle": 0.04 * (map[bool]float64{true: -1, false: 1}[toggle]),
+				"angle": 0.03 * (map[bool]float64{true: -1, false: 1}[toggle]),
 			})
 			toggle = !toggle
 			cur += step
@@ -825,22 +815,21 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0, "alpha": 1.0})
 
 	case "lean":
-		// Active posture: leans forward into terminal, with continuous subtle typing pulses
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
-		addKey(t0+0.16, map[string]any{"x": baseX + 18, "y": baseY + 12, "w": baseW, "angle": 0.12})
+		addKey(t0+0.14, map[string]any{"x": baseX + 12, "y": baseY + 8, "w": baseW, "angle": 0.07})
 
-		step := 0.40
-		cur := t0 + 0.16 + step
+		step := 0.42
+		cur := t0 + 0.14 + step
 		toggle := false
 		for cur < maxT-0.05 {
-			leanAngle := 0.14
-			leanY := baseY + 14
+			leanAngle := 0.09
+			leanY := baseY + 10
 			if toggle {
-				leanAngle = 0.10
-				leanY = baseY + 10
+				leanAngle = 0.05
+				leanY = baseY + 6
 			}
 			addKey(cur, map[string]any{
-				"x":     baseX + 18,
+				"x":     baseX + 12,
 				"y":     leanY,
 				"w":     baseW,
 				"angle": leanAngle,
@@ -848,21 +837,20 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 			toggle = !toggle
 			cur += step
 		}
-		addKey(maxT, map[string]any{"x": baseX + 18, "y": baseY + 12, "w": baseW, "angle": 0.12})
+		addKey(maxT, map[string]any{"x": baseX + 12, "y": baseY + 8, "w": baseW, "angle": 0.07})
 
 	case "punch":
-		// High-energy hacker keystroke flurry pounding on keyboard
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
-		addKey(t0+0.12, map[string]any{"x": baseX - 18, "y": baseY - 24, "w": baseW + 50})
+		addKey(t0+0.12, map[string]any{"x": baseX - 14, "y": baseY - 18, "w": baseW + 28})
 		addKey(t0+0.24, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
-		step := 0.22
+		step := 0.24
 		cur := t0 + 0.24 + step
 		toggle := false
 		for cur < maxT-0.05 {
-			strikeY := baseY - 18
-			strikeW := baseW + 35
-			strikeX := baseX - 12
+			strikeY := baseY - 14
+			strikeW := baseW + 20
+			strikeX := baseX - 8
 			if toggle {
 				strikeY = baseY
 				strikeW = baseW
@@ -879,27 +867,26 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
 	case "peek":
-		// Lurking hacker creeps in from right with stealth angle, watching victim
-		t1 := math.Min(0.24, maxSpan*0.45)
-		t2 := math.Min(0.48, maxSpan*0.80)
-		addKey(t0, map[string]any{"x": baseX + 160, "y": baseY, "w": baseW, "angle": -0.10, "alpha": 0.0})
-		addKey(t0+t1, map[string]any{"x": baseX + 40, "y": baseY - 12, "w": baseW, "angle": -0.06, "alpha": 1.0})
-		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.03, "alpha": 1.0})
+		t1 := math.Min(0.22, maxSpan*0.45)
+		t2 := math.Min(0.44, maxSpan*0.80)
+		addKey(t0, map[string]any{"x": baseX + 100, "y": baseY, "w": baseW, "angle": -0.07, "alpha": 0.9})
+		addKey(t0+t1, map[string]any{"x": baseX + 30, "y": baseY - 10, "w": baseW, "angle": -0.04, "alpha": 1.0})
+		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.02, "alpha": 1.0})
 
 		step := 0.45
 		cur := t0 + t2 + step
 		toggle := false
 		for cur < maxT-0.05 {
 			addKey(cur, map[string]any{
-				"x":     baseX + map[bool]int{true: 12, false: -8}[toggle],
-				"y":     baseY + map[bool]int{true: -10, false: 0}[toggle],
+				"x":     baseX + map[bool]int{true: 10, false: -6}[toggle],
+				"y":     baseY + map[bool]int{true: -8, false: 0}[toggle],
 				"w":     baseW,
-				"angle": -0.03,
+				"angle": -0.02,
 			})
 			toggle = !toggle
 			cur += step
 		}
-		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.03, "alpha": 1.0})
+		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.02, "alpha": 1.0})
 
 	default: // "bounce"
 		step := 0.42
@@ -908,8 +895,8 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 		cur += step * 0.5
 		for cur < maxT-0.05 {
-			bY := baseY - 28
-			bW := baseW + 12
+			bY := baseY - 22
+			bW := baseW + 10
 			if toggle {
 				bY = baseY
 				bW = baseW
@@ -930,59 +917,77 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 
 // BuildSoundDesign compiles rich, synchronized SFX cues for high-retention video pacing.
 func BuildSoundDesign(scenes []SceneDefinition, totalDuration float64) []map[string]any {
+	return BuildSoundDesignWithTimings(scenes, nil, totalDuration)
+}
+
+// BuildSoundDesignWithTimings places synchronized SFX cues aligned to exact scene cut boundaries.
+func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64, totalDuration float64) []map[string]any {
 	if len(scenes) == 0 || totalDuration <= 0.5 {
 		return []map[string]any{}
 	}
 
 	numScenes := len(scenes)
-	sceneDur := totalDuration / float64(numScenes)
-	sfxList := make([]map[string]any, 0)
+	if len(boundaries) != numScenes+1 {
+		boundaries = ComputeSceneBoundaries(scenes, nil, "", totalDuration)
+	}
+	sfxList := make([]map[string]any, 0, numScenes*5)
 
-	for i, sc := range scenes {
-		start := math.Round(float64(i)*sceneDur*1000) / 1000
-		shotLen := sceneDur
-		if i == numScenes-1 {
-			shotLen = totalDuration - start
+	// Opening hook punch (0.02s)
+	sfxList = append(sfxList, map[string]any{
+		"time": 0.02,
+		"kind": "pop",
+		"gain": 0.20,
+	})
+
+	for i, rawSc := range scenes {
+		sc := inferSceneVisuals(rawSc, i, numScenes, "", "")
+		start := boundaries[i]
+		end := boundaries[i+1]
+		shotLen := end - start
+		if shotLen <= 0.05 {
+			continue
 		}
-		tSwitch := math.Round(math.Min(shotLen*0.42, 1.8)*1000) / 1000
+		tSwitch := math.Round(math.Min(shotLen*0.44, 1.85)*1000) / 1000
 
-		// 1. Scene Title Pop
-		tPop := math.Round((start+0.04)*1000) / 1000
-		if tPop < totalDuration-0.1 {
-			sfxList = append(sfxList, map[string]any{
-				"time": tPop,
-				"kind": "pop",
-				"gain": 0.18,
-			})
-		}
-
-		// 2. Underline Swipe / Air whoosh
-		if sc.Underline || i%2 == 0 {
-			tSwipe := math.Round((start+0.18)*1000) / 1000
-			if tSwipe < totalDuration-0.1 {
+		// 1. Scene transition whoosh/pop
+		if i > 0 {
+			tCut := math.Round((start+0.02)*1000) / 1000
+			if tCut < totalDuration-0.1 {
 				sfxList = append(sfxList, map[string]any{
-					"time": tSwipe,
+					"time": tCut,
 					"kind": "paper",
 					"gain": 0.14,
 				})
 			}
 		}
 
-		// 3. Scene Event Reaction SFX (Timed to character reaction & secondary prop drop)
+		// 2. Pre-twist/danger riser
+		if i > 0 && (sc.Mood == "danger" || sc.Mood == "breach" || sc.Mood == "twist") && start > 0.65 {
+			tRise := math.Round((start-0.45)*1000) / 1000
+			if tRise >= 0.05 && tRise < totalDuration-0.15 {
+				sfxList = append(sfxList, map[string]any{
+					"time": tRise,
+					"kind": "pop",
+					"gain": 0.14,
+				})
+			}
+		}
+
+		// 3. Scene Event Reaction SFX
 		actionTime := math.Round((start+tSwitch)*1000) / 1000
 		if actionTime < totalDuration-0.1 {
 			kind := sc.SFX
 			if kind == "" {
-				switch i {
-				case 0:
+				switch sc.Mood {
+				case "hook":
 					kind = "keyboard"
-				case 1:
+				case "danger":
 					kind = "alert"
-				case 2:
+				case "breach":
 					kind = "glitch"
-				case 3:
+				case "twist":
 					kind = "chime"
-				case 4:
+				case "defense":
 					kind = "lock"
 				default:
 					kind = "jingle"
@@ -1001,55 +1006,27 @@ func BuildSoundDesign(scenes []SceneDefinition, totalDuration float64) []map[str
 						})
 					}
 				}
-			case "alert":
-				sfxList = append(sfxList, map[string]any{
-					"time": actionTime,
-					"kind": "alert",
-					"gain": 0.22,
-				})
-			case "glitch":
-				tPre := math.Round((start+0.42)*1000) / 1000
-				if tPre < actionTime && tPre < totalDuration-0.1 {
-					sfxList = append(sfxList, map[string]any{
-						"time": tPre,
-						"kind": "keyboard",
-						"gain": 0.16,
-					})
+			case "alert", "glitch", "lock", "chime", "jingle", "paper", "pop", "tap":
+				gain := 0.19
+				if kind == "alert" || kind == "glitch" || kind == "lock" || kind == "jingle" {
+					gain = 0.21
 				}
 				sfxList = append(sfxList, map[string]any{
 					"time": actionTime,
-					"kind": "glitch",
-					"gain": 0.20,
-				})
-			case "lock":
-				sfxList = append(sfxList, map[string]any{
-					"time": actionTime,
-					"kind": "lock",
-					"gain": 0.20,
-				})
-			case "chime":
-				sfxList = append(sfxList, map[string]any{
-					"time": actionTime,
-					"kind": "chime",
-					"gain": 0.18,
-				})
-			case "jingle":
-				sfxList = append(sfxList, map[string]any{
-					"time": actionTime,
-					"kind": "jingle",
-					"gain": 0.20,
+					"kind": kind,
+					"gain": gain,
 				})
 			default:
 				sfxList = append(sfxList, map[string]any{
 					"time": actionTime,
 					"kind": "tap",
-					"gain": 0.15,
+					"gain": 0.16,
 				})
 			}
 		}
 
-		// 4. Secondary prop drop / micro-reaction cue
-		tSec := math.Round((start+tSwitch+0.18)*1000) / 1000
+		// 4. Micro-reaction / callout pop cue
+		tSec := math.Round((start+tSwitch+0.16)*1000) / 1000
 		if tSec < totalDuration-0.1 {
 			sfxList = append(sfxList, map[string]any{
 				"time": tSec,
@@ -1060,8 +1037,8 @@ func BuildSoundDesign(scenes []SceneDefinition, totalDuration float64) []map[str
 	}
 
 	// 5. Climax / Victory resolution in final scene
-	tClimax := math.Round((totalDuration-0.65)*1000) / 1000
-	if tClimax > 0.5 {
+	tClimax := math.Round((totalDuration-0.55)*1000) / 1000
+	if tClimax > 0.4 {
 		sfxList = append(sfxList, map[string]any{
 			"time": tClimax,
 			"kind": "jingle",
@@ -1069,7 +1046,6 @@ func BuildSoundDesign(scenes []SceneDefinition, totalDuration float64) []map[str
 		})
 	}
 
-	// Sort strictly by timestamp
 	sort.Slice(sfxList, func(i, j int) bool {
 		return sfxList[i]["time"].(float64) < sfxList[j]["time"].(float64)
 	})

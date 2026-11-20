@@ -469,11 +469,11 @@ func distributeOverSpeech(canonical []string, speech []SpeechSegment, speechStar
 	}
 }
 
-// BuildAccurateCaptions creates perfectly spelled, acoustically aligned viral captions from the script.
-func BuildAccurateCaptions(scriptText string, wavPath string, totalDuration float64) []CaptionCue {
+// AlignAndBuildCaptions creates perfectly spelled, acoustically aligned viral captions and returns both cues and word timings.
+func AlignAndBuildCaptions(scriptText string, wavPath string, totalDuration float64) ([]CaptionCue, []TimedWord) {
 	canonicalWords := ExtractScriptWords(scriptText)
 	if len(canonicalWords) == 0 {
-		return []CaptionCue{}
+		return []CaptionCue{}, []TimedWord{}
 	}
 
 	var recognized []TimedWord
@@ -487,34 +487,67 @@ func BuildAccurateCaptions(scriptText string, wavPath string, totalDuration floa
 		}
 	}
 
-	return GroupCaptionCues(AlignScriptWords(canonicalWords, recognized, speech, totalDuration), totalDuration)
+	aligned := AlignScriptWords(canonicalWords, recognized, speech, totalDuration)
+	return GroupCaptionCues(aligned, totalDuration), aligned
 }
 
-// GroupCaptionCues groups timed words into monotonic 1-3 word viral caption cues.
+// BuildAccurateCaptions creates perfectly spelled, acoustically aligned viral captions from the script.
+func BuildAccurateCaptions(scriptText string, wavPath string, totalDuration float64) []CaptionCue {
+	cues, _ := AlignAndBuildCaptions(scriptText, wavPath, totalDuration)
+	return cues
+}
+
+func estimateDisplayUnits(s string) float64 {
+	units := 0.0
+	for _, r := range s {
+		switch r {
+		case ' ':
+			units += 0.45
+		case 'I', 'İ', 'L', 'J', '1', '.', ',', '!', '?', '-':
+			units += 0.62
+		case 'M', 'W', 'G', 'Ğ', 'O', 'Ö', 'U', 'Ü', 'Q', 'D', 'H', 'B', 'R':
+			units += 1.22
+		default:
+			units += 1.0
+		}
+	}
+	return units
+}
+
+// GroupCaptionCues groups timed words into monotonic 1-3 word viral caption cues guaranteed to fit on a single line.
 func GroupCaptionCues(timedWords []TimedWord, totalDuration float64) []CaptionCue {
 	for k := range timedWords {
 		timedWords[k].Start = math.Round(timedWords[k].Start*1000) / 1000
 		timedWords[k].End = math.Round(timedWords[k].End*1000) / 1000
 	}
 
-	// 3. Group into 1-3 word cues (Alex Hormozi viral rhythm), never across a real pause
+	// 3. Group into 1-3 word cues (Alex Hormozi viral rhythm), never across a real pause or single-line width limit
 	const pauseBreak = 0.35
 	rawCues := make([]CaptionCue, 0)
 	i := 0
 	n := len(timedWords)
 
 	for i < n {
-		take := 2
-		if i+3 <= n {
-			len3 := len(timedWords[i].Word) + len(timedWords[i+1].Word) + len(timedWords[i+2].Word)
-			if len3 <= 16 {
-				take = 3
-			} else if len(timedWords[i].Word) > 8 {
-				take = 1
+		w0 := timedWords[i].Word
+		r0 := len([]rune(w0))
+		take := 1
+
+		if i+2 <= n {
+			w1 := timedWords[i+1].Word
+			combined2 := w0 + " " + w1
+			if r0+len([]rune(w1))+1 <= 17 && estimateDisplayUnits(combined2) <= 21.5 {
+				take = 2
 			}
-		} else if i+1 == n {
-			take = 1
 		}
+		if take == 2 && i+3 <= n {
+			w1 := timedWords[i+1].Word
+			w2 := timedWords[i+2].Word
+			combined3 := w0 + " " + w1 + " " + w2
+			if r0+len([]rune(w1))+len([]rune(w2))+2 <= 16 && estimateDisplayUnits(combined3) <= 19.5 {
+				take = 3
+			}
+		}
+
 		for k := 1; k < take; k++ {
 			if timedWords[i+k].Start-timedWords[i+k-1].End > pauseBreak {
 				take = k
