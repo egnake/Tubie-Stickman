@@ -1,9 +1,16 @@
 <!doctype html>
 <html lang="tr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>Tubie Studio</title><link rel="stylesheet" href="app.css"><script src="app.js" defer></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Tubie Studio Pro</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
 <body>
 <aside class="sidebar">
-  <a class="brand" href="#produce" aria-label="Tubie Studio ana sayfa"><span class="brand-mark">t<span>›</span></span><span>tubie<span class="brand-sub">STUDIO</span></span></a>
+  <a class="brand" href="#produce" aria-label="Tubie Studio ana sayfa"><span class="brand-mark">t<span>›</span></span><span>tubie<span class="brand-sub">STUDIO PRO</span></span></a>
   <div class="workspace-label">ÇALIŞMA ALANI</div>
   <nav aria-label="Ana gezinme">
     <button class="nav active" data-tab="produce"><svg viewBox="0 0 24 24"><path d="m9 5 11 7-11 7zM4 5v14"/></svg>Üretim</button>
@@ -11,63 +18,123 @@
     <button class="nav" data-tab="outputs"><svg viewBox="0 0 24 24"><path d="M3 7h7l2-3h9v16H3zM9 11l5 3-5 3z"/></svg>Çıktılar<span id="output-count" class="nav-count">0</span></button>
     <button class="nav" data-tab="system"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Ortam</button>
   </nav>
-  <div class="sidebar-bottom"><span class="local-dot"></span>Bu bilgisayarda çalışıyor<button id="shutdown" class="text-button">Uygulamayı kapat ↗</button><span class="version">TUBIE / 01</span></div>
+  <div class="sidebar-bottom"><span class="local-dot"></span>Bu bilgisayarda çalışıyor<button id="shutdown" class="text-button">Uygulamayı kapat ↗</button><span class="version">TUBIE PRO / 02</span></div>
 </aside>
 <div class="shell">
 <header class="topbar"><span>Çalışma alanı <span class="slash">/</span> <span id="breadcrumb">Üretim</span></span><span id="connection"><i class="local-dot"></i> Yerel bağlantı</span></header>
 <main>
 <div id="toast" role="alert" hidden></div>
 <section id="produce" class="page">
-  <div class="page-heading"><div><div class="eyebrow">FİKİRDEN VİDEOYA</div><h1>Üretim masası</h1><p>Konunu seç. Sesini belirle. Hikâyene hareket kat.</p></div><span class="format-label">720 × 1280 <span>·</span> 30 FPS <span>·</span> MP4</span></div>
+  <div class="page-heading">
+    <div>
+      <div class="eyebrow">VİRAL SİBER GÜVENLİK STÜDYOSU</div>
+      <h1>Üretim masası</h1>
+      <p>Kancayı kur, tutma skorunu ölç, 6 sahneyi yönet ve tek tıkla 9:16 + 16:9 üret.</p>
+    </div>
+    <span class="format-label">720 × 1280 <span>·</span> 30 FPS <span>·</span> MP4</span>
+  </div>
   <div class="production-layout">
     <section class="settings-panel" aria-label="Üretim ayarları">
-      <div class="section-title"><h2>01 <span>Konu & Senaryo</span></h2></div>
+      <div class="section-title"><h2>01 <span>Konu, Fikir & Senaryo</span></h2></div>
       <div class="topic-mode-tabs" role="tablist">
-        <button id="mode-tab-ai" class="mode-tab active" type="button" role="tab" aria-selected="true"><span class="sparkle">✨</span> Yapay Zeka ile Üret</button>
-        <button id="mode-tab-presets" class="mode-tab" type="button" role="tab" aria-selected="false">📋 Hazır Şablonlar</button>
+        <button id="mode-tab-ai" class="mode-tab active" type="button" role="tab" aria-selected="true"><span class="sparkle">✨</span> Yapay Zeka & Trendler</button>
+        <button id="mode-tab-presets" class="mode-tab" type="button" role="tab" aria-selected="false">📋 10 Hazır Şablon</button>
       </div>
 
       <div id="ai-panel" class="tab-content">
         <label for="ai-prompt" class="field-label">Konunuz veya Fikriniz:</label>
         <textarea id="ai-prompt" rows="2" class="text-input" placeholder="Örn: Sahte linkleri 5 saniyede nasıl anlarsın? Tıklamadan önce dikkat etmen gereken işaretler..."></textarea>
-        <label for="ai-style" class="field-label">Senaryo Tarzı:</label>
-        <select id="ai-style" class="text-input">
-          <option value="hybrid" selected>🎬 Sinematik + Bilgi Akışı (Önerilen)</option>
-          <option value="cinematic">🎥 Sinematik Gerilim & Hikâye</option>
-          <option value="informative">⚡ Yoğun Bilgi Akışı (Rehber)</option>
-        </select>
-        <div class="chip-container">
-          <button type="button" class="chip" data-prompt="Sahte linkleri 5 saniyede nasıl anlarsın? Oltalama tuzakları">🔗 Sahte Link / Oltalama</button>
-          <button type="button" class="chip" data-prompt="Yapay zeka sizi internette ne kadar tanıyor?">🤖 Yapay Zeka Gizliliği</button>
-          <button type="button" class="chip" data-prompt="İnstagram hesap çalma tuzakları ve korunma yöntemleri">📱 İnstagram Çalma</button>
-          <button type="button" class="chip" data-prompt="Kripto cüzdan dolandırıcılığı ve airdrop tuzağı">💰 Kripto Cüzdan</button>
-          <button type="button" class="chip" data-prompt="WhatsApp hesap çalma ve SMS onay kodu hilesi">💬 WhatsApp Tuzağı</button>
-          <button type="button" class="chip" data-prompt="Kafe Wi-Fi ağlarında şifre hırsızlığı">🔓 Wi-Fi Korsanlığı</button>
+
+        <div class="form-row-two">
+          <div>
+            <label for="ai-style" class="field-label">Viral Senaryo Formatı:</label>
+            <select id="ai-style" class="text-input">
+              <option value="hybrid" selected>🎬 Hibrit Viral Akış (Önerilen)</option>
+              <option value="cinematic">🎥 Sinematik Gerilim & Hikâye</option>
+              <option value="informative">⚡ Yoğun Bilgi & 3 Kural</option>
+              <option value="mythbuster">💥 Efsane Yıkıcı (Myth-Buster)</option>
+              <option value="challenge">🧠 5 Saniye Testi (Challenge)</option>
+              <option value="redvsblue">⚔️ Saldırı vs Savunma (Red/Blue)</option>
+            </select>
+          </div>
         </div>
+
+        <label class="toggle-row" for="loop-ending">
+          <input type="checkbox" id="loop-ending">
+          <span><strong>Sonsuz Döngü (Loop) Modu</strong> — Son cümleyi ilk kancaya bağlayarak izlenme tekrarını artır</span>
+        </label>
+
+        <div class="ideas-deck">
+          <div class="ideas-header">
+            <span class="field-label" style="margin:0;">🔥 Viral Siber Güvenlik Fikir Havuzu</span>
+            <span id="ideas-count" class="editor-counter">18 fikir</span>
+          </div>
+          <div id="ideas-categories" class="chip-container"></div>
+          <div id="ideas-list" class="ideas-grid"></div>
+        </div>
+
         <button id="btn-ai-generate" type="button" class="secondary ai-generate-btn"><span class="sparkle">✨</span> Yapay Zeka ile Senaryo Üret</button>
         <div id="ai-status" class="field-hint" hidden></div>
       </div>
 
       <div id="presets-panel" class="tab-content" hidden>
-        <div class="preset-header"><label class="all-select"><input type="checkbox" id="all"> Tümünü sıraya al</label></div>
+        <div class="preset-header"><label class="all-select"><input type="checkbox" id="all"> Tümünü (10) sıraya al</label></div>
         <div id="presets" class="presets"></div>
       </div>
 
       <div class="script-editor-box">
-        <div class="editor-header"><span class="editor-badge">SENARYO DETAYI</span><span id="char-word-count" class="editor-counter">0 kelime</span></div>
+        <div class="editor-header">
+          <span class="editor-badge">SENARYO & STORYBOARD</span>
+          <span id="char-word-count" class="editor-counter">0 kelime</span>
+        </div>
         <label for="custom-title" class="field-label">Video Başlığı:</label>
         <input type="text" id="custom-title" class="text-input" placeholder="Video Başlığı">
 
         <label for="custom-narration" class="field-label" style="margin-top:10px;">Seslendirme Metni (Düzenlenebilir):</label>
         <textarea id="custom-narration" rows="5" class="text-input" placeholder="Seslendirilecek Türkçe metin..."></textarea>
 
+        <div id="viral-analyzer-card" class="viral-card" hidden>
+          <div class="viral-card-head">
+            <div>
+              <span class="editor-badge">VİRAL TUTMA ANALİZİ</span>
+              <div id="viral-meta-line" class="viral-meta-line"></div>
+            </div>
+            <div class="viral-score-badge">
+              <strong id="viral-total-score">--</strong>
+              <span id="viral-grade-pill" class="grade-pill">-</span>
+            </div>
+          </div>
+          <div id="viral-dimensions" class="viral-dims"></div>
+          <ul id="viral-tips" class="viral-tips"></ul>
+        </div>
+
+        <div class="editor-actions-row">
+          <button id="btn-thumb-preview" type="button" class="secondary small-btn">🖼️ Kapak Önizle (9:16 + 16:9)</button>
+        </div>
+        <div id="thumb-preview-strip" class="thumb-preview-strip" hidden>
+          <figure class="thumb-figure"><img id="thumb-prev-9x16" alt="9:16 Kapak Önizleme"><figcaption>9:16 Shorts / Reels</figcaption></figure>
+          <figure class="thumb-figure"><img id="thumb-prev-16x9" alt="16:9 Kapak Önizleme"><figcaption>16:9 YouTube</figcaption></figure>
+        </div>
+
         <div id="scenes-preview-container" class="scenes-preview-container" hidden>
-          <span class="field-label" style="margin-top:8px;">Planlanan Sahneler:</span>
+          <div class="editor-header" style="margin-bottom:6px;">
+            <span class="field-label" style="margin:0;">🎬 Etkileşimli Sahne Yönetmeni (6 Sahne):</span>
+            <button id="btn-toggle-director" type="button" class="text-button">Düzenle ▾</button>
+          </div>
           <div id="scenes-badges" class="scenes-badges"></div>
+          <div id="scenes-director" class="scenes-director" hidden></div>
         </div>
       </div>
 
-      <div class="section-title voice-title"><h2>02 <span>Ses & Müzik</span></h2></div>
+      <div class="section-title voice-title"><h2>02 <span>Ses, Müzik & Format</span></h2></div>
+      <label for="video-format" class="field-label">Video Çözünürlük & Oranı:</label>
+      <select id="video-format" class="text-input" style="margin-bottom:10px;">
+        <option value="shorts" selected>📱 Dikey Shorts / Reels (9:16 · 720×1280)</option>
+        <option value="shorts-hd">📱 Full HD Dikey (9:16 · 1080×1920)</option>
+        <option value="youtube">🖥️ Yatay YouTube (16:9 · 1280×720)</option>
+        <option value="youtube-hd">🖥️ Full HD Yatay (16:9 · 1920×1080)</option>
+      </select>
+
       <label for="voice-style" class="field-label">Seslendirme Stili:</label>
       <select id="voice-style" class="text-input">
         <option value="viral-male" selected>🔥 Viral & Enerjik · Ahmet (+15% Hız)</option>
@@ -79,19 +146,21 @@
       </select>
       <p id="mode-hint" class="field-hint">Viral tempoda, broadcast filtreli profesyonel seslendirme.</p>
 
-      <label for="bgm-choice" class="field-label" style="margin-top:10px;">Arka Plan Müziği:</label>
+      <label for="bgm-choice" class="field-label" style="margin-top:10px;">Arka Plan Müziği (Sidechain Ducking):</label>
       <select id="bgm-choice" class="text-input">
         <option value="cyber" selected>🎧 Cyber Synth & Bass (Yüksek Enerji)</option>
+        <option value="thriller">🚨 Siber Gerilim (Thriller Pulse)</option>
         <option value="lofi">☕ Rahatlatıcı Lo-Fi Beat</option>
-        <option value="none">🔇 Müziksiz (Sadece Ses Efektleri)</option>
+        <option value="none">🔇 Müziksiz (Sadece SFX)</option>
       </select>
       <button id="generate" class="primary">Üretime başla <span>↗</span></button>
-      <p class="save-note">Çıktılar bu bilgisayarda saklanır. Kusursuz .srt ve .mp4 otomatik oluşturulur.</p>
+      <p class="save-note">Çıktılar bu bilgisayarda saklanır. MP4, SRT, VTT, A/B Kapak ve Viral Analiz paketi otomatik kaydedilir.</p>
     </section>
+
     <section class="preview-panel" aria-label="Canlı üretim önizlemesi">
       <div class="preview-heading"><h2>Önizleme</h2><span id="preview-badge" class="badge">BEKLEMEDE</span></div>
       <div class="preview-stage">
-        <div id="preview-empty" class="preview-empty"><svg viewBox="0 0 120 150" aria-hidden="true"><circle cx="60" cy="28" r="13"/><path d="M60 41v46m0-30L33 77m27-20 27 20M60 87l-21 37m21-37 21 37"/><path class="ground" d="M22 134h76"/></svg><p>İlk kareyi birlikte görelim.</p><span>Üretim başladığında gerçek render kareleri burada görünür.</span></div>
+        <div id="preview-empty" class="preview-empty"><svg viewBox="0 0 120 150" aria-hidden="true"><circle cx="60" cy="28" r="13"/><path d="M60 41v46m0-30L33 77m27-20 27 20M60 87l-21 37m21-37 21 37"/><path class="ground" d="M22 134h76"/></svg><p>İlk kareyi birlikte görelim.</p><span>Üretim başladığında gerçek render kareleri canlı olarak burada görünür.</span></div>
         <img id="live-frame" alt="Üretim sırasında işlenen son kare" hidden>
         <video id="preview-video" controls playsinline preload="metadata" hidden></video>
         <span class="stage-corner">9 : 16</span>
@@ -113,10 +182,11 @@
   <div class="two-columns"><section class="surface"><h2>Referans ses</h2><p>Temiz ve doğal bir kayıt kullanın. Yeni ses, mevcut referansın yerine kaydedilir.</p><label class="upload-area" for="voice-file"><svg viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg><strong>Ses dosyası seç</strong><span>WAV, MP3, M4A veya WebM · En fazla 50 MB</span></label><input id="voice-file" type="file" accept="audio/*" hidden><p id="upload-label" class="field-hint"></p><audio id="reference-audio" controls preload="none" hidden></audio><button id="test-voice" class="secondary">Klonlanmış sesi dene ↗</button><audio id="test-audio" controls hidden></audio><p class="field-hint">Klonlama için XTTS ek kurulumu gerekir. Model ilk kullanımda indirilir.</p></section>
   <section class="surface"><h2>Mikrofondan kaydet</h2><p>15 saniye boyunca, aşağıdaki metni doğal bir sesle okuyun.</p><blockquote>Merhaba! Ben bu kaydı, yapay zeka videolarımda kendi ses tonumu klonlamak için yapıyorum. Bundan sonra üreteceğim tüm videolar, tamamen benim sesimle, akıcı, enerjik ve profesyonel bir şekilde hazırlanacak.</blockquote><button id="record" class="secondary"><span class="record-dot"></span>15 saniyelik kayıt başlat</button><p id="record-status" class="field-hint" role="status">Tarayıcı mikrofon erişimi isteyecek.</p></section></div>
 </section>
-<section id="outputs" class="page" hidden><div class="page-heading"><div><div class="eyebrow">TAMAMLANAN İŞLER</div><h1>Çıktı arşivi</h1><p>Videoların, izlemeye ve paylaşmaya hazır.</p></div></div><div id="output-list"></div><div class="surface" id="output-player" hidden><video controls playsinline preload="metadata"></video></div></section>
-<section id="system" class="page" hidden><div class="page-heading"><div><div class="eyebrow">ÜRETİMDEN ÖNCE</div><h1>Ortam kontrolü</h1><p>Bu bilgisayarın üretime hazır olup olmadığını görün.</p></div></div><div class="surface system-panel"><h2>Çalışma ortamı</h2><p>Python paketleri, Node.js, FFmpeg ve render bağımlılıkları kontrol edilir. Bu işlem model indirmez.</p><button id="doctor" class="secondary">Bağımlılıkları kontrol et ↗</button><p class="field-hint">Sonuçlar aşağıdaki işlem günlüğünde canlı olarak görünür.</p><div class="setup-note">Eksik paketlerin kurulum komutları günlükte gösterilir. Kurulum ayrıntıları için projenin README ve docs/setup.md dosyalarını kullanın.</div></div></section>
+<section id="outputs" class="page" hidden><div class="page-heading"><div><div class="eyebrow">TAMAMLANAN İŞLER</div><h1>Çıktı arşivi</h1><p>Videoların, A/B kapakların ve viral analizlerin izlemeye hazır.</p></div></div><div id="output-list"></div><div class="surface" id="output-player" hidden><video controls playsinline preload="metadata"></video></div></section>
+<section id="system" class="page" hidden><div class="page-heading"><div><div class="eyebrow">ÜRETİMDEN ÖNCE</div><h1>Ortam kontrolü</h1><p>Bu bilgisayarın üretime hazır olup olmadığını görün.</p></div></div><div class="surface system-panel"><h2>Çalışma ortamı</h2><p>Python paketleri, Node.js, FFmpeg, faster-whisper ve render bağımlılıkları kontrol edilir. Bu işlem model indirmez.</p><button id="doctor" class="secondary">Bağımlılıkları kontrol et ↗</button><p class="field-hint">Sonuçlar aşağıdaki işlem günlüğünde canlı olarak görünür.</p><div class="setup-note">Eksik paketlerin kurulum komutları günlükte gösterilir. Kurulum ayrıntıları için projenin README ve docs/setup.md dosyalarını kullanın.</div></div></section>
 <details id="log-panel" class="log-panel"><summary><span>İşlem günlüğü <span id="log-count">0</span></span><span>Canlı kayıt ↗</span></summary><pre id="logs" tabindex="0" aria-label="Canlı işlem günlüğü">Üretim başladığında ayrıntılar burada görünecek.</pre></details>
-<footer><span>Bir hikâye, birkaç çizgi.</span><button id="shutdown-footer" class="text-button">Uygulamayı kapat ↗</button><span>Tubie Studio</span></footer>
+<footer><span>Bir hikâye, birkaç çizgi.</span><button id="shutdown-footer" class="text-button">Uygulamayı kapat ↗</button><span>Tubie Studio Pro</span></footer>
 </main>
 </div>
-</body></html>
+</body>
+</html>
