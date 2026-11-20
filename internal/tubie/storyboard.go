@@ -200,12 +200,22 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 
 		layers := make([]map[string]any, 0, 10)
 
-		// Coordinates adapt cleanly to 9:16 Portrait (1280x2275) vs 16:9 Landscape (1280x720)
-		hudY, titleX, titleY, titleW, titleSize := 112, 72, 165, 1136, 56
-		underlineY, pillX, pillY, pillSize := 288, 640, 336, 22
+		// Coordinates adapt cleanly to 9:16 Portrait (1280x2276) vs 16:9 Landscape (1280x720)
+		hudY, hudSize := 162, 24
+		titleX, titleY, titleW, titleSize := 72, 200, 1136, 54
+		underlineY := 272
+		if len([]rune(titleText)) > 24 {
+			underlineY = 330
+		}
+		pillX, pillY, pillW, pillSize := 640, 320, 920, 22
+		if underlineY > 300 {
+			pillY = 360
+		}
 		if isLandscape {
-			hudY, titleX, titleY, titleW, titleSize = 72, 54, 102, 1172, 42
-			underlineY, pillX, pillY, pillSize = 154, 960, 72, 18
+			hudY, hudSize = 78, 20
+			titleX, titleY, titleW, titleSize = 54, 108, 710, 36
+			underlineY = 156
+			pillX, pillY, pillW, pillSize = 995, 102, 440, 16
 		}
 
 		// 1. Cyber Security HUD Header Badge (immediately visible at t=0.0 — zero blank frames)
@@ -216,10 +226,10 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 			"x":     titleX,
 			"y":     hudY,
 			"w":     titleW,
-			"size":  26,
+			"size":  hudSize,
 			"bold":  true,
 			"color": hudColor,
-			"keys": buildSnappyAppearKeys(titleX, hudY, 0, shotLen),
+			"keys":  buildSnappyAppearKeys(titleX, hudY, 0, shotLen),
 		})
 
 		// 2. Main Scene Title Text (instant punch-in, never starts invisible)
@@ -239,12 +249,14 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 		if sc.Underline || idx%2 == 0 {
 			lineW := len([]rune(titleText)) * 31
 			if isLandscape {
-				lineW = len([]rune(titleText)) * 22
+				lineW = len([]rune(titleText)) * 21
 			}
 			if lineW < 340 {
 				lineW = 340
 			}
-			if lineW > 1020 {
+			if isLandscape && lineW > 660 {
+				lineW = 660
+			} else if lineW > 1020 {
 				lineW = 1020
 			}
 			tUnderline := math.Floor(math.Min(0.28, shotLen*0.70)*1000) / 1000
@@ -258,26 +270,24 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 				"w":         lineW,
 				"color":     titleColor,
 				"lineWidth": 7,
-				"keys": buildProgressKeys(0.0, tUnderline, 0.25, 1.0, shotLen),
+				"keys":      buildProgressKeys(0.0, tUnderline, 0.25, 1.0, shotLen),
 			})
 		}
 
 		// 4. Dynamic Cyber Status Pill Badge
 		pillText, pillColor := getStatusPill(idx, titleText)
 		pillLayer := map[string]any{
-			"type":  "text",
-			"text":  pillText,
-			"x":     pillX,
-			"y":     pillY,
-			"w":     860,
-			"size":  pillSize,
-			"bold":  true,
-			"color": pillColor,
-			"badge": pillColor,
-			"keys":  buildSnappySlideKeys(pillX, pillY, pillY+6, shotLen),
-		}
-		if !isLandscape {
-			pillLayer["center"] = true
+			"type":   "text",
+			"text":   pillText,
+			"x":      pillX,
+			"y":      pillY,
+			"w":      pillW,
+			"size":   pillSize,
+			"bold":   true,
+			"center": true,
+			"color":  pillColor,
+			"badge":  pillColor,
+			"keys":   buildSnappySlideKeys(pillX, pillY, pillY+6, shotLen),
 		}
 		layers = append(layers, pillLayer)
 
@@ -334,9 +344,9 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 				cStart = math.Floor(shotLen*0.35*1000) / 1000
 			}
 			if cStart < shotLen-0.12 {
-				cx, cy, cw, csize := 440, 425, 400, 36
+				cx, cy, cw, csize := 440, 415, 400, 34
 				if isLandscape {
-					cx, cy, cw, csize = 80, 178, 380, 26
+					cx, cy, cw, csize = 110, 174, 340, 22
 				}
 				layers = append(layers, map[string]any{
 					"type":  "cyber_callout",
@@ -423,9 +433,9 @@ func buildProceduralCyberActors(sc SceneDefinition, idx int, shotLen, tSwitch fl
 	hx, hy, hw, hh := 710, 425, 440, 530
 	cx, cy, cw, ch := 415, 435, 450, 520
 	if isLandscape {
-		vx, vy, vw, vh = 40, 195, 250, 355
-		hx, hy, hw, hh = 275, 185, 265, 365
-		cx, cy, cw, ch = 145, 185, 275, 365
+		vx, vy, vw, vh = 40, 222, 240, 330
+		hx, hy, hw, hh = 275, 212, 255, 340
+		cx, cy, cw, ch = 145, 212, 265, 340
 	}
 
 	canSplit := shotLen >= 0.75 && tSwitch > 0.12 && tSwitch < shotLen-0.12
@@ -584,7 +594,7 @@ func buildMotionKeys(baseX, baseY, baseW int, tStart, span float64, action strin
 func buildCyberWidgetLayer(sc SceneDefinition, shotLen float64, isLandscape bool) map[string]any {
 	wx, wy, ww, wh := 70, 1020, 1140, 520
 	if isLandscape {
-		wx, wy, ww, wh = 565, 175, 670, 375
+		wx, wy, ww, wh = 565, 178, 670, 372
 	}
 
 	if sc.VisualType == "prop_stage" && sc.Prop != nil && sc.Prop.Path != "" {
