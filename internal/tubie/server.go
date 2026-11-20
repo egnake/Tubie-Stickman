@@ -373,6 +373,20 @@ func (s *StudioServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Serve fast-changing live preview frames from memory so Windows never holds an OS read handle
+	// open across HTTP writes while the renderer atomically replaces live-frame.jpg.
+	if filepath.Base(target) == "live-frame.jpg" {
+		data, err := os.ReadFile(target)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(data)
+		return
+	}
+
 	http.ServeFile(w, r, target)
 }
 

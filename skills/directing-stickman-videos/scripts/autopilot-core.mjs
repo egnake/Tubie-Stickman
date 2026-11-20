@@ -24,11 +24,42 @@ export function concatFileLine(file) {
 export const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 export const hashFile = file => sha(fs.readFileSync(file));
 export const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const sleepSync = ms => {
+  try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch {}
+};
+const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+export function renameSafe(src, dst, {retries = 12, allowSkip = false} = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      fs.renameSync(src, dst);
+      return true;
+    } catch (e) {
+      lastErr = e;
+      if (!RETRYABLE_RENAME_CODES.has(e?.code)) break;
+      if (attempt < retries) sleepSync(Math.min(120, 20 * (attempt + 1)));
+    }
+  }
+  if (allowSkip) {
+    try { fs.unlinkSync(src); } catch {}
+    return false;
+  }
+  if (RETRYABLE_RENAME_CODES.has(lastErr?.code)) {
+    let isSymlink = false;
+    try { isSymlink = fs.lstatSync(dst).isSymbolicLink(); } catch {}
+    if (!isSymlink) {
+      fs.copyFileSync(src, dst);
+      try { fs.unlinkSync(src); } catch {}
+      return true;
+    }
+  }
+  throw lastErr;
+}
 export function save(file, value) {
   fs.mkdirSync(path.dirname(file), {recursive: true});
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n');
-  fs.renameSync(tmp, file);
+  renameSafe(tmp, file);
 }
 export function run(exe, args) {
   const result = spawnSync(exe, args, {encoding: 'utf8', maxBuffer: 8 * 1024 * 1024});

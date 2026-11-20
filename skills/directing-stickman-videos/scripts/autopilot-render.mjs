@@ -3,7 +3,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {createCanvas, loadImage, GlobalFonts} from '@napi-rs/canvas';
-import {ROOT, FFMPEG, sha, hashFile, save, probe, run, mediaPath, fontPaths, outputDir, designPlane, loadProject, concatFileLine} from './autopilot-core.mjs';
+import {ROOT, FFMPEG, sha, hashFile, save, renameSafe, probe, run, mediaPath, fontPaths, outputDir, designPlane, loadProject, concatFileLine} from './autopilot-core.mjs';
 
 import {walkLayers, drawB3Shape, televisionFinish} from './b3-graphics.mjs';
 import {appendB4Audio} from './b4-runtime.mjs';
@@ -408,10 +408,12 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
   const onFrame = live ? (canvas, current, force = false) => {
     if (!force && current !== count && Date.now() - lastUpdate < 500) return;
     lastUpdate = Date.now();
-    thumbnail.getContext('2d').drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
-    const destination = path.join(out, 'live-frame.jpg'), temporary = destination + '.tmp';
-    fs.writeFileSync(temporary, thumbnail.toBuffer('image/jpeg'));
-    fs.renameSync(temporary, destination);
+    try {
+      thumbnail.getContext('2d').drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+      const destination = path.join(out, 'live-frame.jpg'), temporary = `${destination}.${process.pid}.tmp`;
+      fs.writeFileSync(temporary, thumbnail.toBuffer('image/jpeg'));
+      renameSafe(temporary, destination, {retries: 3, allowSkip: true});
+    } catch {}
     process.stdout.write('TUBIE_EVENT ' + JSON.stringify({kind, frame: current, frames: count, seconds: current / p.fps, duration}) + '\n');
   } : null;
   const done = value => save(path.join(out, 'checkpoint.json'), {stage: value, kind, fingerprint: p.fingerprint, pid: process.pid, updated_at: new Date().toISOString()});
@@ -440,7 +442,7 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
         done(`rendering shot ${i + 1}/${p.shots.length}`);
         const tmp = path.join(cache, `${key}.partial.mp4`);
         await encode(p, frame, first, last - first, tmp, onFrame);
-        fs.renameSync(tmp, clip);
+        renameSafe(tmp, clip);
       }
       clips.push(clip); process.stdout.write(JSON.stringify({shot: i + 1, total: p.shots.length, cache_hit: valid}) + '\n');
     }
@@ -474,7 +476,7 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     filters.push(`${mixes.join('')}amix=inputs=${mixes.length}:normalize=0:duration=first,alimiter=limit=0.97:level=false:latency=true[a]`);
     const partial = path.join(out, `${kind}.partial.mp4`);
     args.push('-filter_complex', filters.join(';'), '-map', '0:v:0', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', String(count / p.fps), '-movflags', '+faststart', partial);
-    run(FFMPEG, args); run(FFMPEG, ['-v', 'error', '-i', partial, '-f', 'null', '-']); fs.renameSync(partial, target);
+    run(FFMPEG, args); run(FFMPEG, ['-v', 'error', '-i', partial, '-f', 'null', '-']); renameSafe(partial, target);
     const cues = p.captions.filter(c => c.start < duration).map(c => ({...c, end: Math.min(c.end, duration)}));
     fs.writeFileSync(path.join(out, `${kind}.srt`), cues.map((c, i) => `${i + 1}\n${stamp(c.start)} --> ${stamp(c.end)}\n${c.text}\n`).join('\n'));
     fs.writeFileSync(path.join(out, `${kind}.vtt`), 'WEBVTT\n\n' + cues.map(c => `${stamp(c.start, true)} --> ${stamp(c.end, true)}\n${c.text}\n`).join('\n'));
@@ -492,5 +494,5 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     }
     save(reportPath, report); done('complete'); return report;
   } catch (e) { done(`failed: ${e.message}`); throw e; }
-  finally { fs.unlinkSync(lock); }
+  finally { try { fs.unlinkSync(lock); } catch {} }
 }
