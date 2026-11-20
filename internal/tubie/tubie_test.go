@@ -688,3 +688,388 @@ func TestDescribeSubcommand(t *testing.T) {
 		t.Fatalf("describe output hijacked into unrelated template:\n%s", content)
 	}
 }
+
+func TestViralAnalyzerScoring(t *testing.T) {
+	ideas := tubie.TrendingCyberIdeas()
+	if len(ideas) != 18 {
+		t.Fatalf("expected 18 curated cyber ideas, got %d", len(ideas))
+	}
+	for _, idea := range ideas {
+		if idea.ID == "" || idea.Category == "" || idea.Title == "" || idea.Prompt == "" {
+			t.Fatalf("incomplete curated cyber idea: %+v", idea)
+		}
+	}
+
+	if cat := tubie.DetectThreatCategory("Kahvecide ücretsiz Wi-Fi Deauth ve Evil Twin saldırısı"); !strings.Contains(cat, "Wi-Fi") {
+		t.Fatalf("unexpected category for Wi-Fi topic: %s", cat)
+	}
+	if cat := tubie.DetectThreatCategory("3 saniyelik videodan yapay zeka deepfake ses klonlama"); !strings.Contains(cat, "Yapay Zeka") {
+		t.Fatalf("unexpected category for AI topic: %s", cat)
+	}
+
+	strongTitle := "3 Saniyede Wi-Fi Şifren Nasıl Çalınır?"
+	strongText := "Şu an bağlandığın kafe Wi-Fi ağı senin tüm şifrelerini çalabilir! Hacker kaba kuvvet denemez, tek paketle seni ağdan düşürür. Oysa bağlandığın anda el sıkışma paketi havada yakalanır ve %95 risk doğar! Kendini 2 adımda koru: 1. Asla şifresiz ortak ağa güvenme. 2. Hemen VPN aç ve 2FA doğrulamayı etkinleştir. Bu videoyu kaydet ve paylaş; işte bu yüzden:"
+	strongScenes := tubie.EnsureScenesForScript(strongTitle, strongText)
+	strong := tubie.AnalyzeScriptVirality(strongTitle, strongText, strongScenes, true)
+
+	weak := tubie.AnalyzeScriptVirality("Video", "Merhaba bugün biraz internetten konuşalım.", nil, false)
+	if strong.TotalScore <= weak.TotalScore+25 {
+		t.Fatalf("expected strong script (%d) to beat weak script (%d) by >25 points", strong.TotalScore, weak.TotalScore)
+	}
+	if len(strong.Dimensions) != 6 {
+		t.Fatalf("expected 6 viral dimensions, got %d", len(strong.Dimensions))
+	}
+	dimSum := 0
+	for _, d := range strong.Dimensions {
+		dimSum += d.Score
+	}
+	if dimSum != strong.TotalScore {
+		t.Fatalf("dimension sum %d != TotalScore %d", dimSum, strong.TotalScore)
+	}
+	if !strong.LoopReady || weak.LoopReady {
+		t.Fatalf("expected strong.LoopReady=true and weak.LoopReady=false, got strong=%v weak=%v", strong.LoopReady, weak.LoopReady)
+	}
+}
+
+func TestAllSixViralStylesAndLoopMode(t *testing.T) {
+	t.Setenv("TUBIE_OFFLINE_AI", "1")
+	styles := []string{
+		tubie.StyleHybrid,
+		tubie.StyleCinematic,
+		tubie.StyleInformative,
+		tubie.StyleMythBuster,
+		tubie.StyleChallenge,
+		tubie.StyleRedVsBlue,
+	}
+	seenNarr := make(map[string]string)
+	for _, st := range styles {
+		res, err := tubie.GenerateScriptWithOptions("Sahte banka SMS ve oltalama linki", tubie.ScriptOptions{
+			Style:      st,
+			LoopEnding: false,
+		})
+		if err != nil {
+			t.Fatalf("style %s failed: %v", st, err)
+		}
+		if res.Style != st {
+			t.Fatalf("expected style %s, got %s", st, res.Style)
+		}
+		if len(res.Scenes) != 6 {
+			t.Fatalf("style %s: expected 6 scenes, got %d", st, len(res.Scenes))
+		}
+		if res.ViralScore == nil || res.ViralScore.TotalScore <= 0 {
+			t.Fatalf("style %s: expected non-zero ViralScore, got %+v", st, res.ViralScore)
+		}
+		if prevStyle, dup := seenNarr[res.Narration]; dup {
+			t.Fatalf("style %s produced identical narration to %s", st, prevStyle)
+		}
+		seenNarr[res.Narration] = st
+	}
+
+	loopRes, err := tubie.GenerateScriptWithOptions("Sahte banka SMS ve oltalama linki", tubie.ScriptOptions{
+		Style:      tubie.StyleHybrid,
+		LoopEnding: true,
+	})
+	if err != nil {
+		t.Fatalf("loop generation failed: %v", err)
+	}
+	if !loopRes.LoopEnding || loopRes.ViralScore == nil || !loopRes.ViralScore.LoopReady {
+		t.Fatalf("expected loop metadata on generated result, got loop=%v score=%+v", loopRes.LoopEnding, loopRes.ViralScore)
+	}
+}
+
+func TestSyncedStoryboardPortraitAndLandscape(t *testing.T) {
+	narration := "Bu linke sakın tıklama! Hacker kopya siteyle şifreni alır. Hemen göndericiyi kontrol et. Resmi uygulamadan giriş yap. Authenticator ile iki adımlı doğrulama aç. Tuzağa düşme ve güvende kal!"
+	words := tubie.ExtractScriptWords(narration)
+	timed := make([]tubie.TimedWord, len(words))
+	step := 18.0 / float64(len(words))
+	for i, w := range words {
+		timed[i] = tubie.TimedWord{
+			Word:  w,
+			Start: math.Round(float64(i)*step*1000) / 1000,
+			End:   math.Round((float64(i)*step+step*0.85)*1000) / 1000,
+		}
+	}
+	scenes := tubie.EnsureScenesForScript("Sahte Link Tuzağı", narration)
+
+	bounds := tubie.ComputeSceneBoundaries(scenes, timed, narration, 18.0)
+	if len(bounds) != len(scenes)+1 || bounds[0] != 0 || bounds[len(bounds)-1] != 18.0 {
+		t.Fatalf("unexpected scene boundaries: %v", bounds)
+	}
+	for i := 1; i < len(bounds); i++ {
+		if bounds[i] <= bounds[i-1] {
+			t.Fatalf("non-monotonic boundaries at %d: %v", i, bounds)
+		}
+	}
+
+	for _, tc := range []struct {
+		name string
+		w, h int
+	}{
+		{"portrait", 720, 1280},
+		{"landscape", 1280, 720},
+	} {
+		shots := tubie.BuildStoryboardWithOptions(scenes, 18.0, tubie.StoryboardOptions{
+			Width:      tc.w,
+			Height:     tc.h,
+			TimedWords: timed,
+			Narration:  narration,
+		})
+		if len(shots) != 6 {
+			t.Fatalf("%s: expected 6 shots, got %d", tc.name, len(shots))
+		}
+		var sawActor, sawWidget, sawCallout bool
+		for _, sh := range shots {
+			for _, l := range sh["layers"].([]map[string]any) {
+				switch l["type"] {
+				case "cyber_actor":
+					sawActor = true
+				case "cyber_widget":
+					sawWidget = true
+				case "cyber_callout":
+					sawCallout = true
+				}
+			}
+		}
+		if !sawActor || !sawWidget || !sawCallout {
+			t.Fatalf("%s: missing cyber layers actor=%v widget=%v callout=%v", tc.name, sawActor, sawWidget, sawCallout)
+		}
+	}
+}
+
+func TestVoiceViralFilterOffline(t *testing.T) {
+	dir := t.TempDir()
+	rawWav := filepath.Join(dir, "raw.wav")
+	outWav := filepath.Join(dir, "filtered.wav")
+	ffmpeg := tubie.BinaryPath("ffmpeg")
+
+	makeCmd := exec.Command(ffmpeg, "-v", "error", "-y",
+		"-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono:d=0.35",
+		"-f", "lavfi", "-i", "sine=f=320:r=24000:d=1.0",
+		"-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1",
+		rawWav)
+	if out, err := makeCmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed creating synthetic wav: %v (%s)", err, string(out))
+	}
+
+	filter := tubie.BuildViralVocalFilter(1.06)
+	if !strings.Contains(filter, "silenceremove=") || !strings.Contains(filter, "loudnorm=") {
+		t.Fatalf("unexpected viral vocal filter chain: %s", filter)
+	}
+	filtCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", rawWav, "-af", filter, "-ar", "24000", "-ac", "1", outWav)
+	if out, err := filtCmd.CombinedOutput(); err != nil {
+		t.Fatalf("viral vocal filter execution failed: %v (%s)", err, string(out))
+	}
+
+	dur, err := tubie.GetAudioDuration(outWav)
+	if err != nil {
+		t.Fatalf("GetAudioDuration failed: %v", err)
+	}
+	if dur <= 0.4 || dur >= 1.25 {
+		t.Fatalf("expected tightened & tempo-adjusted duration in (0.4, 1.25), got %.3f", dur)
+	}
+}
+
+func TestDualFormatAndABThumbnails(t *testing.T) {
+	root, err := tubie.FindRoot()
+	if err != nil {
+		t.Fatalf("FindRoot failed: %v", err)
+	}
+	dir := t.TempDir()
+	thumb9A := filepath.Join(dir, "thumb_9x16_a.jpg")
+	thumb9B := filepath.Join(dir, "thumb_9x16_b.jpg")
+	thumb16A := filepath.Join(dir, "thumb_16x9_a.jpg")
+
+	for _, job := range []struct {
+		out  string
+		opts tubie.ThumbnailOptions
+	}{
+		{thumb9A, tubie.ThumbnailOptions{Aspect: "9:16", Variant: "a", Mood: "danger"}},
+		{thumb9B, tubie.ThumbnailOptions{Aspect: "9:16", Variant: "b", Mood: "defense"}},
+		{thumb16A, tubie.ThumbnailOptions{Aspect: "16:9", Variant: "a", Mood: "breach"}},
+	} {
+		if err := tubie.GenerateDedicatedThumbnailWithOptions(root, "Bu Linke Tıklarsan Ne Olur?", "Sahte URL oltalama", "@b1/cyber-skull.png", 2, job.opts, job.out, ""); err != nil {
+			t.Fatalf("thumbnail %+v failed: %v", job.opts, err)
+		}
+	}
+
+	ffprobe := tubie.BinaryPath("ffprobe")
+	readDims := func(path string) (int, int) {
+		out, err := exec.Command(ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", path).Output()
+		if err != nil {
+			t.Fatalf("ffprobe failed on %s: %v", path, err)
+		}
+		var parsed struct {
+			Streams []struct {
+				Width  int `json:"width"`
+				Height int `json:"height"`
+			} `json:"streams"`
+		}
+		if err := json.Unmarshal(out, &parsed); err != nil || len(parsed.Streams) == 0 {
+			t.Fatalf("failed decoding probe on %s: %v (%s)", path, err, string(out))
+		}
+		return parsed.Streams[0].Width, parsed.Streams[0].Height
+	}
+
+	w9, h9 := readDims(thumb9A)
+	if w9 >= h9 || math.Abs(float64(w9)/float64(h9)-9.0/16.0) > 0.02 {
+		t.Fatalf("expected 9:16 portrait dimensions, got %dx%d", w9, h9)
+	}
+	w16, h16 := readDims(thumb16A)
+	if w16 <= h16 || math.Abs(float64(w16)/float64(h16)-16.0/9.0) > 0.02 {
+		t.Fatalf("expected 16:9 landscape dimensions, got %dx%d", w16, h16)
+	}
+
+	bytesA, _ := os.ReadFile(thumb9A)
+	bytesB, _ := os.ReadFile(thumb9B)
+	if bytes.Equal(bytesA, bytesB) {
+		t.Fatalf("expected A and B thumbnail variants to differ visually")
+	}
+}
+
+func TestTurkishCaptionSingleLineSafety(t *testing.T) {
+	words := tubie.ExtractScriptWords("İSTANBUL içindeki kullanıcıların ŞİFRELERİNİZİ ve DOĞRULAMA kodlarını siber güvenlik uzmanları korur!")
+	timed := make([]tubie.TimedWord, len(words))
+	for i, w := range words {
+		timed[i] = tubie.TimedWord{
+			Word:  w,
+			Start: float64(i) * 0.45,
+			End:   float64(i)*0.45 + 0.38,
+		}
+	}
+	cues := tubie.GroupCaptionCues(timed, 10.0)
+	if len(cues) == 0 {
+		t.Fatal("expected non-empty Turkish cues")
+	}
+	for i, c := range cues {
+		if strings.ContainsAny(c.Text, "\r\n") {
+			t.Fatalf("cue %d contains newline: %q", i, c.Text)
+		}
+		if len([]rune(c.Text)) > 26 {
+			t.Fatalf("cue %d unexpectedly wide (%d runes): %q", i, len([]rune(c.Text)), c.Text)
+		}
+	}
+	vtt := tubie.FormatVTT(cues)
+	if !strings.HasPrefix(vtt, "WEBVTT\n\n") || !strings.Contains(vtt, ".") {
+		t.Fatalf("invalid VTT output:\n%s", vtt)
+	}
+}
+
+func TestStudioServerSecurityAndViralEndpoints(t *testing.T) {
+	root, err := tubie.FindRoot()
+	if err != nil {
+		t.Fatalf("FindRoot failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(filepath.Join(root, "projects", "_thumb_preview"))
+	})
+
+	studio, err := tubie.NewStudioServer(root, 0)
+	if err != nil {
+		t.Fatalf("NewStudioServer failed: %v", err)
+	}
+	defer studio.Close()
+	go func() {
+		_ = studio.Serve()
+	}()
+
+	baseURL := strings.Split(studio.URL(""), "#")[0]
+
+	// Mutating / POST-only endpoints must reject GET with 405 Method Not Allowed.
+	for _, ep := range []string{"api/approve", "api/cancel", "api/shutdown", "api/viral-analyze", "api/thumbnail-preview"} {
+		resp, err := http.Get(baseURL + ep)
+		if err != nil {
+			t.Fatalf("GET %s failed: %v", ep, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusMethodNotAllowed {
+			t.Fatalf("GET %s: expected 405, got %d", ep, resp.StatusCode)
+		}
+	}
+
+	// Path traversal / restricted file check on /media/.
+	travResp, err := http.Get(baseURL + "media/output/../../go.mod")
+	if err != nil {
+		t.Fatalf("GET traversal check failed: %v", err)
+	}
+	travResp.Body.Close()
+	if travResp.StatusCode != http.StatusBadRequest && travResp.StatusCode != http.StatusForbidden && travResp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 400/403/404 on path traversal, got %d", travResp.StatusCode)
+	}
+	secretResp, err := http.Get(baseURL + "media/projects/foo/output/project.json")
+	if err != nil {
+		t.Fatalf("GET restricted project file failed: %v", err)
+	}
+	secretResp.Body.Close()
+	if secretResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden on projects/.../project.json, got %d", secretResp.StatusCode)
+	}
+
+	// GET /api/ideas
+	ideasResp, err := http.Get(baseURL + "api/ideas")
+	if err != nil {
+		t.Fatalf("GET api/ideas failed: %v", err)
+	}
+	defer ideasResp.Body.Close()
+	var ideasPayload struct {
+		OK    bool              `json:"ok"`
+		Ideas []tubie.CyberIdea `json:"ideas"`
+	}
+	if err := json.NewDecoder(ideasResp.Body).Decode(&ideasPayload); err != nil || !ideasPayload.OK || len(ideasPayload.Ideas) != 18 {
+		t.Fatalf("unexpected api/ideas response: %+v err=%v", ideasPayload, err)
+	}
+
+	// POST /api/viral-analyze
+	analyzeResp, err := http.Post(baseURL+"api/viral-analyze", "application/json",
+		bytes.NewBufferString(`{"title":"Bu Linke Tıklama!","narration":"3 saniyede şifren çalınır! Hemen 2FA aç ve bu videoyu kaydet.","loop_ending":true}`))
+	if err != nil {
+		t.Fatalf("POST api/viral-analyze failed: %v", err)
+	}
+	defer analyzeResp.Body.Close()
+	var analyzePayload struct {
+		OK     bool                    `json:"ok"`
+		Report *tubie.ViralScoreReport `json:"report"`
+	}
+	if err := json.NewDecoder(analyzeResp.Body).Decode(&analyzePayload); err != nil || !analyzePayload.OK || analyzePayload.Report == nil || len(analyzePayload.Report.Dimensions) != 6 {
+		t.Fatalf("unexpected api/viral-analyze response: %+v err=%v", analyzePayload, err)
+	}
+
+	// POST /api/thumbnail-preview and fetch generated JPEG via /media/.
+	thumbResp, err := http.Post(baseURL+"api/thumbnail-preview", "application/json",
+		bytes.NewBufferString(`{"title":"Sahte Link Tuzağı","topic":"Phishing","mood":"danger"}`))
+	if err != nil {
+		t.Fatalf("POST api/thumbnail-preview failed: %v", err)
+	}
+	defer thumbResp.Body.Close()
+	var thumbPayload struct {
+		OK          bool   `json:"ok"`
+		Preview9x16 string `json:"preview_9x16"`
+		Preview16x9 string `json:"preview_16x9"`
+	}
+	if err := json.NewDecoder(thumbResp.Body).Decode(&thumbPayload); err != nil || !thumbPayload.OK || thumbPayload.Preview9x16 == "" || thumbPayload.Preview16x9 == "" {
+		t.Fatalf("unexpected api/thumbnail-preview response: %+v err=%v", thumbPayload, err)
+	}
+	imgResp, err := http.Get(baseURL + "media/" + thumbPayload.Preview9x16)
+	if err != nil {
+		t.Fatalf("GET preview thumbnail failed: %v", err)
+	}
+	imgResp.Body.Close()
+	if imgResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for generated preview thumbnail, got %d", imgResp.StatusCode)
+	}
+}
+
+func TestAnalyzeSubcommand(t *testing.T) {
+	if code := tubie.Main([]string{"analyze"}); code == 0 {
+		t.Fatalf("expected non-zero exit when --text and --title are missing")
+	}
+	code := tubie.Main([]string{
+		"analyze",
+		"--title", "Sahte Link Tuzağı",
+		"--text", "Tıklama! 3 saniyede şifren çalınır. Hemen 2FA aç ve kaydet!",
+		"--loop",
+		"--json",
+	})
+	if code != 0 {
+		t.Fatalf("analyze subcommand failed with exit code %d", code)
+	}
+}
