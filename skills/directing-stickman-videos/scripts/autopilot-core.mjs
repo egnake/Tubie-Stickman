@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {walkLayers, validateB3, visibleLayers} from './b3-graphics.mjs';
 import {prepareB4} from './b4-runtime.mjs';
+import {CYBER_LAYER_TYPES, CYBER_EXTRA_SFX, validateCyberLayer, validateCyberShot} from './cyber-visuals.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const STYLES = ['B1', 'B2', 'B3', 'B4'];
@@ -88,6 +89,7 @@ export function loadProject(file, {seconds} = {}) {
   let end = 0;
   const assets = new Set([voicePath]);
   const types = new Set(['image', 'pose', 'text', 'line', 'arrow', 'underline']);
+  if (p.theme === 'cyber') for (const type of CYBER_LAYER_TYPES) types.add(type);
   if (p.style === 'B4') types.add('shadow');
   if (p.style === 'B3') for (const type of ['group', 'path', 'rect', 'ellipse']) types.add(type);
   for (const [i, shot] of shots.entries()) {
@@ -96,6 +98,7 @@ export function loadProject(file, {seconds} = {}) {
     end = shot.end;
     if (p.style === 'B4' && shot.end - shot.start > 3.000001 &&
       !(shot.kind === 'exceptional_hold' && typeof shot.user_approval === 'string' && shot.user_approval.trim() && typeof shot.reason === 'string' && shot.reason.trim())) throw new Error('B4 narrative shots must be at most 3 seconds; exceptional holds require user_approval and reason');
+    if (p.theme === 'cyber') validateCyberShot(shot);
     if (!Array.isArray(shot.layers) || !shot.layers.length) throw new Error(`Shot ${i} has no layers`);
     if (p.style === 'B3') validateB3(shot.layers, p.television);
     for (const l of walkLayers(shot.layers)) {
@@ -105,9 +108,10 @@ export function loadProject(file, {seconds} = {}) {
       if (l.w !== undefined && l.w <= 0 || l.size !== undefined && l.size <= 0) throw new Error('Layer dimensions must be positive');
       if (l.type === 'shadow') { number(l.w, 'shadow width', 1, 10000); number(l.h, 'shadow height', 1, 10000); }
       if (l.type === 'image') { const f = mediaPath(base, l.path); if (!/\.(png|jpe?g)$/i.test(f)) throw new Error('Only PNG/JPEG image layers'); assets.add(f); }
-      if (l.type === 'pose') { if (p.style !== 'B1') throw new Error('B1 pose atlas cannot be used in another style; author story-specific image layers'); number(l.pose, 'pose', 0, 2); if (!Number.isInteger(l.pose)) throw new Error('Integer pose index required'); assets.add(mediaPath(base, '@b1/character-pose-sheet-v6.png')); }
+      if (l.type === 'pose') { if (p.style !== 'B1') throw new Error('B1 pose atlas cannot be used in another style; author story-specific image layers'); number(l.pose, 'pose', 0, 2); if (!Number.isInteger(l.pose)) throw new Error('Integer pose index required'); assets.add(mediaPath(base, (p.theme === 'cyber' || l.sheet === 'cyber') ? '@b1/character-pose-sheet-cyber.png' : '@b1/character-pose-sheet-v6.png')); }
       if (l.type === 'text' && (typeof l.text !== 'string' || !l.text.trim() || l.text.length > 400)) throw new Error('Text layer must be 1–400 characters');
       if (l.type === 'line' && (!Array.isArray(l.points) || l.points.length < 2 || l.points.some(pt => !Array.isArray(pt) || pt.length !== 2 || pt.some(n => !Number.isFinite(n))))) throw new Error('Line requires finite [x,y] points');
+      if (CYBER_LAYER_TYPES.includes(l.type)) validateCyberLayer(l);
       const span = shot.end - shot.start;
       number(l.from ?? 0, 'layer from', 0, span); number(l.to ?? span, 'layer to', l.from ?? 0, span);
       let previous = -1;
@@ -136,14 +140,14 @@ export function loadProject(file, {seconds} = {}) {
   }
   const sfx = scoped ? (p.sfx || []).filter(s => s.time < rangeEnd) : p.sfx || [];
   if (p.voice.contains_sfx && sfx.length) throw new Error('Already mixed voice must not receive duplicate SFX');
-  for (const s of sfx) { number(s.time, 'SFX time', 0, duration); number(s.gain, 'SFX gain', 0, p.style === 'B4' && s.kind === 'file' ? 1 : 0.3); if (!['tap', 'paper', 'pop', 'chime', 'jingle', 'alert', 'keyboard', 'glitch', 'lock', ...(p.style === 'B4' ? ['file'] : [])].includes(s.kind)) throw new Error('Unknown SFX'); }
+  for (const s of sfx) { number(s.time, 'SFX time', 0, duration); number(s.gain, 'SFX gain', 0, p.style === 'B4' && s.kind === 'file' ? 1 : 0.3); if (!['tap', 'paper', 'pop', 'chime', 'jingle', 'alert', 'keyboard', 'glitch', 'lock', ...(p.theme === 'cyber' ? CYBER_EXTRA_SFX : []), ...(p.style === 'B4' ? ['file'] : [])].includes(s.kind)) throw new Error('Unknown SFX'); }
   if (p.music) { assets.add(mediaPath(base, p.music.path)); number(p.music.gain, 'music gain', 0, 0.2); }
   const b4 = p.style === 'B4' ? prepareB4({...p, sfx}, {base, duration, rangeEnd, assets, mediaPath, probe}) : {};
   const timeline = {...p, shots, captions, sfx, ...b4};
   const project = {...timeline, file, base, voicePath, voiceDuration, voiceTrimStart, lead, tail, duration, rangeEnd};
   for (const f of Object.values(fontPaths(project))) { if (!fs.existsSync(f)) throw new Error(`Missing font: ${f}`); assets.add(f); }
   const inputs = [...assets].sort().map(f => ({path: f, sha256: hashFile(f)}));
-  const engine = ['autopilot-core.mjs', 'autopilot-render.mjs', 'b3-graphics.mjs', ...(p.style === 'B4' ? ['b4-runtime.mjs', 'b4-style-lock.mjs', 'b4-opening-audio-check.mjs'] : [])].map(f => hashFile(path.join(ROOT, 'scripts', f)));
+  const engine = ['autopilot-core.mjs', 'autopilot-render.mjs', 'b3-graphics.mjs', 'cyber-visuals.mjs', ...(p.style === 'B4' ? ['b4-runtime.mjs', 'b4-style-lock.mjs', 'b4-opening-audio-check.mjs'] : [])].map(f => hashFile(path.join(ROOT, 'scripts', f)));
   return {...project, inputs, fingerprint: sha(JSON.stringify({project: timeline, rangeEnd, inputs, engine}))};
 }
 export function outputDir(p) {

@@ -8,6 +8,15 @@ import {ROOT, FFMPEG, sha, hashFile, save, probe, run, mediaPath, fontPaths, out
 import {walkLayers, drawB3Shape, televisionFinish} from './b3-graphics.mjs';
 import {appendB4Audio} from './b4-runtime.mjs';
 import {checkOpeningFile} from './b4-opening-audio-check.mjs';
+import {
+  drawCyberAtmosphere,
+  drawCyberTopHud,
+  applyCyberCamera,
+  drawCyberTransitionOverlay,
+  drawCyberActor,
+  drawCyberWidget,
+  drawCyberCallout,
+} from './cyber-visuals.mjs';
 
 const clamp = x => Math.max(0, Math.min(1, x));
 const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
@@ -60,142 +69,20 @@ export async function painter(p) {
     ctx.fillStyle = p.backgroundColor || (isCyber ? '#0A0E17' : (['B3', 'B4'].includes(p.style) ? '#111316' : p.style === 'B2' ? '#f4f0e5' : '#FDFDFC'));
     ctx.fillRect(0, 0, plane.width, plane.height);
     if ((p.style === 'B1' || isCyber) && p.grid !== false) {
-      ctx.beginPath();
-      ctx.strokeStyle = isCyber ? 'rgba(0, 255, 128, 0.055)' : 'rgba(76,90,105,.036)';
-      ctx.lineWidth = 0.8;
-      for (let x = 32.5; x < plane.width; x += 64) { ctx.moveTo(x, 0); ctx.lineTo(x, captionBand - 1); }
-      for (let y = 16.5; y < captionBand; y += 64) { ctx.moveTo(0, y); ctx.lineTo(plane.width, y); }
-      ctx.stroke();
-    }
-    if (isCyber) {
-      // 1. Deterministic Animated Cyber Binary Rain (subtle motion & depth)
-      ctx.save();
-      ctx.font = '700 18px B1Caption';
-      ctx.textBaseline = 'top';
-      const cols = 16;
-      const colW = plane.width / cols;
-      for (let c = 0; c < cols; c++) {
-        const speed = 135 + ((c * 43) % 110);
-        const offset = (c * 317) % plane.height;
-        const baseY = (t * speed + offset) % (plane.height + 320) - 160;
-        for (let row = 0; row < 6; row++) {
-          const ch = ((c * 3 + row + Math.floor(t * 5)) % 2 === 0) ? '1' : '0';
-          ctx.fillStyle = `rgba(0, 255, 128, ${(0.085 - row * 0.012).toFixed(3)})`;
-          ctx.fillText(ch, c * colW + 26, baseY - row * 24);
-        }
-      }
-      ctx.restore();
-
-      // 1b. Dynamic Cyber Radar Scanline Sweep
-      ctx.save();
-      const scanY = (t * 210) % (plane.height - 520) + 220;
-      const scanGrad = ctx.createLinearGradient(0, scanY - 36, 0, scanY + 36);
-      scanGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
-      scanGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.055)');
-      scanGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
-      ctx.fillStyle = scanGrad;
-      ctx.fillRect(40, scanY - 36, plane.width - 80, 72);
-      ctx.restore();
-
-      // 1c. Holographic Cyber Deck Floor Horizon (grounds actors & workstations)
-      ctx.save();
-      const deckY = 1485;
-      const deckGlow = ctx.createLinearGradient(60, deckY, plane.width - 60, deckY);
-      deckGlow.addColorStop(0, 'rgba(0, 240, 255, 0)');
-      deckGlow.addColorStop(0.25, 'rgba(0, 240, 255, 0.28)');
-      deckGlow.addColorStop(0.5, 'rgba(0, 255, 128, 0.42)');
-      deckGlow.addColorStop(0.75, 'rgba(0, 240, 255, 0.28)');
-      deckGlow.addColorStop(1, 'rgba(0, 240, 255, 0)');
-      ctx.strokeStyle = deckGlow;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(60, deckY);
-      ctx.lineTo(plane.width - 60, deckY);
-      ctx.stroke();
-
-      // Perspective deck grid lines fading below the stage
-      const perspGrad = ctx.createLinearGradient(0, deckY, 0, deckY + 185);
-      perspGrad.addColorStop(0, 'rgba(0, 240, 255, 0.14)');
-      perspGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
-      ctx.strokeStyle = perspGrad;
-      ctx.lineWidth = 1.2;
-      for (let gx = 160; gx <= plane.width - 160; gx += 160) {
+      if (!isCyber) {
         ctx.beginPath();
-        ctx.moveTo(gx, deckY);
-        ctx.lineTo(gx + (gx - plane.width / 2) * 0.35, deckY + 185);
+        ctx.strokeStyle = 'rgba(76,90,105,.036)';
+        ctx.lineWidth = 0.8;
+        for (let x = 32.5; x < plane.width; x += 64) { ctx.moveTo(x, 0); ctx.lineTo(x, captionBand - 1); }
+        for (let y = 16.5; y < captionBand; y += 64) { ctx.moveTo(0, y); ctx.lineTo(plane.width, y); }
         ctx.stroke();
       }
-      ctx.beginPath();
-      ctx.moveTo(110, deckY + 48);
-      ctx.lineTo(plane.width - 110, deckY + 48);
-      ctx.moveTo(85, deckY + 108);
-      ctx.lineTo(plane.width - 85, deckY + 108);
-      ctx.stroke();
-      ctx.restore();
-
-      // 2. Cinematic Radial Cyber Vignette
-      const vig = ctx.createRadialGradient(plane.width / 2, plane.height * 0.45, plane.width * 0.25, plane.width / 2, plane.height * 0.45, plane.width * 0.85);
-      vig.addColorStop(0, 'rgba(0,0,0,0)');
-      vig.addColorStop(1, 'rgba(4, 8, 16, 0.72)');
-      ctx.fillStyle = vig;
-      ctx.fillRect(0, 0, plane.width, plane.height);
-
-      // 3. High-Tech Cyber HUD Corner Brackets
-      ctx.save();
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.50)';
-      ctx.lineWidth = 3.5;
-      const bLen = 42, bPad = 36;
-      // Top-Left
-      ctx.beginPath(); ctx.moveTo(bPad, bPad + bLen); ctx.lineTo(bPad, bPad); ctx.lineTo(bPad + bLen, bPad); ctx.stroke();
-      // Top-Right
-      ctx.beginPath(); ctx.moveTo(plane.width - bPad - bLen, bPad); ctx.lineTo(plane.width - bPad, bPad); ctx.lineTo(plane.width - bPad, bPad + bLen); ctx.stroke();
-      // Bottom-Left
-      ctx.beginPath(); ctx.moveTo(bPad, plane.height - bPad - bLen); ctx.lineTo(bPad, plane.height - bPad); ctx.lineTo(bPad + bLen, plane.height - bPad); ctx.stroke();
-      // Bottom-Right
-      ctx.beginPath(); ctx.moveTo(plane.width - bPad - bLen, plane.height - bPad); ctx.lineTo(plane.width - bPad, plane.height - bPad); ctx.lineTo(plane.width - bPad, plane.height - bPad - bLen); ctx.stroke();
-
-      // 4. Top Cyber Broadcast HUD (REC 4K UHD, Threat Intel & Progress Bar)
-      ctx.font = '700 24px B1Caption';
-      ctx.fillStyle = 'rgba(0, 240, 255, 0.85)';
-      ctx.textBaseline = 'top';
-      ctx.fillText('[ SİBER İSTİHBARAT ]', bPad + 12, bPad + 10);
-
-      const recBlink = Math.floor(t * 2) % 2 === 0 ? 0.95 : 0.30;
-      ctx.fillStyle = `rgba(255, 59, 48, ${recBlink})`;
-      ctx.beginPath();
-      ctx.arc(plane.width - bPad - 165, bPad + 22, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(255, 59, 48, 0.95)';
-      ctx.fillText('REC', plane.width - bPad - 148, bPad + 10);
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
-      ctx.fillText('4K UHD', plane.width - bPad - 95, bPad + 10);
-
-      // Subtle retention progress bar under top HUD
-      const barW = plane.width - (bPad + 12) * 2;
-      const pct = clamp(t / Math.max(0.1, p.duration || 30));
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.fillRect(bPad + 12, bPad + 44, barW, 3);
-      const barGrad = ctx.createLinearGradient(bPad + 12, 0, bPad + 12 + barW, 0);
-      barGrad.addColorStop(0, '#00F0FF');
-      barGrad.addColorStop(1, '#00FF66');
-      ctx.fillStyle = barGrad;
-      ctx.fillRect(bPad + 12, bPad + 44, barW * pct, 3);
-
-      // Micro Telemetry Bar & Equalizer Visualizer
-      ctx.font = '600 13px B1Caption';
-      ctx.fillStyle = 'rgba(0, 240, 255, 0.42)';
-      ctx.fillText('NODE 0x7F // SSL_TLS · AES-256 MONITORING', bPad + 12, bPad + 54);
-
-      for (let eq = 0; eq < 5; eq++) {
-        const eqH = 4 + Math.abs(Math.sin(t * (7 + eq * 2.3) + eq)) * 11;
-        ctx.fillStyle = 'rgba(0, 255, 102, 0.65)';
-        ctx.fillRect(plane.width - bPad - 44 + eq * 6, bPad + 66 - eqH, 3.5, eqH);
-      }
-      ctx.restore();
     }
     const shot = p.shots.find(s => t >= s.start && t < s.end) || p.shots.at(-1);
+    const dtShot = t - shot.start;
+    if (isCyber) {
+      drawCyberAtmosphere(ctx, plane, t, shot, dtShot);
+    }
     function paintLayers(layers) { for (const layer of layers) {
       const dt = t - shot.start;
       if (dt < (layer.from || 0) || dt >= (layer.to ?? Infinity)) continue;
@@ -205,6 +92,9 @@ export async function painter(p) {
       ctx.translate(px, py); ctx.rotate(l.angle || 0); ctx.scale(l.scaleX ?? 1, l.scaleY ?? 1); ctx.translate(-px, -py);
       if (l.type === 'group') paintLayers(l.children);
       else if (['path', 'rect', 'ellipse'].includes(l.type)) drawB3Shape(ctx, l);
+      else if (l.type === 'cyber_actor') drawCyberActor(ctx, l, dt, t);
+      else if (l.type === 'cyber_widget') drawCyberWidget(ctx, l, dt, t);
+      else if (l.type === 'cyber_callout') drawCyberCallout(ctx, l, dt);
       else if (l.type === 'image') {
         const img = images.get(mediaPath(p.base, l.path)), h = l.h || w * img.height / img.width;
         const scale = Math.min(w / img.width, h / img.height);
@@ -282,7 +172,16 @@ export async function painter(p) {
       }
       ctx.restore();
     } }
-    paintLayers(shot.layers);
+    if (isCyber) {
+      ctx.save();
+      applyCyberCamera(ctx, plane, shot, dtShot);
+      paintLayers(shot.layers);
+      ctx.restore();
+      drawCyberTransitionOverlay(ctx, plane, shot, dtShot);
+      drawCyberTopHud(ctx, plane, t, p.duration);
+    } else {
+      paintLayers(shot.layers);
+    }
     if (sceneCopy && p.television?.enabled !== false) {
       sceneCopy.getContext('2d').drawImage(canvas, 0, 0);
       televisionFinish(ctx, sceneCopy, p.width, p.height, p.television?.intensity ?? 0.45);
@@ -294,7 +193,9 @@ export async function painter(p) {
       ctx.font = `${isModern ? 800 : (p.style === 'B2' ? 500 : 600)} ${fontSize}px B1Caption`;
       ctx.textBaseline = 'middle';
       if (/[\r\n]/.test(cue.text)) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
-      const textToDisplay = (isModern && p.captionUppercase !== false) ? cue.text.toUpperCase() : (p.style === 'B3' ? cue.text.toUpperCase() : cue.text);
+      const textToDisplay = (isModern && p.captionUppercase !== false)
+        ? (isCyber ? cue.text.toLocaleUpperCase('tr-TR') : cue.text.toUpperCase())
+        : (p.style === 'B3' ? cue.text.toUpperCase() : cue.text);
       const lines = wrap(ctx, textToDisplay, 1120);
       if (lines.length > 1) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
       const cy = p.captionY !== undefined ? p.captionY : (isModern ? Math.round(plane.height * 0.72) : plane.height - 60);
@@ -322,32 +223,42 @@ export async function painter(p) {
           const spaceW = ctx.measureText(' ').width;
           let curX = 640 - textWidth / 2;
           for (const wObj of words) {
-            const wText = (p.captionUppercase !== false) ? wObj.word.toUpperCase() : wObj.word;
+            const wText = (p.captionUppercase !== false)
+              ? (isCyber ? wObj.word.toLocaleUpperCase('tr-TR') : wObj.word.toUpperCase())
+              : wObj.word;
             const wWidth = ctx.measureText(wText).width;
             const isActive = t >= wObj.start && t < wObj.end;
             const drawY = isActive && isCyber ? cy - 3 : cy;
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 6;
-            ctx.strokeText(wText, curX, drawY);
-            if (isActive) {
+            if (isActive && isCyber) {
+              const popT = clamp((t - wObj.start) / 0.12);
+              const popScale = 1 + 0.09 * Math.sin(popT * Math.PI);
               let activeColor = p.captionActiveColor || '#FFE500';
-              if (isCyber) {
-                if (/(HACKER|ŞİFRE|ÇALIN|SAHTE|TUZA[ĞG]|TEHLİKE|SIZDIR|KAYIP|PANİK|SIFIRLAN|SALDIR|KRİPT|KIRMAK|AĞDAN|HEDİYE|ATLAR|KÖTÜ|BOŞALT|VİRÜS)/.test(wText)) {
-                  activeColor = '#FF3B4E';
-                } else if (/(2FA|KORU|GÜVEN|DOĞRULAMA|ŞİMDİ|VPN|UYANIK|KALKAN|AVCI|GÜÇLÜ|TAKİP|AÇ|PAROLA)/.test(wText)) {
-                  activeColor = '#00FF66';
-                } else {
-                  activeColor = '#00F0FF';
-                }
+              if (/(HACKER|ŞİFRE|ÇALIN|SAHTE|TUZA[ĞG]|TEHLİKE|SIZDIR|KAYIP|PANİK|SIFIRLAN|SALDIR|KRİPT|KIRMAK|AĞDAN|HEDİYE|ATLAR|KÖTÜ|BOŞALT|VİRÜS|FİDYE|İHLAL|KOPYA|ELE|ASLA|SIZINTI|DARK)/.test(wText)) {
+                activeColor = '#FF3B4E';
+              } else if (/(2FA|KORU|GÜVEN|DOĞRULAMA|ŞİMDİ|VPN|UYANIK|KALKAN|AVCI|GÜÇLÜ|TAKİP|AÇ|PAROLA|PASSKEY|AUTHENTICATOR|YEDEK|PARAMETRİK|KONTROL|KİLİTLE)/.test(wText)) {
+                activeColor = '#00FF66';
+              } else if (/^(?:\d+|[0-9]+%|BİR|İKİ|ÜÇ|DÖRT|BEŞ|ALTI|SANİYE|DAKİKA|YIL|HANE|TEK|HEMEN|DİKKAT|DUR)$/.test(wText)) {
+                activeColor = '#FFE500';
+              } else {
+                activeColor = '#00F0FF';
               }
               ctx.save();
+              ctx.translate(curX + wWidth / 2, drawY);
+              ctx.scale(popScale, popScale);
+              ctx.textAlign = 'center';
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 6;
+              ctx.strokeText(wText, 0, 0);
               ctx.shadowColor = activeColor;
               ctx.shadowBlur = 16;
               ctx.fillStyle = activeColor;
-              ctx.fillText(wText, curX, drawY);
+              ctx.fillText(wText, 0, 0);
               ctx.restore();
             } else {
-              ctx.fillStyle = '#FFFFFF';
+              ctx.strokeStyle = '#000000';
+              ctx.lineWidth = 6;
+              ctx.strokeText(wText, curX, drawY);
+              ctx.fillStyle = isActive ? (p.captionActiveColor || '#FFE500') : '#FFFFFF';
               ctx.fillText(wText, curX, drawY);
             }
             curX += wWidth + spaceW;
@@ -466,15 +377,15 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     }
     const cache = path.join(out, 'cache'); fs.mkdirSync(cache, {recursive: true});
     const frame = await painter(p), clips = []; let reused = 0;
-    const rendererHash = sha(['autopilot-render.mjs', 'b3-graphics.mjs'].map(f => hashFile(path.join(ROOT, 'scripts', f))).join(':'));
+    const rendererHash = sha(['autopilot-render.mjs', 'b3-graphics.mjs', 'cyber-visuals.mjs'].map(f => hashFile(path.join(ROOT, 'scripts', f))).join(':'));
     for (const [i, shot] of p.shots.entries()) {
       const first = Math.round(shot.start * p.fps), last = Math.min(count, i === p.shots.length - 1 ? count : Math.round(shot.end * p.fps)); if (last <= first) continue;
       const files = new Set(Object.values(fontPaths(p)));
       for (const layer of walkLayers(shot.layers)) {
         if (layer.type === 'image') files.add(mediaPath(p.base, layer.path));
-        if (layer.type === 'pose') files.add(mediaPath(p.base, '@b1/character-pose-sheet-v6.png'));
+        if (layer.type === 'pose') files.add(mediaPath(p.base, (p.theme === 'cyber' || layer.sheet === 'cyber') ? '@b1/character-pose-sheet-cyber.png' : '@b1/character-pose-sheet-v6.png'));
       }
-      const key = sha(JSON.stringify({shot, first, last, style: p.style, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionSize: p.captionSize, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
+      const key = sha(JSON.stringify({shot, first, last, style: p.style, theme: p.theme, backgroundColor: p.backgroundColor, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionStyle: p.captionStyle, captionSize: p.captionSize, captionY: p.captionY, captionColor: p.captionColor, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
       const clip = path.join(cache, `${key}.mp4`); let valid = false;
       if (fs.existsSync(clip)) try { const info = probe(clip); valid = Number(info.streams[0].nb_frames) === last - first; } catch {}
       if (valid) {
