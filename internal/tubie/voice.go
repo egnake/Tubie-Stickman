@@ -2,6 +2,7 @@ package tubie
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -50,9 +51,31 @@ func GetAudioDuration(filePath string) (float64, error) {
 	return val, nil
 }
 
-// SynthesizeEdgeTTS generates speech via edge-tts CLI, applies vocal compression/loudnorm,
-// and converts it to 24000Hz mono WAV.
+// BuildViralVocalFilter constructs the FFmpeg broadcast mastering chain:
+// silence tightening (zero dead air at 0:00, crisp inter-sentence pacing), studio EQ, compression, and -15 LUFS normalization.
+func BuildViralVocalFilter(atempo float64) string {
+	parts := make([]string, 0, 7)
+	if atempo > 0 && atempo != 1.0 {
+		parts = append(parts, fmt.Sprintf("atempo=%.2f", atempo))
+	}
+	parts = append(parts,
+		"silenceremove=start_periods=1:start_silence=0.02:start_threshold=-42dB:stop_periods=-1:stop_duration=0.28:stop_silence=0.14:stop_threshold=-42dB",
+		"highpass=f=75",
+		"equalizer=f=145:t=q:w=1.2:g=2.0",
+		"equalizer=f=3200:t=q:w=1.4:g=2.4",
+		"acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60",
+		"loudnorm=I=-15:TP=-1.5:LRA=9",
+	)
+	return strings.Join(parts, ",")
+}
+
+// SynthesizeEdgeTTS generates speech via edge-tts CLI, applies viral mastering, and converts to 24kHz mono WAV.
 func SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav string) (float64, error) {
+	return SynthesizeEdgeTTSContext(context.Background(), text, voiceName, rate, pitch, outWav)
+}
+
+// SynthesizeEdgeTTSContext synthesizes speech via edge-tts CLI with cancellation support.
+func SynthesizeEdgeTTSContext(ctx context.Context, text, voiceName, rate, pitch, outWav string) (float64, error) {
 	if voiceName == "" {
 		voiceName = "tr-TR-AhmetNeural"
 	}
@@ -74,10 +97,10 @@ func SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav string) (float64, er
 	// Determine edge-tts runner (either binary or python -m edge_tts)
 	var edgeCmd *exec.Cmd
 	if p, err := exec.LookPath("edge-tts"); err == nil {
-		edgeCmd = exec.Command(p, "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
+		edgeCmd = exec.CommandContext(ctx, p, "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
 	} else {
 		pyExe := BinaryPath("python")
-		edgeCmd = exec.Command(pyExe, "-m", "edge_tts", "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
+		edgeCmd = exec.CommandContext(ctx, pyExe, "-m", "edge_tts", "--voice", voiceName, "--rate", rate, "--pitch", pitch, "--text", text, "--write-media", tempMp3)
 	}
 
 	var stderr bytes.Buffer
@@ -90,10 +113,9 @@ func SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav string) (float64, er
 		return 0, err
 	}
 
-	// High-impact broadcast vocal chain: dynamic compression + loudness normalization to -16 LUFS
 	ffmpeg := BinaryPath("ffmpeg")
-	convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", tempMp3,
-		"-af", "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10",
+	convCmd := exec.CommandContext(ctx, ffmpeg, "-v", "error", "-y", "-i", tempMp3,
+		"-af", BuildViralVocalFilter(1.0),
 		"-ar", "24000", "-ac", "1", outWav)
 	if out, err := convCmd.CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("ffmpeg mp3 to wav conversion failed: %v: %s", err, string(out))
@@ -115,11 +137,7 @@ func ClonedVoiceTiming(voiceStyle string) (xttsSpeed float64, atempo float64) {
 
 // BuildClonedAudioFilter constructs the FFmpeg audio filter chain for cloned voice polishing and tempo.
 func BuildClonedAudioFilter(atempo float64) string {
-	base := "acompressor=threshold=-16dB:ratio=3.5:attack=10:release=60,loudnorm=I=-16:TP=-1.5:LRA=10"
-	if atempo > 0 && atempo != 1.0 {
-		return fmt.Sprintf("atempo=%.2f,%s", atempo, base)
-	}
-	return base
+	return BuildViralVocalFilter(atempo)
 }
 
 func normalizeSpeechText(text string) string {
@@ -128,8 +146,28 @@ func normalizeSpeechText(text string) string {
 	return strings.Join(fields, " ")
 }
 
+// xttsScript reads UTF-8 JSON arguments from stdin (eliminating code string interpolation).
+const xttsScript = `import json, sys
+args = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+from TTS.api import TTS
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
+tts.tts_to_file(
+    text=args["text"],
+    speaker_wav=args["speaker_wav"],
+    language="tr",
+    file_path=args["file_path"],
+    speed=float(args["speed"]),
+    repetition_penalty=4.5,
+)
+`
+
 // SynthesizeVoice handles voice generation for pro, cloned, or auto modes with custom voice styling.
 func SynthesizeVoice(text string, outWav string, mode string, voiceStyle string, root string) (float64, string, error) {
+	return SynthesizeVoiceContext(context.Background(), text, outWav, mode, voiceStyle, root)
+}
+
+// SynthesizeVoiceContext synthesizes narration with context cancellation and mastering.
+func SynthesizeVoiceContext(ctx context.Context, text string, outWav string, mode string, voiceStyle string, root string) (float64, string, error) {
 	sesimWav := filepath.Join(root, "sesim.wav")
 	modeUsed := mode
 
@@ -151,31 +189,25 @@ func SynthesizeVoice(text string, outWav string, mode string, voiceStyle string,
 		rawClonedWav := filepath.Join(filepath.Dir(outWav), "raw_cloned.wav")
 		defer os.Remove(rawClonedWav)
 
-		textJSON, _ := json.Marshal(normalizeSpeechText(text))
-		speakerJSON, _ := json.Marshal(sesimWav)
-		outJSON, _ := json.Marshal(rawClonedWav)
+		payload, err := json.Marshal(map[string]any{
+			"text":        normalizeSpeechText(text),
+			"speaker_wav": sesimWav,
+			"file_path":   rawClonedWav,
+			"speed":       xttsSpeed,
+		})
+		if err != nil {
+			return 0, "", err
+		}
 
-		pyCode := fmt.Sprintf(`import json
-from TTS.api import TTS
-tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cpu")
-tts.tts_to_file(
-    text=json.loads(%q),
-    speaker_wav=json.loads(%q),
-    language="tr",
-    file_path=json.loads(%q),
-    speed=%.2f,
-    repetition_penalty=4.5,
-)
-`, string(textJSON), string(speakerJSON), string(outJSON), xttsSpeed)
-
-		cmd := exec.Command(BinaryPath("python"), "-c", pyCode)
+		cmd := exec.CommandContext(ctx, BinaryPath("python"), "-c", xttsScript)
+		cmd.Stdin = bytes.NewReader(payload)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return 0, "", fmt.Errorf("XTTS synthesis failed: %v: %s", err, string(out))
 		}
 
-		// Apply pitch-preserving speedup + broadcast compression and loudnorm
+		// Apply pitch-preserving speedup + silence tightening + broadcast EQ and loudnorm
 		ffmpeg := BinaryPath("ffmpeg")
-		convCmd := exec.Command(ffmpeg, "-v", "error", "-y", "-i", rawClonedWav,
+		convCmd := exec.CommandContext(ctx, ffmpeg, "-v", "error", "-y", "-i", rawClonedWav,
 			"-af", BuildClonedAudioFilter(atempo),
 			"-ar", "24000", "-ac", "1", outWav)
 		if out, err := convCmd.CombinedOutput(); err != nil {
@@ -205,6 +237,6 @@ tts.tts_to_file(
 		pitch = "+0Hz"
 	}
 
-	dur, err := SynthesizeEdgeTTS(text, voiceName, rate, pitch, outWav)
+	dur, err := SynthesizeEdgeTTSContext(ctx, text, voiceName, rate, pitch, outWav)
 	return dur, "pro", err
 }

@@ -933,11 +933,10 @@ func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64,
 	sfxList := make([]map[string]any, 0, numScenes*5)
 
 	// Opening hook punch (0.02s)
-	sfxList = append(sfxList, map[string]any{
-		"time": 0.02,
-		"kind": "pop",
-		"gain": 0.20,
-	})
+	sfxList = append(sfxList,
+		map[string]any{"time": 0.02, "kind": "boom", "gain": 0.22},
+		map[string]any{"time": 0.04, "kind": "pop", "gain": 0.16},
+	)
 
 	for i, rawSc := range scenes {
 		sc := inferSceneVisuals(rawSc, i, numScenes, "", "")
@@ -949,26 +948,35 @@ func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64,
 		}
 		tSwitch := math.Round(math.Min(shotLen*0.44, 1.85)*1000) / 1000
 
-		// 1. Scene transition whoosh/pop
+		// 1. Scene transition whoosh + paper texture (always monotonic)
 		if i > 0 {
 			tCut := math.Round((start+0.02)*1000) / 1000
 			if tCut < totalDuration-0.1 {
 				sfxList = append(sfxList, map[string]any{
 					"time": tCut,
+					"kind": "whoosh",
+					"gain": 0.17,
+				})
+			}
+		} else {
+			tIntroSwipe := math.Round((start+0.12)*1000) / 1000
+			if tIntroSwipe < totalDuration-0.1 {
+				sfxList = append(sfxList, map[string]any{
+					"time": tIntroSwipe,
 					"kind": "paper",
-					"gain": 0.14,
+					"gain": 0.13,
 				})
 			}
 		}
 
 		// 2. Pre-twist/danger riser
 		if i > 0 && (sc.Mood == "danger" || sc.Mood == "breach" || sc.Mood == "twist") && start > 0.65 {
-			tRise := math.Round((start-0.45)*1000) / 1000
+			tRise := math.Round((start-0.48)*1000) / 1000
 			if tRise >= 0.05 && tRise < totalDuration-0.15 {
 				sfxList = append(sfxList, map[string]any{
 					"time": tRise,
-					"kind": "pop",
-					"gain": 0.14,
+					"kind": "riser",
+					"gain": 0.15,
 				})
 			}
 		}
@@ -978,19 +986,21 @@ func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64,
 		if actionTime < totalDuration-0.1 {
 			kind := sc.SFX
 			if kind == "" {
-				switch sc.Mood {
-				case "hook":
+				switch sc.VisualType {
+				case "notification":
+					kind = "notification"
+				case "terminal":
 					kind = "keyboard"
-				case "danger":
-					kind = "alert"
-				case "breach":
-					kind = "glitch"
-				case "twist":
-					kind = "chime"
-				case "defense":
-					kind = "lock"
+				case "threat_meter":
+					kind = "heartbeat"
+				case "url_inspect", "network_mitm":
+					kind = "radar"
+				case "checklist":
+					kind = "shield"
+				case "versus":
+					kind = "buzz"
 				default:
-					kind = "jingle"
+					kind = "alert"
 				}
 			}
 
@@ -1006,9 +1016,10 @@ func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64,
 						})
 					}
 				}
-			case "alert", "glitch", "lock", "chime", "jingle", "paper", "pop", "tap":
+			case "alert", "glitch", "lock", "chime", "jingle", "paper", "pop", "tap",
+				"whoosh", "riser", "boom", "notification", "heartbeat", "radar", "shield", "buzz":
 				gain := 0.19
-				if kind == "alert" || kind == "glitch" || kind == "lock" || kind == "jingle" {
+				if kind == "alert" || kind == "glitch" || kind == "lock" || kind == "jingle" || kind == "boom" || kind == "shield" {
 					gain = 0.21
 				}
 				sfxList = append(sfxList, map[string]any{
@@ -1025,13 +1036,13 @@ func BuildSoundDesignWithTimings(scenes []SceneDefinition, boundaries []float64,
 			}
 		}
 
-		// 4. Micro-reaction / callout pop cue
+		// 4. Callout stamp pop cue
 		tSec := math.Round((start+tSwitch+0.16)*1000) / 1000
 		if tSec < totalDuration-0.1 {
 			sfxList = append(sfxList, map[string]any{
 				"time": tSec,
-				"kind": "tap",
-				"gain": 0.14,
+				"kind": "pop",
+				"gain": 0.15,
 			})
 		}
 	}

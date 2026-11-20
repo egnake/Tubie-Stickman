@@ -306,9 +306,13 @@ async function encode(p, frame, start, frames, target, onFrame) {
 function makeSfx(p, file, duration) {
   const rate = 48000, n = Math.ceil(duration * rate), samples = new Float32Array(n);
   let seed = 8731; const noise = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296 * 2 - 1; };
+  const sfxLen = {
+    jingle: 0.52, chime: 0.55, alert: 0.42, keyboard: 0.12, glitch: 0.28, lock: 0.35, paper: 0.22,
+    whoosh: 0.24, riser: 0.65, boom: 0.55, notification: 0.32, heartbeat: 0.50, radar: 0.42, shield: 0.48, buzz: 0.26,
+  };
   for (const s of p.sfx || []) {
     if (s.kind === 'file') continue;
-    const len = s.kind === 'jingle' ? 0.52 : s.kind === 'chime' ? 0.55 : s.kind === 'alert' ? 0.42 : s.kind === 'keyboard' ? 0.12 : s.kind === 'glitch' ? 0.28 : s.kind === 'lock' ? 0.35 : s.kind === 'paper' ? 0.22 : 0.12;
+    const len = sfxLen[s.kind] || 0.12;
     for (let i = 0; i < len * rate; i++) {
       const index = Math.round(s.time * rate) + i; if (index >= n) break;
       const t = i / rate;
@@ -329,6 +333,47 @@ function makeSfx(p, file, duration) {
       }
       else if (s.kind === 'lock') {
         value = (Math.sin(2 * Math.PI * 115 * t) * 0.6 + noise() * 0.4) * Math.exp(-t * 12);
+      }
+      else if (s.kind === 'whoosh') {
+        const env = Math.sin(Math.PI * (t / 0.24));
+        const sweep = Math.sin(2 * Math.PI * (240 + 1100 * (t / 0.24)) * t) * 0.35 + noise() * 0.65;
+        value = sweep * env * 0.85;
+      }
+      else if (s.kind === 'riser') {
+        const prog = t / 0.65;
+        const freq = 180 + prog * prog * 1450;
+        value = (Math.sin(2 * Math.PI * freq * t) * 0.55 + noise() * 0.35 * prog) * prog * Math.exp(-(0.65 - t) * 2.5);
+      }
+      else if (s.kind === 'boom') {
+        const sub = Math.sin(2 * Math.PI * (76 - 48 * Math.min(1, t * 2.4)) * t) * Math.exp(-t * 4.8);
+        const punch = Math.sin(2 * Math.PI * 260 * t) * Math.exp(-t * 32) * 0.45;
+        value = Math.tanh((sub + punch) * 1.4);
+      }
+      else if (s.kind === 'notification') {
+        const n1 = Math.sin(2 * Math.PI * 1046.5 * t) * Math.exp(-t * 16);
+        const q = t - 0.095;
+        const n2 = q >= 0 ? Math.sin(2 * Math.PI * 1318.5 * q) * Math.exp(-q * 11) : 0;
+        value = (n1 * 0.6 + n2 * 0.8);
+      }
+      else if (s.kind === 'heartbeat') {
+        const b1 = t < 0.16 ? Math.sin(2 * Math.PI * (60 - 110 * t) * t) * Math.exp(-t * 18) : 0;
+        const q = t - 0.19;
+        const b2 = q >= 0 ? Math.sin(2 * Math.PI * (66 - 100 * q) * q) * Math.exp(-q * 14) : 0;
+        value = (b1 + b2 * 0.85);
+      }
+      else if (s.kind === 'radar') {
+        value = (Math.sin(2 * Math.PI * 1480 * t) * 0.68 + Math.sin(2 * Math.PI * 2960 * t) * 0.22) * Math.exp(-t * 8.5);
+      }
+      else if (s.kind === 'shield') {
+        value = 0;
+        for (const [delay, f] of [[0, 523.25], [0.06, 659.25], [0.12, 783.99], [0.19, 1046.5]]) {
+          const q = t - delay;
+          if (q >= 0) value += Math.sin(2 * Math.PI * f * q) * 0.35 * Math.exp(-q * 9);
+        }
+      }
+      else if (s.kind === 'buzz') {
+        const sq = Math.sign(Math.sin(2 * Math.PI * 145 * t)) * 0.45 + noise() * 0.35;
+        value = sq * Math.exp(-t * 9);
       }
       else if (s.kind === 'jingle') {
         value = 0;
@@ -403,11 +448,24 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     const list = path.join(cache, 'concat.txt'); fs.writeFileSync(list, clips.map(concatFileLine).join('\n') + '\n');
     const args = ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-i', p.voicePath];
     const trim = p.voiceTrimStart ? `atrim=start=${p.voiceTrimStart},asetpts=PTS-STARTPTS,` : '';
-    const filters = [`[1:a]${trim}adelay=${Math.round(p.lead * 1000)}:all=1,apad,atrim=0:${count / p.fps}[voice]`], mixes = ['[voice]'], backgrounds = [];
+    const useSidechain = p.theme === 'cyber' && Boolean(p.music);
+    const voiceChain = useSidechain
+      ? `[1:a]${trim}adelay=${Math.round(p.lead * 1000)}:all=1,apad,atrim=0:${count / p.fps},aformat=sample_rates=48000:channel_layouts=stereo,asplit=2[voice][voice_sc]`
+      : `[1:a]${trim}adelay=${Math.round(p.lead * 1000)}:all=1,apad,atrim=0:${count / p.fps}[voice]`;
+    const filters = [voiceChain], mixes = ['[voice]'], backgrounds = [];
     const effects = p.style === 'B4' ? backgrounds : mixes; let idx = 2;
     if (p.sfx?.some(s => s.kind !== 'file')) { const f = path.join(cache, 'sfx.wav'); makeSfx(p, f, count / p.fps); args.push('-i', f); effects.push(`[${idx++}:a]`); }
     if (p.style === 'B4') idx = appendB4Audio(p, args, filters, mixes, backgrounds, idx);
-    if (p.music) { args.push('-stream_loop', '-1', '-i', mediaPath(p.base, p.music.path)); filters.push(`[${idx++}:a]volume=${p.music.gain}[music]`); effects.push('[music]'); }
+    if (p.music) {
+      args.push('-stream_loop', '-1', '-i', mediaPath(p.base, p.music.path));
+      if (useSidechain) {
+        filters.push(`[${idx++}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${p.music.gain}[music_raw]`);
+        filters.push('[music_raw][voice_sc]sidechaincompress=threshold=0.035:ratio=6:attack=25:release=260:makeup=1[music]');
+      } else {
+        filters.push(`[${idx++}:a]volume=${p.music.gain}[music]`);
+      }
+      effects.push('[music]');
+    }
     if (backgrounds.length) {
       const cuts = p.audio_cuts.map(cut => `volume=0:enable='gte(t,${cut.start})*lt(t,${cut.end})'`);
       filters.push(`${backgrounds.join('')}amix=inputs=${backgrounds.length}:normalize=0:duration=longest${cuts.length ? ',' + cuts.join(',') : ''}[background]`);
