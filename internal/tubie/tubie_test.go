@@ -26,11 +26,11 @@ func TestFindRoot(t *testing.T) {
 
 func TestPresets(t *testing.T) {
 	presets := tubie.PresetList()
-	if len(presets) != 4 {
-		t.Fatalf("expected 4 presets, got %d", len(presets))
+	if len(presets) != 10 {
+		t.Fatalf("expected 10 presets, got %d", len(presets))
 	}
 	for _, p := range presets {
-		if p.ID == "" || p.Title == "" || p.Slug == "" || p.Narration == "" {
+		if p.ID == "" || p.Title == "" || p.Slug == "" || p.Narration == "" || p.Category == "" {
 			t.Errorf("incomplete preset data: %+v", p)
 		}
 	}

@@ -361,13 +361,13 @@ func invokeG4F(ctx context.Context, req g4fRequest) (*g4fResponse, error) {
 	return &resp, nil
 }
 
-func generateScriptViaG4F(topic, style string) (*ScriptResult, error) {
+func generateScriptViaG4F(topic string, opts ScriptOptions) (*ScriptResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), g4fRunnerTimeout)
 	defer cancel()
 
 	noBrowser := strings.TrimSpace(os.Getenv("TUBIE_G4F_NO_BROWSER")) == "1"
 	sysPrompt := "You are a strict JSON API that writes Turkish cybersecurity short-video scripts. Reply ONLY with one valid JSON object. Never output markdown fences, explanations, or placeholder text."
-	userPrompt := buildScriptSystemPrompt(topic, style)
+	userPrompt := buildScriptSystemPromptWithOptions(topic, opts)
 
 	resp, err := invokeG4F(ctx, g4fRequest{
 		Task:         "script",
@@ -380,7 +380,7 @@ func generateScriptViaG4F(topic, style string) (*ScriptResult, error) {
 		return nil, err
 	}
 
-	return parseAndNormalizeScript(resp.JSON, topic, style, resp.Engine)
+	return parseAndNormalizeScript(resp.JSON, topic, opts.Style, resp.Engine)
 }
 
 func generateViralViaG4F(title, narration string) (*ViralMetadata, error) {

@@ -30,13 +30,18 @@ type SceneProp struct {
 
 // SceneDefinition is the high-level specification of a single video scene.
 type SceneDefinition struct {
-	Title     string          `json:"title"`
-	Color     string          `json:"color"`
-	Underline bool            `json:"underline"`
-	SFX       string          `json:"sfx"`
-	Stickmen  []StickmanActor `json:"stickmen,omitempty"`
-	Prop      *SceneProp      `json:"prop,omitempty"`
-	Arrow     bool            `json:"arrow"`
+	Title      string          `json:"title"`
+	Color      string          `json:"color"`
+	Underline  bool            `json:"underline"`
+	SFX        string          `json:"sfx"`
+	Stickmen   []StickmanActor `json:"stickmen,omitempty"`
+	Prop       *SceneProp      `json:"prop,omitempty"`
+	Arrow      bool            `json:"arrow"`
+	VisualType string          `json:"visual_type,omitempty"`
+	Mood       string          `json:"mood,omitempty"`
+	Camera     string          `json:"camera,omitempty"`
+	Callout    string          `json:"callout,omitempty"`
+	VisualData map[string]any  `json:"visual_data,omitempty"`
 }
 
 // BuildStoryboard compiles high-level scene definitions into rich autopilot shots with micro-acting and cyber staging.
