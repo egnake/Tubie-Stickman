@@ -31,10 +31,12 @@ type StudioServer struct {
 	server   *http.Server
 	port     int
 
-	mu       sync.RWMutex
-	job      map[string]any
-	logs     []map[string]any
-	revision int
+	mu          sync.RWMutex
+	thumbMu     sync.Mutex
+	job         map[string]any
+	logs        []map[string]any
+	revision    int
+	refRevision int64
 
 	approveChan chan struct{}
 	cancelCtx   context.Context
@@ -88,7 +90,8 @@ func NewStudioServer(root string, port int) (*StudioServer, error) {
 	mux.HandleFunc(s.prefix+"media/", s.handleMedia)
 
 	s.server = &http.Server{
-		Handler: s.securityMiddleware(mux),
+		Handler:           s.securityMiddleware(mux),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	return s, nil
@@ -173,7 +176,7 @@ func (s *StudioServer) securityMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
 
 		next.ServeHTTP(w, r)
 	})
@@ -222,6 +225,7 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 	jobSnap := cloneJobMap(s.job)
 	logsSnap := make([]map[string]any, len(s.logs))
 	copy(logsSnap, s.logs)
+	refRev := s.refRevision
 	s.mu.RUnlock()
 
 	// List files in output directory (both organized subdirectories and legacy root files)
@@ -314,10 +318,11 @@ func (s *StudioServer) handleState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"job":       jobSnap,
-		"logs":      logsSnap,
-		"outputs":   outputs,
-		"reference": hasRef,
+		"job":                jobSnap,
+		"logs":               logsSnap,
+		"outputs":            outputs,
+		"reference":          hasRef,
+		"reference_revision": refRev,
 	})
 }
 
@@ -412,7 +417,7 @@ func (s *StudioServer) handleAIGenerate(w http.ResponseWriter, r *http.Request) 
 
 	style := NormalizeScriptStyle(req.Style)
 	s.log(fmt.Sprintf("Yapay zeka senaryo üretiyor [%s, loop=%v]: %q...", style, req.LoopEnding, prompt))
-	result, err := GenerateScriptWithOptions(prompt, ScriptOptions{
+	result, err := GenerateScriptContext(r.Context(), prompt, ScriptOptions{
 		Style:      style,
 		LoopEnding: req.LoopEnding,
 	})
@@ -497,6 +502,9 @@ func (s *StudioServer) handleThumbnailPreview(w http.ResponseWriter, r *http.Req
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
+
+	s.thumbMu.Lock()
+	defer s.thumbMu.Unlock()
 
 	out9x16 := filepath.Join(previewDir, "preview-9x16.jpg")
 	if err := GenerateDedicatedThumbnailWithOptions(s.root, title, topic, "", 2, ThumbnailOptions{
@@ -586,6 +594,7 @@ func (s *StudioServer) handleJob(w http.ResponseWriter, r *http.Request) {
 		"stage":       "starting",
 		"label":       "İşlem başlatılıyor",
 		"action":      req.Action,
+		"presets":     append([]string(nil), req.Presets...),
 		"voice_style": req.VoiceStyle,
 		"format":      fmtSpec.Name,
 		"loop_ending": req.LoopEnding,
@@ -617,7 +626,7 @@ func (s *StudioServer) runJob(action string, presets []string, mode, voiceStyle,
 
 	if action == "doctor" {
 		s.log("Ortam kontrolü başlatılıyor...")
-		code := Doctor(s.root)
+		code := DoctorWithLogger(s.root, s.log)
 		if code == 0 {
 			s.log("Ortam kontrolü başarıyla tamamlandı.")
 		} else {
@@ -795,9 +804,14 @@ func (s *StudioServer) handleVoiceUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 50*1024*1024))
+	const maxVoiceUploadBytes = 50 * 1024 * 1024
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxVoiceUploadBytes+1))
 	if err != nil || len(body) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "Boş veya geçersiz ses verisi"})
+		return
+	}
+	if len(body) > maxVoiceUploadBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"error": "Ses dosyası en fazla 50 MB olabilir."})
 		return
 	}
 
@@ -821,14 +835,31 @@ func (s *StudioServer) handleVoiceUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	s.mu.Lock()
+	s.refRevision = time.Now().UnixNano()
+	rev := s.refRevision
+	s.mu.Unlock()
+
 	s.log("Yeni ses referansı yüklendi: sesim.wav")
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reference_revision": rev})
 }
 
 func (s *StudioServer) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
+
+	s.mu.Lock()
+	cancel := s.cancelFunc
+	if cancel != nil && (s.job["status"] == "running" || s.job["status"] == "approval") {
+		s.job["status"] = "stopping"
+		s.job["label"] = "Uygulama kapatılıyor"
+	}
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 
 	go func() {

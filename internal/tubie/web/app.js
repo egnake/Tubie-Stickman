@@ -49,7 +49,7 @@ const CAMERA_OPTIONS = [
 let presets = [], ideas = [], activeIdeaCategory = 'Tümü';
 let state = null, busy = false, pending = false, disconnected = false, stopped = false;
 let recorder = null, recordingStream = null, recordingTimer = null, recordingDeadline = 0, recordingChunks = [];
-let lastVideo = '', lastFrame = '', lastOutputs = '', lastLog = '', lastReference = false, syncedJob = 0;
+let lastVideo = '', lastFrame = '', lastOutputs = '', lastLog = '', lastReference = false, lastRefRevision = 0, syncedJob = 0;
 let toastTimer, analyzeTimer;
 
 const media = name => 'media/' + name.split('/').map(encodeURIComponent).join('/');
@@ -547,6 +547,7 @@ async function upload(blob, name) {
   try {
     if (blob.size > 50 * 1024 * 1024) throw new Error('Ses dosyası en fazla 50 MB olabilir.');
     await api('voice', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
+    $('#upload-label').textContent = 'Referans ses hazır (sesim.wav). Üretim ekranından “Kendi sesim” seçebilirsiniz.';
     $('#log-panel').open = true;
     await refresh();
   } catch (error) { toast(error.message); $('#upload-label').textContent = ''; }
@@ -603,15 +604,24 @@ function setVideo(file) {
 
 function extractPinnedComment(descText) {
   if (!descText) return '';
-  const marker = '[SABİT YORUM';
-  const idx = descText.indexOf(marker);
+  const lines = String(descText).replace(/\r\n/g, '\n').split('\n');
+  let idx = lines.findIndex(line => line.includes('SABİTLENECEK YORUM KANCASI') || line.includes('[SABİT YORUM'));
   if (idx === -1) return '';
-  const after = descText.slice(idx);
-  const nl = after.indexOf('\n');
-  if (nl === -1) return '';
-  const rest = after.slice(nl + 1).trim();
-  const nextSec = rest.indexOf('\n[');
-  return (nextSec === -1 ? rest : rest.slice(0, nextSec)).trim();
+  idx++;
+  if (idx < lines.length && /^-+$/.test(lines[idx].trim())) idx++;
+  const collected = [];
+  while (idx < lines.length) {
+    const trimmed = lines[idx].trim();
+    if (!trimmed) {
+      if (collected.length) break;
+      idx++;
+      continue;
+    }
+    if (/^(?:\[|📝|🚀|🏷️|📌|📊)/.test(trimmed)) break;
+    collected.push(trimmed);
+    idx++;
+  }
+  return collected.join('\n').trim();
 }
 
 function makeDownloadLink(label, mediaPath, fileName) {
@@ -772,11 +782,13 @@ function render(data) {
   }
   $('#completed').hidden = !job.results?.length;
   $('#reference-badge').textContent = data.reference ? 'REFERANS HAZIR' : 'REFERANS YOK';
-  if (data.reference && (!lastReference || (job.action === 'voice' && job.status === 'complete' && $('#reference-audio').dataset.job !== String(job.started)))) {
-    $('#reference-audio').src = media('sesim.wav') + '?v=' + (job.ended || Date.now());
-    $('#reference-audio').dataset.job = String(job.started); $('#reference-audio').hidden = false;
+  const refRev = data.reference_revision || 0;
+  if (data.reference && (!lastReference || (refRev && refRev !== lastRefRevision) || (job.action === 'voice' && job.status === 'complete' && $('#reference-audio').dataset.job !== String(job.started)))) {
+    $('#reference-audio').src = media('sesim.wav') + '?v=' + (refRev || job.ended || Date.now());
+    $('#reference-audio').dataset.job = String(job.started || refRev); $('#reference-audio').hidden = false;
   }
   lastReference = data.reference;
+  lastRefRevision = refRev;
   if (job.action === 'voice' && job.status === 'complete') $('#upload-label').textContent = 'Referans ses hazır. Üretim ekranından “Kendi sesim” seçebilirsiniz.';
   if (job.audio) {
     const src = media(job.audio) + '?v=' + job.started;
