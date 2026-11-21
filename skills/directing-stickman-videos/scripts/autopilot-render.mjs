@@ -13,13 +13,16 @@ import {
   drawCyberTopHud,
   applyCyberCamera,
   drawCyberTransitionOverlay,
+  drawCyberStageFX,
   drawCyberActor,
   drawCyberWidget,
   drawCyberCallout,
+  sampleSpeechLevel,
 } from './cyber-visuals.mjs';
 
 const clamp = x => Math.max(0, Math.min(1, x));
 const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const easeOutBack = x => { const t = clamp(x), c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 export function keyState(l, t) {
   const out = {...l};
   for (const prop of ['x', 'y', 'w', 'angle', 'alpha', 'progress', 'scaleX', 'scaleY']) {
@@ -80,8 +83,10 @@ export async function painter(p) {
     }
     const shot = p.shots.find(s => t >= s.start && t < s.end) || p.shots.at(-1);
     const dtShot = t - shot.start;
+    const shotDuration = Math.max(0.2, (shot?.end ?? p.duration) - (shot?.start ?? 0));
+    const speechLevel = isCyber ? sampleSpeechLevel(p, t) : 0;
     if (isCyber) {
-      drawCyberAtmosphere(ctx, plane, t, shot, dtShot);
+      drawCyberAtmosphere(ctx, plane, t, shot, dtShot, speechLevel);
     }
     function paintLayers(layers) { for (const layer of layers) {
       const dt = t - shot.start;
@@ -92,8 +97,8 @@ export async function painter(p) {
       ctx.translate(px, py); ctx.rotate(l.angle || 0); ctx.scale(l.scaleX ?? 1, l.scaleY ?? 1); ctx.translate(-px, -py);
       if (l.type === 'group') paintLayers(l.children);
       else if (['path', 'rect', 'ellipse'].includes(l.type)) drawB3Shape(ctx, l);
-      else if (l.type === 'cyber_actor') drawCyberActor(ctx, l, dt, t);
-      else if (l.type === 'cyber_widget') drawCyberWidget(ctx, l, dt, t);
+      else if (l.type === 'cyber_actor') drawCyberActor(ctx, l, dt, t, speechLevel);
+      else if (l.type === 'cyber_widget') drawCyberWidget(ctx, l, dt, t, shotDuration, speechLevel);
       else if (l.type === 'cyber_callout') drawCyberCallout(ctx, l, dt);
       else if (l.type === 'image') {
         const img = images.get(mediaPath(p.base, l.path)), h = l.h || w * img.height / img.width;
@@ -174,11 +179,12 @@ export async function painter(p) {
     } }
     if (isCyber) {
       ctx.save();
-      applyCyberCamera(ctx, plane, shot, dtShot);
+      applyCyberCamera(ctx, plane, shot, dtShot, speechLevel);
       paintLayers(shot.layers);
+      drawCyberStageFX(ctx, plane, shot, dtShot, t, speechLevel);
       ctx.restore();
       drawCyberTransitionOverlay(ctx, plane, shot, dtShot);
-      drawCyberTopHud(ctx, plane, t, p.duration);
+      drawCyberTopHud(ctx, plane, t, p.duration, shot, speechLevel);
     } else {
       paintLayers(shot.layers);
     }
@@ -200,76 +206,137 @@ export async function painter(p) {
       if (lines.length > 1) throw new Error('B captions allow at most one line; split the timed cue at a semantic boundary');
       const cy = p.captionY !== undefined ? p.captionY : (isModern ? Math.round(plane.height * 0.72) : plane.height - 60);
       if (isModern && p.style !== 'B2' && p.style !== 'B3' && p.style !== 'B4') {
-        const textWidth = ctx.measureText(textToDisplay).width;
-        const boxW = Math.min(1160, textWidth + 64);
-        const boxH = Math.max(84, fontSize * 1.6);
-        ctx.save();
-        ctx.shadowColor = isCyber ? 'rgba(0, 255, 128, 0.40)' : 'rgba(0,0,0,0.50)';
-        ctx.shadowBlur = isCyber ? 22 : 16;
-        ctx.shadowOffsetY = 6;
-        ctx.fillStyle = p.captionBg || (isCyber ? 'rgba(7, 12, 20, 0.96)' : 'rgba(14, 17, 23, 0.94)');
-        ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') ctx.roundRect(640 - boxW / 2, cy - boxH / 2, boxW, boxH, 20);
-        else ctx.rect(640 - boxW / 2, cy - boxH / 2, boxW, boxH);
-        ctx.fill();
-        ctx.strokeStyle = p.captionBorder || (isCyber ? 'rgba(0, 255, 128, 0.50)' : 'rgba(255, 255, 255, 0.18)');
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-        ctx.restore();
-
         const words = (cue.words && cue.words.length) ? cue.words : null;
-        if (words && words.length > 0) {
-          ctx.textAlign = 'left';
-          const spaceW = ctx.measureText(' ').width;
-          let curX = 640 - textWidth / 2;
-          for (const wObj of words) {
+        if (isCyber && words && words.length > 0) {
+          const spaceW = ctx.measureText(' ').width * 1.45;
+          const wordTokens = words.map(wObj => {
             const wText = (p.captionUppercase !== false)
-              ? (isCyber ? wObj.word.toLocaleUpperCase('tr-TR') : wObj.word.toUpperCase())
+              ? wObj.word.toLocaleUpperCase('tr-TR')
               : wObj.word;
-            const wWidth = ctx.measureText(wText).width;
+            return {wObj, wText, wWidth: ctx.measureText(wText).width};
+          });
+          const totalSpacedW = wordTokens.reduce((acc, item) => acc + item.wWidth, 0) + spaceW * (wordTokens.length - 1);
+          const scaleFit = totalSpacedW > 1100 ? Math.max(0.78, 1100 / totalSpacedW) : 1;
+          const cuePop = (t - cue.start < 0.09) ? (0.94 + 0.06 * easeOutBack((t - cue.start) / 0.09)) : 1;
+          const boxW = Math.min(1160, totalSpacedW * scaleFit + 76);
+          const boxH = Math.max(84, fontSize * 1.62);
+
+          ctx.save();
+          ctx.translate(640, cy);
+          ctx.scale(cuePop, cuePop);
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.50)';
+          ctx.shadowBlur = 20;
+          ctx.shadowOffsetY = 6;
+          ctx.fillStyle = p.captionBg || 'rgba(15, 23, 42, 0.92)';
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, 20);
+          else ctx.rect(-boxW / 2, -boxH / 2, boxW, boxH);
+          ctx.fill();
+          ctx.strokeStyle = p.captionBorder || 'rgba(148, 163, 184, 0.24)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(640, cy);
+          ctx.scale(scaleFit * cuePop, scaleFit * cuePop);
+          ctx.textAlign = 'left';
+          let curX = -totalSpacedW / 2;
+          for (const {wObj, wText, wWidth} of wordTokens) {
             const isActive = t >= wObj.start && t < wObj.end;
-            const drawY = isActive && isCyber ? cy - 3 : cy;
-            if (isActive && isCyber) {
+            const drawY = isActive ? -3 : 0;
+            if (isActive) {
               const popT = clamp((t - wObj.start) / 0.12);
-              const popScale = 1 + 0.09 * Math.sin(popT * Math.PI);
-              let activeColor = p.captionActiveColor || '#FFE500';
+              const popScale = 1 + 0.08 * Math.sin(popT * Math.PI);
+              let activeColor = p.captionActiveColor || '#38BDF8';
               if (/(HACKER|ŞİFRE|ÇALIN|SAHTE|TUZA[ĞG]|TEHLİKE|SIZDIR|KAYIP|PANİK|SIFIRLAN|SALDIR|KRİPT|KIRMAK|AĞDAN|HEDİYE|ATLAR|KÖTÜ|BOŞALT|VİRÜS|FİDYE|İHLAL|KOPYA|ELE|ASLA|SIZINTI|DARK)/.test(wText)) {
-                activeColor = '#FF3B4E';
+                activeColor = '#F43F5E';
               } else if (/(2FA|KORU|GÜVEN|DOĞRULAMA|ŞİMDİ|VPN|UYANIK|KALKAN|AVCI|GÜÇLÜ|TAKİP|AÇ|PAROLA|PASSKEY|AUTHENTICATOR|YEDEK|PARAMETRİK|KONTROL|KİLİTLE)/.test(wText)) {
-                activeColor = '#00FF66';
+                activeColor = '#34D399';
               } else if (/^(?:\d+|[0-9]+%|BİR|İKİ|ÜÇ|DÖRT|BEŞ|ALTI|SANİYE|DAKİKA|YIL|HANE|TEK|HEMEN|DİKKAT|DUR)$/.test(wText)) {
-                activeColor = '#FFE500';
+                activeColor = '#FBBF24';
               } else {
-                activeColor = '#00F0FF';
+                activeColor = '#38BDF8';
               }
+              const pillH = fontSize * 1.18;
               ctx.save();
               ctx.translate(curX + wWidth / 2, drawY);
               ctx.scale(popScale, popScale);
+              ctx.fillStyle = activeColor === '#F43F5E'
+                ? 'rgba(244, 63, 94, 0.16)'
+                : activeColor === '#34D399'
+                  ? 'rgba(52, 211, 153, 0.16)'
+                  : activeColor === '#FBBF24'
+                    ? 'rgba(251, 191, 36, 0.16)'
+                    : 'rgba(56, 189, 248, 0.16)';
+              ctx.strokeStyle = activeColor;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') ctx.roundRect(-wWidth / 2 - 10, -pillH / 2, wWidth + 20, pillH, 10);
+              else ctx.rect(-wWidth / 2 - 10, -pillH / 2, wWidth + 20, pillH);
+              ctx.fill();
+              ctx.stroke();
+
               ctx.textAlign = 'center';
-              ctx.strokeStyle = '#000000';
-              ctx.lineWidth = 6;
+              ctx.strokeStyle = '#070B14';
+              ctx.lineWidth = 5;
               ctx.strokeText(wText, 0, 0);
               ctx.shadowColor = activeColor;
-              ctx.shadowBlur = 16;
+              ctx.shadowBlur = 4;
               ctx.fillStyle = activeColor;
               ctx.fillText(wText, 0, 0);
               ctx.restore();
             } else {
-              ctx.strokeStyle = '#000000';
-              ctx.lineWidth = 6;
+              ctx.strokeStyle = '#070B14';
+              ctx.lineWidth = 5;
               ctx.strokeText(wText, curX, drawY);
-              ctx.fillStyle = isActive ? (p.captionActiveColor || '#FFE500') : '#FFFFFF';
+              ctx.fillStyle = '#F8FAFC';
               ctx.fillText(wText, curX, drawY);
             }
             curX += wWidth + spaceW;
           }
+          ctx.restore();
         } else {
-          ctx.textAlign = 'center';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 6;
-          ctx.strokeText(textToDisplay, 640, cy);
-          ctx.fillStyle = p.captionColor || (isCyber ? '#00FF66' : '#FFE500');
-          ctx.fillText(textToDisplay, 640, cy);
+          const textWidth = ctx.measureText(textToDisplay).width;
+          const boxW = Math.min(1160, textWidth + 64);
+          const boxH = Math.max(84, fontSize * 1.6);
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.50)';
+          ctx.shadowBlur = 18;
+          ctx.shadowOffsetY = 6;
+          ctx.fillStyle = p.captionBg || (isCyber ? 'rgba(15, 23, 42, 0.92)' : 'rgba(14, 17, 23, 0.94)');
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(640 - boxW / 2, cy - boxH / 2, boxW, boxH, 20);
+          else ctx.rect(640 - boxW / 2, cy - boxH / 2, boxW, boxH);
+          ctx.fill();
+          ctx.strokeStyle = p.captionBorder || (isCyber ? 'rgba(148, 163, 184, 0.24)' : 'rgba(255, 255, 255, 0.18)');
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+
+          if (words && words.length > 0) {
+            ctx.textAlign = 'left';
+            const spaceW = ctx.measureText(' ').width;
+            let curX = 640 - textWidth / 2;
+            for (const wObj of words) {
+              const wText = (p.captionUppercase !== false) ? wObj.word.toUpperCase() : wObj.word;
+              const wWidth = ctx.measureText(wText).width;
+              const isActive = t >= wObj.start && t < wObj.end;
+              ctx.strokeStyle = '#070B14';
+              ctx.lineWidth = 5;
+              ctx.strokeText(wText, curX, cy);
+              ctx.fillStyle = isActive ? (p.captionActiveColor || '#38BDF8') : '#F8FAFC';
+              ctx.fillText(wText, curX, cy);
+              curX += wWidth + spaceW;
+            }
+          } else {
+            ctx.textAlign = 'center';
+            ctx.strokeStyle = '#070B14';
+            ctx.lineWidth = 5;
+            ctx.strokeText(textToDisplay, 640, cy);
+            ctx.fillStyle = p.captionColor || (isCyber ? '#F8FAFC' : '#FFE500');
+            ctx.fillText(textToDisplay, 640, cy);
+          }
         }
       } else if (p.style === 'B2') {
         const width = Math.max(...lines.map(s => ctx.measureText(s).width));
@@ -322,8 +389,8 @@ function makeSfx(p, file, duration) {
       else if (s.kind === 'chime') value = Math.sin(2 * Math.PI * (880 + 200 * t) * t) * Math.exp(-t * 8);
       else if (s.kind === 'pop') value = Math.sin(2 * Math.PI * (500 - 900 * t) * t) * Math.exp(-t * 25);
       else if (s.kind === 'alert') {
-        const f = Math.floor(t * 14) % 2 === 0 ? 880 : 1320;
-        value = Math.sin(2 * Math.PI * f * t) * 0.7 * Math.exp(-t * 5);
+        const f = 880 + 440 * (0.5 + 0.5 * Math.sin(2 * Math.PI * 7 * t));
+        value = Math.sin(2 * Math.PI * f * t) * 0.65 * Math.exp(-t * 5);
       }
       else if (s.kind === 'keyboard') {
         value = (noise() * 0.6 + Math.sin(2 * Math.PI * 3400 * t) * 0.4) * Math.exp(-t * 45);
@@ -372,8 +439,8 @@ function makeSfx(p, file, duration) {
         }
       }
       else if (s.kind === 'buzz') {
-        const sq = Math.sign(Math.sin(2 * Math.PI * 145 * t)) * 0.45 + noise() * 0.35;
-        value = sq * Math.exp(-t * 9);
+        const warm = Math.sin(2 * Math.PI * 145 * t) * 0.45 + Math.sin(2 * Math.PI * 290 * t) * 0.25 + noise() * 0.22;
+        value = Math.tanh(warm * 1.2) * Math.exp(-t * 9);
       }
       else if (s.kind === 'jingle') {
         value = 0;
@@ -382,7 +449,8 @@ function makeSfx(p, file, duration) {
           if (q >= 0) value += (Math.sin(2 * Math.PI * f * q) * 0.55 + Math.sin(2 * Math.PI * f * 1.73 * q) * 0.25 + Math.sin(2 * Math.PI * f * 2.31 * q) * 0.12) * Math.exp(-q * 18);
         }
       }
-      samples[index] += value * s.gain;
+      const declickEnv = Math.min(1, t / 0.004) * Math.min(1, (len - t) / 0.004);
+      samples[index] += value * declickEnv * s.gain;
     }
   }
   const bytes = Buffer.alloc(44 + n * 2); bytes.write('RIFF'); bytes.writeUInt32LE(bytes.length - 8, 4); bytes.write('WAVEfmt ', 8); bytes.writeUInt32LE(16, 16); bytes.writeUInt16LE(1, 20); bytes.writeUInt16LE(1, 22); bytes.writeUInt32LE(rate, 24); bytes.writeUInt32LE(rate * 2, 28); bytes.writeUInt16LE(2, 32); bytes.writeUInt16LE(16, 34); bytes.write('data', 36); bytes.writeUInt32LE(n * 2, 40);
@@ -432,7 +500,7 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
         if (layer.type === 'image') files.add(mediaPath(p.base, layer.path));
         if (layer.type === 'pose') files.add(mediaPath(p.base, (p.theme === 'cyber' || layer.sheet === 'cyber') ? '@b1/character-pose-sheet-cyber.png' : '@b1/character-pose-sheet-v6.png'));
       }
-      const key = sha(JSON.stringify({shot, first, last, style: p.style, theme: p.theme, backgroundColor: p.backgroundColor, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionStyle: p.captionStyle, captionSize: p.captionSize, captionY: p.captionY, captionColor: p.captionColor, grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
+      const key = sha(JSON.stringify({shot, first, last, style: p.style, theme: p.theme, backgroundColor: p.backgroundColor, television: p.television, width: p.width, height: p.height, fps: p.fps, captions: p.captions.filter(c => c.end > first / p.fps && c.start < last / p.fps), captionStyle: p.captionStyle, captionSize: p.captionSize, captionY: p.captionY, captionColor: p.captionColor, captionActiveColor: p.captionActiveColor, captionBg: p.captionBg, captionBorder: p.captionBorder, captionUppercase: p.captionUppercase, loopEnding: p.loopEnding, speechHash: Array.isArray(p.speechLevels) ? sha(JSON.stringify(p.speechLevels.slice(first, last))) : '', grid: p.grid, inputs: p.inputs.filter(f => files.has(f.path)), rendererHash}));
       const clip = path.join(cache, `${key}.mp4`); let valid = false;
       if (fs.existsSync(clip)) try { const info = probe(clip); valid = Number(info.streams[0].nb_frames) === last - first; } catch {}
       if (valid) {
@@ -461,7 +529,9 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     if (p.music) {
       args.push('-stream_loop', '-1', '-i', mediaPath(p.base, p.music.path));
       if (useSidechain) {
-        filters.push(`[${idx++}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${p.music.gain}[music_raw]`);
+        const totalSec = count / p.fps;
+        const fadeOut = (!p.loopEnding && totalSec > 1.2) ? `,afade=t=out:st=${(totalSec - 0.6).toFixed(3)}:d=0.6` : '';
+        filters.push(`[${idx++}:a]aformat=sample_rates=48000:channel_layouts=stereo,volume=${p.music.gain},afade=t=in:st=0:d=0.35${fadeOut}[music_raw]`);
         filters.push('[music_raw][voice_sc]sidechaincompress=threshold=0.035:ratio=6:attack=25:release=260:makeup=1[music]');
       } else {
         filters.push(`[${idx++}:a]volume=${p.music.gain}[music]`);
@@ -480,8 +550,10 @@ export async function render(p, {full = false, seconds = 20, replace = false, li
     const cues = p.captions.filter(c => c.start < duration).map(c => ({...c, end: Math.min(c.end, duration)}));
     fs.writeFileSync(path.join(out, `${kind}.srt`), cues.map((c, i) => `${i + 1}\n${stamp(c.start)} --> ${stamp(c.end)}\n${c.text}\n`).join('\n'));
     fs.writeFileSync(path.join(out, `${kind}.vtt`), 'WEBVTT\n\n' + cues.map(c => `${stamp(c.start, true)} --> ${stamp(c.end, true)}\n${c.text}\n`).join('\n'));
-    const sheet = createCanvas(960, 540), sc = sheet.getContext('2d');
-    for (let i = 0; i < 9; i++) sc.drawImage(frame(Math.min(duration - 1 / p.fps, (i + 0.5) * duration / 9)), (i % 3) * 320, Math.floor(i / 3) * 180, 320, 180);
+    const tileW = 320;
+    const tileH = p.height > p.width ? Math.round(320 * p.height / p.width) : 180;
+    const sheet = createCanvas(tileW * 3, tileH * 3), sc = sheet.getContext('2d');
+    for (let i = 0; i < 9; i++) sc.drawImage(frame(Math.min(duration - 1 / p.fps, (i + 0.5) * duration / 9)), (i % 3) * tileW, Math.floor(i / 3) * tileH, tileW, tileH);
     fs.writeFileSync(path.join(out, `${kind}-contact-sheet.png`), sheet.toBuffer('image/png'));
     const info = probe(target), report = {fingerprint: p.fingerprint, preview_seconds: full ? null : duration, output: target, output_sha256: hashFile(target), original_voice_sha256: hashFile(p.voicePath), original_voice_duration: p.voiceDuration, voice_rate: 'unchanged; leading/trailing padding only', frames: count, duration: Number(info.format.duration), cache_hits: reused, shot_count: clips.length, full_decode: 'pass', caption_count: cues.length, human_review: 'required; technical checks are not acceptance', inputs: p.inputs};
     if (p.style === 'B4') {

@@ -169,6 +169,16 @@ export function loadProject(file, {seconds} = {}) {
     if (typeof cue.text !== 'string' || !cue.text.trim() || cue.text.length > 240) throw new Error('Invalid caption text');
     cueEnd = cue.end;
   }
+  if (p.theme === 'cyber') {
+    if (p.speechLevels !== undefined) {
+      if (!Array.isArray(p.speechLevels) || p.speechLevels.some(v => !Number.isFinite(v) || v < 0 || v > 1)) {
+        throw new Error('speechLevels must be an array of numbers in [0, 1]');
+      }
+    }
+    if (p.loopEnding !== undefined && typeof p.loopEnding !== 'boolean') {
+      throw new Error('loopEnding must be boolean');
+    }
+  }
   const sfx = scoped ? (p.sfx || []).filter(s => s.time < rangeEnd) : p.sfx || [];
   if (p.voice.contains_sfx && sfx.length) throw new Error('Already mixed voice must not receive duplicate SFX');
   for (const s of sfx) { number(s.time, 'SFX time', 0, duration); number(s.gain, 'SFX gain', 0, p.style === 'B4' && s.kind === 'file' ? 1 : 0.3); if (!['tap', 'paper', 'pop', 'chime', 'jingle', 'alert', 'keyboard', 'glitch', 'lock', ...(p.theme === 'cyber' ? CYBER_EXTRA_SFX : []), ...(p.style === 'B4' ? ['file'] : [])].includes(s.kind)) throw new Error('Unknown SFX'); }
