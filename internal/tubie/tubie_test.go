@@ -3,6 +3,7 @@ package tubie_test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -1209,5 +1210,216 @@ func TestLoopEndingStripsTrailingConjunctionAndEcho(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(vm.Description), "misafir") {
 		t.Fatalf("expected viral metadata description to reflect actual narration rules, got: %s", vm.Description)
+	}
+}
+
+func TestExtractSpeechLevelsAndWAVSegmentsOffline(t *testing.T) {
+	dir := t.TempDir()
+	wav := filepath.Join(dir, "speech_pattern.wav")
+	ffmpeg := tubie.BinaryPath("ffmpeg")
+
+	cmd := exec.Command(ffmpeg, "-v", "error", "-y",
+		"-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono:d=0.6",
+		"-f", "lavfi", "-i", "sine=f=320:r=24000:d=1.1",
+		"-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono:d=0.8",
+		"-filter_complex", "[0:a][1:a][2:a]concat=n=3:v=0:a=1",
+		"-ar", "24000", "-ac", "1", wav,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed generating synthetic WAV: %v (%s)", err, string(out))
+	}
+
+	levels := tubie.ExtractSpeechLevels(wav, 30, 2.5)
+	if len(levels) < 70 || len(levels) > 80 {
+		t.Fatalf("expected ~75 speech level frames for 2.5s@30fps, got %d", len(levels))
+	}
+	for i, lv := range levels {
+		if lv < 0 || lv > 1 {
+			t.Fatalf("frame %d level out of [0,1]: %f", i, lv)
+		}
+	}
+	for i := 0; i <= 12; i++ {
+		if levels[i] >= 0.1 {
+			t.Fatalf("expected quiet opening frame %d < 0.1, got %f", i, levels[i])
+		}
+	}
+	peakMid := 0.0
+	for i := 22; i <= 48; i++ {
+		if levels[i] > peakMid {
+			peakMid = levels[i]
+		}
+	}
+	if peakMid < 0.6 {
+		t.Fatalf("expected strong voiced middle peak > 0.6, got %f", peakMid)
+	}
+
+	segs := tubie.DetectSpeechSegmentsFromWAV(wav, 2.5)
+	if len(segs) != 1 {
+		t.Fatalf("expected 1 voiced speech segment, got %d: %+v", len(segs), segs)
+	}
+	if segs[0].Start < 0.45 || segs[0].Start > 0.72 || segs[0].End < 1.55 || segs[0].End > 1.85 {
+		t.Fatalf("unexpected speech segment bounds: %+v", segs[0])
+	}
+}
+
+func TestTurkishAcronymCasingAndSemanticCaptionBreaks(t *testing.T) {
+	words, strongBreaks, _ := tubie.ExtractScriptTokens("AI destekli Wi-Fi phishing saldırısı! İstanbul'da şifrenizi koruyun?")
+	want := []string{"AI", "DESTEKLİ", "WI-FI", "PHISHING", "SALDIRISI", "İSTANBULDA", "ŞİFRENİZİ", "KORUYUN"}
+	if len(words) != len(want) {
+		t.Fatalf("expected %d tokens, got %d: %v", len(want), len(words), words)
+	}
+	for i := range want {
+		if words[i] != want[i] {
+			t.Errorf("token %d: want %q, got %q", i, want[i], words[i])
+		}
+	}
+	if !strongBreaks[4] || !strongBreaks[7] || strongBreaks[0] {
+		t.Fatalf("unexpected strongBreaks flags: %v", strongBreaks)
+	}
+
+	timed := make([]tubie.TimedWord, len(words))
+	for i, w := range words {
+		timed[i] = tubie.TimedWord{
+			Word:       w,
+			Start:      float64(i) * 0.25,
+			End:        float64(i)*0.25 + 0.24,
+			BreakAfter: strongBreaks[i],
+		}
+	}
+	cues := tubie.GroupCaptionCues(timed, 5.0)
+	for _, c := range cues {
+		if strings.Contains(c.Text, "SALDIRISI") && strings.Contains(c.Text, "İSTANBULDA") {
+			t.Fatalf("caption cue illegally merged across sentence boundary: %q", c.Text)
+		}
+	}
+
+	commaWords, commaStrong, commaSoft := tubie.ExtractScriptTokens("HAYIR DUR, BAK!")
+	commaTimed := make([]tubie.TimedWord, len(commaWords))
+	for i, w := range commaWords {
+		commaTimed[i] = tubie.TimedWord{
+			Word:       w,
+			Start:      float64(i) * 0.22,
+			End:        float64(i)*0.22 + 0.21,
+			BreakAfter: commaStrong[i],
+			SoftBreak:  commaSoft[i],
+		}
+	}
+	commaCues := tubie.GroupCaptionCues(commaTimed, 2.0)
+	if len(commaCues) < 2 || commaCues[0].Text != "HAYIR DUR" {
+		t.Fatalf("expected comma SoftBreak on 2nd word to split 3-word chunk into 'HAYIR DUR', got: %+v", commaCues)
+	}
+}
+
+func TestDoctorWithLoggerStreamsLines(t *testing.T) {
+	root, err := tubie.FindRoot()
+	if err != nil {
+		t.Fatalf("FindRoot failed: %v", err)
+	}
+	var lines []string
+	code := tubie.DoctorWithLogger(root, func(line string) {
+		lines = append(lines, line)
+	})
+	if code != 0 {
+		t.Fatalf("DoctorWithLogger returned non-zero code %d:\n%s", code, strings.Join(lines, "\n"))
+	}
+	joined := strings.Join(lines, "\n")
+	for _, needle := range []string{"OK node", "OK ffmpeg", "OK ffprobe", "OK node module @napi-rs/canvas", "OK node module sharp"} {
+		if !strings.Contains(joined, needle) {
+			t.Errorf("expected DoctorWithLogger output to contain %q, got:\n%s", needle, joined)
+		}
+	}
+}
+
+func TestStudioServerHardeningAndPinnedComment(t *testing.T) {
+	dir := t.TempDir()
+	studio, err := tubie.NewStudioServer(dir, 0)
+	if err != nil {
+		t.Fatalf("NewStudioServer failed: %v", err)
+	}
+	defer studio.Close()
+	go func() {
+		_ = studio.Serve()
+	}()
+
+	baseURL := strings.Split(studio.URL(""), "#")[0]
+
+	rootResp, err := http.Get(baseURL)
+	if err != nil {
+		t.Fatalf("GET root failed: %v", err)
+	}
+	rootResp.Body.Close()
+	csp := rootResp.Header.Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self'") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
+		t.Fatalf("unexpected script-src in CSP header: %q", csp)
+	}
+
+	const overLimit = 50*1024*1024 + 1024
+	oversize := make([]byte, overLimit)
+	uploadResp, err := http.Post(baseURL+"api/voice", "application/octet-stream", bytes.NewReader(oversize))
+	if err != nil {
+		t.Fatalf("POST oversize api/voice failed: %v", err)
+	}
+	_, _ = io.ReadAll(uploadResp.Body)
+	uploadResp.Body.Close()
+	if uploadResp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413 Request Entity Too Large for >50MB upload, got %d", uploadResp.StatusCode)
+	}
+
+	vm := tubie.GenerateViralMetadata("Wi-Fi Tuzakları", "Ortak Wi-Fi ağına bağlanma. VPN aç ve şifreni koru.")
+	formatted := tubie.FormatViralText("Wi-Fi Tuzakları", "Ortak Wi-Fi ağına bağlanma. VPN aç ve şifreni koru.", vm)
+	if !strings.Contains(formatted, "SABİTLENECEK YORUM KANCASI") {
+		t.Fatalf("expected FormatViralText to include 'SABİTLENECEK YORUM KANCASI', got:\n%s", formatted)
+	}
+
+	for _, p := range tubie.PresetList() {
+		if p.Title == "" || p.Narration == "" || len(p.Scenes) != 6 {
+			t.Errorf("preset %s invalid (title=%q narrationLen=%d scenes=%d)", p.ID, p.Title, len(p.Narration), len(p.Scenes))
+		}
+	}
+}
+
+func TestTurkishTTSPronunciationAndPhoneticAlignment(t *testing.T) {
+	spoken := tubie.PrepareSpeechForTurkishTTS("Sahte APK'yı ve crack'i indirirsen, Wi-Fi'de QR veya 2FA ile phishing ve deepfake yapan hackerlar SQL ile vurur; elinde ip ile ailenin takip adımları güvende!")
+	checks := []string{
+		"a pe ka'yı",
+		"kırek'i",
+		"vayfay'de",
+		"kü ar",
+		"iki ef ey",
+		"fişing",
+		"dipfeyk",
+		"hekırlar",
+		"es kü el",
+		"elinde ip ile ailenin takip adımları güvende!",
+	}
+	for _, want := range checks {
+		if !strings.Contains(spoken, want) {
+			t.Errorf("PrepareSpeechForTurkishTTS missing %q in:\n%s", want, spoken)
+		}
+	}
+
+	crackli := tubie.PrepareSpeechForTurkishTTS("Ücretsiz crackli uygulama")
+	if !strings.Contains(crackli, "kırekli") {
+		t.Errorf("expected agglutinated 'crackli' -> 'kırekli', got %q", crackli)
+	}
+
+	canonical := []string{"SAHTE", "APK", "VE", "CRACK"}
+	recognized := []tubie.TimedWord{
+		{Word: "sahte", Start: 0.1, End: 0.4},
+		{Word: "a", Start: 0.45, End: 0.55},
+		{Word: "pe", Start: 0.55, End: 0.65},
+		{Word: "ka", Start: 0.65, End: 0.85},
+		{Word: "ve", Start: 0.90, End: 1.05},
+		{Word: "kırek", Start: 1.10, End: 1.50},
+	}
+	aligned := tubie.AlignScriptWords(canonical, recognized, nil, 2.0)
+	if len(aligned) != 4 {
+		t.Fatalf("expected 4 aligned words, got %d", len(aligned))
+	}
+	if aligned[1].Word != "APK" || math.Abs(aligned[1].Start-0.45) > 0.05 || math.Abs(aligned[1].End-0.85) > 0.05 {
+		t.Errorf("expected APK anchored to merged phonetic [0.45..0.85], got %+v", aligned[1])
+	}
+	if aligned[3].Word != "CRACK" || math.Abs(aligned[3].Start-1.10) > 0.05 || math.Abs(aligned[3].End-1.50) > 0.05 {
+		t.Errorf("expected CRACK anchored to phonetic [1.10..1.50], got %+v", aligned[3])
 	}
 }

@@ -232,3 +232,84 @@ test('offline E2E render encodes portrait 9:16 and landscape 16:9 cyber MP4s wit
     assert.equal(Number(vStream.height), tc.height);
   }
 });
+
+test('offline cyber render supports audio-reactive speechLevels, segmented scenes, loopEnding, and proportional portrait contact sheets', async t => {
+  const speechLevels = Array.from({length: 24}, (_, i) => Number((0.05 + (i / 23) * 0.90).toFixed(3)));
+  const cases = [
+    {name: 'portrait', width: 360, height: 640, captionY: 1780, captionSize: 56, widgetPos: {x: 80, y: 955, w: 1120, h: 575}, actorPos: {x: 160, y: 395, w: 360, h: 500}, expectPortraitSheet: true},
+    {name: 'landscape', width: 640, height: 360, captionY: 648, captionSize: 44, widgetPos: {x: 562, y: 98, w: 674, h: 448}, actorPos: {x: 52, y: 242, w: 235, h: 305}, expectPortraitSheet: false},
+  ];
+
+  for (const tc of cases) {
+    const dir = makeBaseDir(t, {voiceDuration: 2.0, withMusic: true});
+    const file = path.join(dir, 'project.json');
+    save(file, {
+      version: 1,
+      style: 'B1',
+      theme: 'cyber',
+      backgroundColor: '#0A0E17',
+      width: tc.width,
+      height: tc.height,
+      fps: 12,
+      loopEnding: true,
+      speechLevels,
+      captionStyle: 'viral',
+      captionSize: tc.captionSize,
+      captionY: tc.captionY,
+      voice: {path: 'voice.wav'},
+      music: {path: 'music.wav', gain: 0.14},
+      captions: [
+        {start: 0, end: 1.0, text: 'RİSK SEVİYESİ %94', words: [{word: 'RİSK', start: 0, end: 0.35}, {word: 'SEVİYESİ', start: 0.35, end: 0.7}, {word: '%94', start: 0.7, end: 1.0}]},
+        {start: 1.0, end: 2.0, text: 'HEMEN VPN AÇ', words: [{word: 'HEMEN', start: 1.0, end: 1.35}, {word: 'VPN', start: 1.35, end: 1.7}, {word: 'AÇ', start: 1.7, end: 2.0}]},
+      ],
+      shots: [
+        {
+          start: 0,
+          end: 1.0,
+          mood: 'hook',
+          camera: 'punch_in',
+          sceneIndex: 0,
+          sceneCount: 2,
+          beat: 0.44,
+          layers: [
+            {type: 'cyber_actor', role: 'victim', pose: 'shocked', ...tc.actorPos},
+            {type: 'cyber_widget', kind: 'threat_meter', ...tc.widgetPos, data: {level: 94, label: 'RİSK', safe: false}},
+            {type: 'cyber_callout', text: 'KRİTİK RİSK', x: tc.width < tc.height ? 440 : 48, y: tc.width < tc.height ? 326 : 204, w: tc.width < tc.height ? 400 : 320, color: '#FF3B30'},
+          ],
+        },
+        {
+          start: 1.0,
+          end: 2.0,
+          mood: 'defense',
+          camera: 'zoom_slow',
+          sceneIndex: 1,
+          sceneCount: 2,
+          beat: 0.44,
+          layers: [
+            {type: 'cyber_actor', role: 'hero', pose: 'shield_hero', ...tc.actorPos},
+            {type: 'cyber_widget', kind: 'url_inspect', ...tc.widgetPos, data: {fakeUrl: 'https://banka-onay1.com', realUrl: 'banka.com.tr', stamp: 'SAHTE'}},
+          ],
+        },
+      ],
+      sfx: [
+        {time: 0.05, kind: 'whoosh', gain: 0.16},
+        {time: 1.05, kind: 'shield', gain: 0.18},
+      ],
+    });
+
+    const rep = await render(loadProject(file), {full: true, replace: true});
+    assert.equal(rep.full_decode, 'pass', `${tc.name} E2E decode failed`);
+
+    const sheetPath = path.join(dir, 'output', 'film-contact-sheet.png');
+    assert.ok(fs.existsSync(sheetPath), `${tc.name} contact sheet missing`);
+    const ihdr = fs.readFileSync(sheetPath);
+    const sheetW = ihdr.readUInt32BE(16);
+    const sheetH = ihdr.readUInt32BE(20);
+    if (tc.expectPortraitSheet) {
+      assert.ok(sheetH > sheetW, `expected portrait contact sheet height > width, got ${sheetW}x${sheetH}`);
+    } else {
+      assert.equal(sheetW, 960);
+      assert.equal(sheetH, 540);
+    }
+  }
+});
