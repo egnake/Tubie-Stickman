@@ -72,16 +72,28 @@ func NormalizeScriptStyle(raw string) string {
 
 // GenerateScript produces a viral cybersecurity script from a user prompt using the balanced hybrid style.
 func GenerateScript(userPrompt string) (*ScriptResult, error) {
-	return GenerateScriptWithOptions(userPrompt, ScriptOptions{Style: StyleHybrid})
+	return GenerateScriptContext(context.Background(), userPrompt, ScriptOptions{Style: StyleHybrid})
 }
 
 // GenerateScriptWithStyle produces a viral cybersecurity script tailored to the requested narrative style.
 func GenerateScriptWithStyle(userPrompt string, style string) (*ScriptResult, error) {
-	return GenerateScriptWithOptions(userPrompt, ScriptOptions{Style: style})
+	return GenerateScriptContext(context.Background(), userPrompt, ScriptOptions{Style: style})
 }
 
 // GenerateScriptWithOptions produces a viral cybersecurity script with style, seamless loop, and retention analysis.
 func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptResult, error) {
+	return GenerateScriptContext(context.Background(), userPrompt, opts)
+}
+
+// GenerateScriptContext produces a viral cybersecurity script with context cancellation, style, loop, and retention analysis.
+func GenerateScriptContext(ctx context.Context, userPrompt string, opts ScriptOptions) (*ScriptResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	trimmed := strings.TrimSpace(userPrompt)
 	if trimmed == "" {
 		return nil, fmt.Errorf("lütfen bir video konusu veya fikir yazın")
@@ -109,7 +121,7 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 	// 1. Try Gemini API if user explicitly configured GEMINI_API_KEY
 	if allowLiveAI {
 		if apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); apiKey != "" {
-			if res, err := generateViaGemini(apiKey, trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
+			if res, err := generateViaGemini(ctx, apiKey, trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
 				return finalize(res), nil
 			} else if err != nil {
 				liveErrors = append(liveErrors, "gemini: "+err.Error())
@@ -117,18 +129,26 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// 2. Try OpenAI / Groq API if user explicitly configured OPENAI_API_KEY or GROQ_API_KEY
 	if allowLiveAI {
-		if res, err := generateViaConfiguredOpenAI(trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
+		if res, err := generateViaConfiguredOpenAI(ctx, trimmed, opts); err == nil && res != nil && len(res.Scenes) >= 3 {
 			return finalize(res), nil
 		} else if err != nil && !strings.Contains(err.Error(), "no OpenAI-compatible") {
 			liveErrors = append(liveErrors, "openai: "+err.Error())
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// 3. Try local Ollama only when a model is already warm in memory (or explicitly requested) to avoid 20s cold-start hangs
-	if allowLiveAI && (ollamaHasWarmModel(defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1") {
-		if res, err := generateScriptViaOllamaAtOpts(defaultOllamaBaseURL, trimmed, opts); err == nil {
+	if allowLiveAI && (ollamaHasWarmModel(ctx, defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1") {
+		if res, err := generateScriptViaOllamaAtOpts(ctx, defaultOllamaBaseURL, trimmed, opts); err == nil {
 			if ok, reason := passesLiveAIQualityFloor(trimmed, res); ok {
 				return finalize(res), nil
 			} else {
@@ -139,9 +159,13 @@ func GenerateScriptWithOptions(userPrompt string, opts ScriptOptions) (*ScriptRe
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// 4. Try cloud AI via Python g4f bridge (ChatGPT first, then Yqcloud) gated by Turkish fluency & topic relevance
 	if allowLiveAI {
-		if res, err := generateScriptViaG4F(trimmed, opts); err == nil {
+		if res, err := generateScriptViaG4F(ctx, trimmed, opts); err == nil {
 			if ok, reason := passesLiveAIQualityFloor(trimmed, res); ok {
 				return finalize(res), nil
 			} else {
@@ -207,10 +231,18 @@ func selectOllamaModel(models []struct {
 	return "qwen2.5:7b"
 }
 
-func ollamaHasWarmModel(baseURL string) bool {
+func ollamaHasWarmModel(ctx context.Context, baseURL string) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	base := strings.TrimRight(baseURL, "/")
-	client := &http.Client{Timeout: 300 * time.Millisecond}
-	resp, err := client.Get(base + "/api/ps")
+	reqCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, base+"/api/ps", nil)
+	if err != nil {
+		return false
+	}
+	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
 		return false
 	}
@@ -289,25 +321,33 @@ Yanıtını SADECE tek bir geçerli JSON objesi olarak ver (markdown veya ek aç
   "title": "Dikkat çekici, konuya özel Türkçe video başlığı",
   "narration": "105-148 kelimelik doğal konuşma dilinde Türkçe seslendirme metni",
   "scenes": [
-    {"title": "SAHNE BAŞLIĞI", "visual_type": "notification", "mood": "hook", "camera": "punch_in", "callout": "SAKIN TIKLAMA!", "sfx": "notification", "color": "#00F0FF", "prop": {"path": "@b1/cyber-laptop.png"}, "arrow": false},
-    {"title": "İKİNCİ SAHNE", "visual_type": "url_inspect", "mood": "danger", "camera": "shake", "callout": "TUZAK ALAN ADI!", "sfx": "alert", "color": "#FF3B30", "prop": {"path": "@b1/cyber-skull.png"}, "arrow": true},
-    {"title": "ÜÇÜNCÜ SAHNE", "visual_type": "terminal", "mood": "breach", "camera": "glitch_cut", "callout": "SIZINTI BAŞLADI", "sfx": "glitch", "color": "#FFCC00", "prop": {"path": "@b1/cyber-terminal.png"}, "arrow": false},
-    {"title": "DÖRDÜNCÜ SAHNE", "visual_type": "threat_meter", "mood": "twist", "camera": "zoom_slow", "callout": "GİZLİ RİSK!", "sfx": "radar", "color": "#E056FD", "prop": {"path": "@b1/cyber-database.png"}, "arrow": false},
-    {"title": "BEŞİNCİ SAHNE", "visual_type": "checklist", "mood": "defense", "camera": "punch_in", "callout": "3 ALTIN KURAL", "sfx": "shield", "color": "#00FF66", "prop": {"path": "@b1/cyber-shield.png"}, "arrow": false},
-    {"title": "ALTINCI SAHNE", "visual_type": "versus", "mood": "cta", "camera": "wide", "callout": "GÜVENDE KAL!", "sfx": "chime", "color": "#00F0FF", "prop": {"path": "@b1/cyber-padlock-locked.png"}, "arrow": false}
+    {"title": "SAHNE BAŞLIĞI", "visual_type": "notification", "mood": "hook", "camera": "punch_in", "callout": "SAKIN TIKLAMA!", "sfx": "notification", "color": "#38BDF8", "prop": {"path": "@b1/cyber-laptop.png"}, "arrow": false},
+    {"title": "İKİNCİ SAHNE", "visual_type": "url_inspect", "mood": "danger", "camera": "shake", "callout": "TUZAK ALAN ADI!", "sfx": "alert", "color": "#F43F5E", "prop": {"path": "@b1/cyber-skull.png"}, "arrow": true},
+    {"title": "ÜÇÜNCÜ SAHNE", "visual_type": "terminal", "mood": "breach", "camera": "glitch_cut", "callout": "SIZINTI BAŞLADI", "sfx": "glitch", "color": "#F59E0B", "prop": {"path": "@b1/cyber-terminal.png"}, "arrow": false},
+    {"title": "DÖRDÜNCÜ SAHNE", "visual_type": "threat_meter", "mood": "twist", "camera": "zoom_slow", "callout": "GİZLİ RİSK!", "sfx": "radar", "color": "#A78BFA", "prop": {"path": "@b1/cyber-database.png"}, "arrow": false},
+    {"title": "BEŞİNCİ SAHNE", "visual_type": "checklist", "mood": "defense", "camera": "punch_in", "callout": "3 ALTIN KURAL", "sfx": "shield", "color": "#10B981", "prop": {"path": "@b1/cyber-shield.png"}, "arrow": false},
+    {"title": "ALTINCI SAHNE", "visual_type": "versus", "mood": "cta", "camera": "wide", "callout": "GÜVENDE KAL!", "sfx": "chime", "color": "#38BDF8", "prop": {"path": "@b1/cyber-padlock-locked.png"}, "arrow": false}
   ]
 }`, topic, styleDirective, loopRule)
 }
 
 // GenerateScriptViaOllamaAt queries an Ollama endpoint (separated for deterministic testing with httptest).
 func GenerateScriptViaOllamaAt(baseURL, prompt, style string) (*ScriptResult, error) {
-	return generateScriptViaOllamaAtOpts(baseURL, prompt, ScriptOptions{Style: style})
+	return generateScriptViaOllamaAtOpts(context.Background(), baseURL, prompt, ScriptOptions{Style: style})
 }
 
-func generateScriptViaOllamaAtOpts(baseURL, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+func generateScriptViaOllamaAtOpts(parentCtx context.Context, baseURL, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
 	base := strings.TrimRight(baseURL, "/")
-	pingClient := &http.Client{Timeout: 600 * time.Millisecond}
-	pingResp, err := pingClient.Get(base + "/api/tags")
+	pingCtx, pingCancel := context.WithTimeout(parentCtx, 600*time.Millisecond)
+	defer pingCancel()
+	pingReq, err := http.NewRequestWithContext(pingCtx, http.MethodGet, base+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+	pingResp, err := (&http.Client{}).Do(pingReq)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +360,7 @@ func generateScriptViaOllamaAtOpts(baseURL, prompt string, opts ScriptOptions) (
 	_ = json.NewDecoder(pingResp.Body).Decode(&tags)
 	modelName := selectOllamaModel(tags.Models)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 20*time.Second)
 	defer cancel()
 
 	reqBody := map[string]any{
@@ -367,8 +407,11 @@ func generateScriptViaOllamaAtOpts(baseURL, prompt string, opts ScriptOptions) (
 	return parseAndNormalizeScript(ollamaResp.Response, prompt, opts.Style, "ollama:"+modelName)
 }
 
-func generateViaGemini(apiKey, prompt string, opts ScriptOptions) (*ScriptResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+func callGeminiJSON(parentCtx context.Context, apiKey, promptText string, temp float64, timeout time.Duration) (string, error) {
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	endpoint := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
@@ -376,37 +419,36 @@ func generateViaGemini(apiKey, prompt string, opts ScriptOptions) (*ScriptResult
 		"contents": []map[string]any{
 			{
 				"parts": []map[string]string{
-					{"text": buildScriptSystemPromptWithOptions(prompt, opts)},
+					{"text": promptText},
 				},
 			},
 		},
 		"generationConfig": map[string]any{
 			"responseMimeType": "application/json",
-			"temperature":      0.75,
+			"temperature":      temp,
 		},
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", apiKey)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini status: %d", resp.StatusCode)
+		return "", fmt.Errorf("gemini status: %d", resp.StatusCode)
 	}
 
 	var gemResp struct {
@@ -419,29 +461,38 @@ func generateViaGemini(apiKey, prompt string, opts ScriptOptions) (*ScriptResult
 		} `json:"candidates"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&gemResp); err != nil {
-		return nil, err
+		return "", err
 	}
 	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("empty gemini response")
+		return "", fmt.Errorf("empty gemini response")
 	}
 
-	return parseAndNormalizeScript(gemResp.Candidates[0].Content.Parts[0].Text, prompt, opts.Style, "gemini")
+	return gemResp.Candidates[0].Content.Parts[0].Text, nil
 }
 
-func generateViaConfiguredOpenAI(prompt string, opts ScriptOptions) (*ScriptResult, error) {
-	var apiKey, baseURL, model, engineName string
+func generateViaGemini(ctx context.Context, apiKey, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	text, err := callGeminiJSON(ctx, apiKey, buildScriptSystemPromptWithOptions(prompt, opts), 0.75, 18*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return parseAndNormalizeScript(text, prompt, opts.Style, "gemini")
+}
+
+func resolveOpenAICompatibleConfig() (apiKey, baseURL, model, engineName string, ok bool) {
 	if k := strings.TrimSpace(os.Getenv("OPENAI_API_KEY")); k != "" {
 		apiKey = k
 		baseURL = "https://api.openai.com/v1/chat/completions"
 		model = "gpt-4o-mini"
 		engineName = "openai"
+		ok = true
 	} else if k := strings.TrimSpace(os.Getenv("GROQ_API_KEY")); k != "" {
 		apiKey = k
 		baseURL = "https://api.groq.com/openai/v1/chat/completions"
 		model = "llama-3.3-70b-versatile"
 		engineName = "groq"
+		ok = true
 	} else {
-		return nil, fmt.Errorf("no OpenAI-compatible API key configured")
+		return "", "", "", "", false
 	}
 	if customURL := strings.TrimSpace(os.Getenv("TUBIE_OPENAI_BASE_URL")); customURL != "" {
 		baseURL = customURL
@@ -449,41 +500,44 @@ func generateViaConfiguredOpenAI(prompt string, opts ScriptOptions) (*ScriptResu
 	if customModel := strings.TrimSpace(os.Getenv("TUBIE_OPENAI_MODEL")); customModel != "" {
 		model = customModel
 	}
-	return generateViaOpenAICompatible(apiKey, baseURL, model, engineName, prompt, opts)
+	return apiKey, baseURL, model, engineName, true
 }
 
-func generateViaOpenAICompatible(apiKey, endpoint, model, engineTag, prompt string, opts ScriptOptions) (*ScriptResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+func callOpenAICompatibleJSON(parentCtx context.Context, apiKey, endpoint, model, engineTag, systemMsg, userMsg string, temp float64, timeout time.Duration) (string, error) {
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
 	defer cancel()
 
 	reqBody := map[string]any{
 		"model": model,
 		"messages": []map[string]string{
-			{"role": "system", "content": "Sen ana dili Türkçe olan ödüllü bir siber güvenlik kısa video senaristisin. Yalnızca doğal, akıcı Türkçe kullan. Sadece tek bir geçerli JSON objesi döndür."},
-			{"role": "user", "content": buildScriptSystemPromptWithOptions(prompt, opts)},
+			{"role": "system", "content": systemMsg},
+			{"role": "user", "content": userMsg},
 		},
-		"temperature":     0.7,
+		"temperature":     temp,
 		"response_format": map[string]string{"type": "json_object"},
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := (&http.Client{}).Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s status: %d", engineTag, resp.StatusCode)
+		return "", fmt.Errorf("%s status: %d", engineTag, resp.StatusCode)
 	}
 
 	var parsed struct {
@@ -494,17 +548,49 @@ func generateViaOpenAICompatible(apiKey, endpoint, model, engineTag, prompt stri
 		} `json:"choices"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return nil, err
+		return "", err
 	}
 	if len(parsed.Choices) == 0 || strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
-		return nil, fmt.Errorf("empty %s response", engineTag)
+		return "", fmt.Errorf("empty %s response", engineTag)
 	}
-	return parseAndNormalizeScript(parsed.Choices[0].Message.Content, prompt, opts.Style, engineTag+":"+model)
+	return parsed.Choices[0].Message.Content, nil
+}
+
+func generateViaConfiguredOpenAI(ctx context.Context, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	apiKey, baseURL, model, engineName, ok := resolveOpenAICompatibleConfig()
+	if !ok {
+		return nil, fmt.Errorf("no OpenAI-compatible API key configured")
+	}
+	return generateViaOpenAICompatible(ctx, apiKey, baseURL, model, engineName, prompt, opts)
+}
+
+func generateViaOpenAICompatible(ctx context.Context, apiKey, endpoint, model, engineTag, prompt string, opts ScriptOptions) (*ScriptResult, error) {
+	raw, err := callOpenAICompatibleJSON(
+		ctx,
+		apiKey,
+		endpoint,
+		model,
+		engineTag,
+		"Sen ana dili Türkçe olan ödüllü bir siber güvenlik kısa video senaristisin. Yalnızca doğal, akıcı Türkçe kullan. Sadece tek bir geçerli JSON objesi döndür.",
+		buildScriptSystemPromptWithOptions(prompt, opts),
+		0.7,
+		18*time.Second,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseAndNormalizeScript(raw, prompt, opts.Style, engineTag+":"+model)
 }
 
 var (
 	metaLabelLeakRe  = regexp.MustCompile(`(?:^|[\s.!?…])(?:efsane|kanca|köprü|final|giriş|açılış|senaryo|açıklama|kapanış|sahne\s*\d+)\s*:`)
 	spacedPercentRe  = regexp.MustCompile(`\b\d+\s+%`)
+	sentenceSplitRe  = regexp.MustCompile(`[.!?…]+\s*`)
+	numberedRuleRe   = regexp.MustCompile(`(?i)(?:^|[\s.!?;(])(?:Bir|İki|Üç|Dört|Beş|İlk olarak|İkinci olarak|Üçüncü olarak)\s*[:,\-–]\s*([^.!?]+)`)
+	headlinePrefixRe = regexp.MustCompile(`^(?:bir|iki|üç|dört|ilk olarak|ikinci olarak|son olarak|peki|ama|çünkü|üstelik|unutma)[,:\s]+`)
+	nonLetterSpaceRe = regexp.MustCompile(`[^\p{L}\p{N}\s]+`)
+	trailingConjRe   = regexp.MustCompile(`(?i)\s+(?:ve|ama|fakat|ancak|çünkü|ki|ya da|veya)[.…,\s]*$`)
+	slugNonAlnumRe   = regexp.MustCompile(`[^a-z0-9]+`)
 	englishStopwords = map[string]bool{
 		"the": true, "and": true, "with": true, "your": true, "this": true, "that": true,
 		"from": true, "have": true, "will": true, "would": true, "could": true, "should": true,
@@ -1269,7 +1355,7 @@ func normalizeScenes(scenes []SceneDefinition) []SceneDefinition {
 }
 
 func normalizeScenesWithContext(scenes []SceneDefinition, title, narration string) []SceneDefinition {
-	defaultColors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#E056FD", "#00FF66", "#00F0FF"}
+	defaultColors := []string{"#38BDF8", "#F43F5E", "#F59E0B", "#A78BFA", "#10B981", "#38BDF8"}
 	defaultSFX := []string{"notification", "alert", "glitch", "radar", "shield", "chime"}
 	validSFX := map[string]bool{
 		"keyboard": true, "alert": true, "glitch": true,
@@ -1385,6 +1471,15 @@ type topicBlueprint struct {
 	scenes    []SceneDefinition
 }
 
+func lookupTopicBlueprint(id string) topicBlueprint {
+	for _, bp := range cyberTopicLibrary {
+		if bp.id == id {
+			return bp
+		}
+	}
+	return cyberTopicLibrary[0]
+}
+
 var cyberTopicLibrary = []topicBlueprint{
 	{
 		id:       "ai-privacy",
@@ -1400,12 +1495,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Yapay zeka araçlarının internette hakkında profil oluşturmasını engelleyen üç temel kural! Bir: Sohbet pencerelerine kesinlikle şifre, kimlik numarası, açık adres veya finansal veri girme. İki: Kişisel fotoğrafları, iş sözleşmelerini ve başkalarının gizli verilerini analiz için yüklemeden önce anonimleştir. Üç: Kullandığın yapay zeka servislerinde sohbet geçmişini sil, bellek özelliğini sınırla ve “sohbetlerimi model eğitiminde kullan” seçeneğini devre dışı bırak. Unutma: İnternette ücretsiz görünen pek çok araç, paylaştığın verilerle güçlenir. Verini koru, kontrolü elinde tut!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "YAPAY ZEKA SENİ TANIYOR MU?", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SOHBETLERİN PROFİL ÇIKARIYOR!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "HER DETAY DİJİTAL İZ BIRAKIR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "HASSAS VERİ VE BELGE PAYLAŞMA", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "MODEL EĞİTİMİ AYARINI KAPAT!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ÖZEL HAYATINI KONTROL ALTINA AL", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "YAPAY ZEKA SENİ TANIYOR MU?", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SOHBETLERİN PROFİL ÇIKARIYOR!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "HER DETAY DİJİTAL İZ BIRAKIR", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "HASSAS VERİ VE BELGE PAYLAŞMA", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MODEL EĞİTİMİ AYARINI KAPAT!", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÖZEL HAYATINI KONTROL ALTINA AL", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1425,12 +1520,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Sahte bir linki sadece beş saniyede nasıl ayıklarsın? İşte oltalama saldırılarını anında ele veren dört net kontrol! Bir: Alan adını harf harf oku. Saldırganlar küçük l yerine büyük ı veya ek tireler kullanır. İki: Görünen ada değil gerçek göndericiye bak; tanıdık logo ve isim taklit edilebilir. Üç: Aciliyet manipülasyonuna düşme. “Hemen tıkla” ya da “Hesabın kapanacak” gibi cümleler mantıklı düşünmeni engellemek için yazılır. Dört: Adres çubuğundaki HTTPS ve kilit simgesi sitenin dürüst olduğunu değil, yalnızca bağlantının şifreli olduğunu gösterir; sahte sitelerde de kilit simgesi vardır! Şüpheli bir mesaj aldığında linke asla dokunma, doğrudan resmi uygulama veya tarayıcıdan kendin giriş yap. İki aşamalı doğrulamayı aktif tut. Bu kuralları kaydet, güvende kal!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "SAHTE MESAJ EKRANDA!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ACELE DOĞRULAMA TUZAĞI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "KÜÇÜK HARF VE ALAN ADI HİLESİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "KİLİT SİMGESİ GARANTİ DEĞİL!", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "DUR. DÜŞÜN. DOĞRULA!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "2FA AÇ, GÜVENDE KAL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SAHTE MESAJ EKRANDA!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ACELE DOĞRULAMA TUZAĞI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "KÜÇÜK HARF VE ALAN ADI HİLESİ", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "KİLİT SİMGESİ GARANTİ DEĞİL!", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "DUR. DÜŞÜN. DOĞRULA!", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "2FA AÇ, GÜVENDE KAL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1447,12 +1542,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Instagram hesabını çalınmaktan koruyacak dört kesin kural! Birinci kural: “Telif ihlali” veya “Mavi tik kazandınız” diyen DM’lere asla tıklama; Instagram destek ekibi DM’den link atmaz. İkinci kural: Şüpheli bir mail veya mesaj geldiğinde doğrulamayı linkten değil, Ayarlar > Hesaplar Merkezi > Parola ve Güvenlik > Son E-postalar sekmesinden yap. Üçüncü kural: İki faktörlü doğrulamayı SMS yerine mutlaka Authenticator uygulamasıyla aç ve yedek kodları çevrimdışı sakla. Dördüncü kural: Hesabına bağlı bilmediğin üçüncü parti uygulamaları ve eski giriş oturumlarını hemen temizle. Linke yanlışlıkla şifre girdiysen saniyeler içinde parolanı değiştir ve tüm cihazlardan çıkış yap. Bu rehberi kaydet, arkadaşlarını da uyar!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "SAHTE DM BİLDİRİMİ!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TELİF VE MAVİ TİK TUZAĞI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "OTURUM VE ŞİFRE ELE GEÇTİ", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "INSTAGRAM DM'DEN ŞİFRE İSTEMEZ", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "AUTHENTICATOR İLE 2FA AÇ!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "EMEĞİNİ VE HESABINI KORU!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SAHTE DM BİLDİRİMİ!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TELİF VE MAVİ TİK TUZAĞI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "OTURUM VE ŞİFRE ELE GEÇTİ", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "INSTAGRAM DM'DEN ŞİFRE İSTEMEZ", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AUTHENTICATOR İLE 2FA AÇ!", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "EMEĞİNİ VE HESABINI KORU!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1469,12 +1564,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Kripto cüzdanını sıfırlayan üç gizli tuzağı bilmeden işlem onaylama! Bir: Cüzdana gelen sahte NFT ve tokenlar. Üzerindeki web adresine girip cüzdan bağlarsan kötü amaçlı sözleşmeye izin vermiş olursun. İki: Sınırsız harcama yetkisi. İşlem onay penceresinde “Approve” veya “SetApprovalForAll” yetkisi isteyen her site varlıklarını çekebilir. Üç: Sahte destek ekipleri. Telegram veya X üzerinden sana önce yazıp “Cüzdanını senkronize et” diyen herkes dolandırıcıdır. Korunmak için ana bakiyeni soğuk cüzdanda tut, deneme siteleri için ayrı boş bir cüzdan kullan ve gizli kurtarma kelimelerini asla dijital ortama yazma!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "BEDAVA AİRDROP TUZAĞI!", Color: "#FFCC00", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SINIRSIZ HARCAMA İZNİ!", Color: "#FF3B30", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "CÜZDAN BAKİYESİ SIFIRLANDI!", Color: "#FF3B30", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GİZLİ KELİME BİLE GEREKMİYOR!", Color: "#00F0FF", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SOĞUK CÜZDAN VE İZİN İPTALİ", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VARLIKLARINI KORU, UYANIK OL!", Color: "#00FF66", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "BEDAVA AİRDROP TUZAĞI!", Color: "#F59E0B", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SINIRSIZ HARCAMA İZNİ!", Color: "#F43F5E", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "CÜZDAN BAKİYESİ SIFIRLANDI!", Color: "#F43F5E", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GİZLİ KELİME BİLE GEREKMİYOR!", Color: "#38BDF8", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SOĞUK CÜZDAN VE İZİN İPTALİ", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VARLIKLARINI KORU, UYANIK OL!", Color: "#10B981", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1491,12 +1586,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "WhatsApp hesabının tek bir mesajla çalınmasını engellemek için üç net önlem! Bir: Altı haneli SMS doğrulama kodu hesabının anahtarıdır; kim yanlışlıkla istediğini söylerse söylesin asla paylaşma. İki: Tanıdığın birinden kod ya da acil para talebi gelirse yazışmaya devam etmeden doğrudan normal telefon aramasıyla teyit et. Üç: WhatsApp Ayarlar > Hesap > İki Adımlı Doğrulama kısmından kendi altı haneli PIN kodunu oluştur ve kurtarma e-postanı ekle. Böylece saldırgan SMS kodunu ele geçirse bile senin belirlediğin PIN olmadan hesabına asla giremez. Bu bilgiyi ailene de gönder!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "BEKLENMEDİK 6 HANELİ SMS KODU", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ARKADAŞINDAN SAHTE MESAJ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "KODU VERDİĞİN AN HESAP GİDER!", Color: "#FF3B30", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "REHBERİNE DOLANDIRICILIK MESAJI", Color: "#FFCC00", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "İKİ ADIMLI DOĞRULAMA PİN'İ AÇ", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "KODU ASLA KİMSEYE VERME!", Color: "#00FF66", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "BEKLENMEDİK 6 HANELİ SMS KODU", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ARKADAŞINDAN SAHTE MESAJ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "KODU VERDİĞİN AN HESAP GİDER!", Color: "#F43F5E", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "REHBERİNE DOLANDIRICILIK MESAJI", Color: "#F59E0B", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "İKİ ADIMLI DOĞRULAMA PİN'İ AÇ", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "KODU ASLA KİMSEYE VERME!", Color: "#10B981", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1513,12 +1608,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Halka açık Wi-Fi ağlarında verilerinin izlenmesini önleyecek dört pratik adım! Bir: Bankacılık, e-devlet ve ana hesap girişlerini ortak Wi-Fi yerine daima kendi mobil internetinden yap. İki: Telefon ayarlarından “Ağlara otomatik bağlan” seçeneğini kapat; böylece cihazın aynı isimdeki sahte ikiz ağlara habersizce atlamaz. Üç: Herkese açık ağları kullanmak zorundaysan uçtan uca şifreli güvenilir bir VPN aç. Dört: Tarayıcında yalnızca HTTPS bağlantıları kabul eden güvenlik ayarını aktif tut ve işin bitince ortak ağı unut. Basit alışkanlıklar büyük saldırıları durdurur!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "ÜCRETSİZ KAFE WI-FI AĞI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SAHTE İKİZ AĞ (EVİL TWİN)!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "TRAFİĞİN YAN MASADAN İZLENİYOR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "OTOMATİK BAĞLANMAYI KAPAT!", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VPN VEYA MOBİL VERİ KULLAN", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "DİJİTAL İZİNİ ŞİFRELE!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÜCRETSİZ KAFE WI-FI AĞI!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SAHTE İKİZ AĞ (EVİL TWİN)!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "TRAFİĞİN YAN MASADAN İZLENİYOR", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "OTOMATİK BAĞLANMAYI KAPAT!", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VPN VEYA MOBİL VERİ KULLAN", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "DİJİTAL İZİNİ ŞİFRELE!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1535,12 +1630,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Hesaplarının saniyeler içinde kırılmasını önleyen üç temel parola gerçeği! Bir: Sekiz haneli ve sadece küçük harfli bir şifre modern donanımlarla dakikalar değil saniyeler içinde çözülür; en az on dört karakter hedeflenmelidir. İki: En büyük hata dünyanın en güçlü şifresini bile beş farklı sitede kullanmaktır; tek bir sitenin veri sızıntısı bütün hesaplarını düşürür. Üç: Büyük harf, rakam ve sembol içeren eşsiz parolaları güvenli bir parola yöneticisinde sakla ve destekleyen platformlarda şifre yerine Passkey aç. Parola hijyenini bugün yenile!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "AYNI ŞİFRE = TEK ANAHTAR RİSKİ", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SANİYEDE MİLYARLARCA DENEME!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "TEK SIZINTI TÜM HESAPLARI AÇAR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "EN AZ 14 KARAKTER KURALI", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "PAROLA YÖNETİCİSİ VE PASSKEY", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "HER HESABA EŞSİZ KİLİT!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AYNI ŞİFRE = TEK ANAHTAR RİSKİ", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SANİYEDE MİLYARLARCA DENEME!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "TEK SIZINTI TÜM HESAPLARI AÇAR", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "EN AZ 14 KARAKTER KURALI", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "PAROLA YÖNETİCİSİ VE PASSKEY", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "HER HESABA EŞSİZ KİLİT!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1557,12 +1652,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Yapay zeka ses klonlama ve deepfake dolandırıcılığına karşı üç altın kural! Bir: Arayan numara gizliyse veya yabancıysa ve karşıdaki ses yakınınmış gibi acil para istiyorsa görüşmeyi derhal kapatıp gerçek numarayı kendin ara. İki: Ailen ve yakın çevrenle acil durumlar için telefonda sorulacak gizli bir aile parolası belirle; yapay zeka bu kelimeyi tahmin edemez. Üç: Görüntülü aramalarda elini yüzünün önünden geçirmesini veya başını yana çevirmesini isteyerek sahte filtreleri test et. Panik yok, teyit var!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "TANIDIK SESLE PANİK ARAMASI!", Color: "#00F0FF", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "3 SANİYELİK VİDEODAN SES KLONU!", Color: "#FF3B30", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "ACİL PARA MANİPÜLASYONU", Color: "#FFCC00", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GERÇEK NUMARAYI KENDİN ARA!", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "AİLE İÇİ GİZLİ PAROLA BELİRLE", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "DUYMADAN ÖNCE DOĞRULA!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TANIDIK SESLE PANİK ARAMASI!", Color: "#38BDF8", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "3 SANİYELİK VİDEODAN SES KLONU!", Color: "#F43F5E", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "ACİL PARA MANİPÜLASYONU", Color: "#F59E0B", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GERÇEK NUMARAYI KENDİN ARA!", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AİLE İÇİ GİZLİ PAROLA BELİRLE", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "DUYMADAN ÖNCE DOĞRULA!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1579,12 +1674,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Zararlı yazılım ve bilgi hırsızı tuzaklarını durduran dört net savunma! Bir: “Kurulum için Defender’ı veya antivirüsü kapatın” uyarısı yüzde yüz zararlı yazılım işaretidir; dosyayı anında sil. İki: Üçüncü parti sitelerden crackli program ve modlu APK indirme; çoğunun içinde sessiz infostealer gizlidir. Üç: Kaynağından emin olmadığın PDF, ZIP veya EXE dosyalarını açmadan önce VirusTotal’de tara. Dört: Tarayıcı şifre yöneticisi yerine ana parolayla korunan ayrı bir parola yöneticisi kullan ve önemli dosyalarını düzenli çevrimdışı yedekle!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "BEDAVA CRACK VE APK TUZAĞI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ANTİVİRÜSÜ KAPAT YALANI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-bug.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "ÇEREZ VE ŞİFRELER 3 SANİYEDE ÇALINDI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GÖRÜNMEZ İNFOSTEALER TEHLİKESİ", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VİRUSTOTAL VE RESMİ KAYNAK KULLAN", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SİSTEMİNİ TEMİZ TUT, GÜVENDE KAL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "BEDAVA CRACK VE APK TUZAĞI!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ANTİVİRÜSÜ KAPAT YALANI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-bug.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "ÇEREZ VE ŞİFRELER 3 SANİYEDE ÇALINDI", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GÖRÜNMEZ İNFOSTEALER TEHLİKESİ", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VİRUSTOTAL VE RESMİ KAYNAK KULLAN", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SİSTEMİNİ TEMİZ TUT, GÜVENDE KAL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1601,12 +1696,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "SQL Injection açığının mantığı ve üç kesin çözümü! Sorun şu: Uygulama kullanıcı girdisini temizlemeden doğrudan SQL metnine eklediğinde, saldırgan sorgunun yapısını değiştirip yetkisiz veri çekebilir. Çözüm bir: Bütün veritabanı işlemlerinde mutlaka parametrik sorgular veya güvenli ORM binding kullan; metin birleştirme yapma. Çözüm iki: En az yetki ilkesini uygula; web uygulamasının veritabanı hesabı tablo silme veya tam okuma yetkisine sahip olmasın. Çözüm üç: Ham SQL hata çıktılarını gizle ve WAF ile anormal sorgu denemelerini izle. Sağlam mimari ilk satırda başlar!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "MASUM GÖRÜNEN GİRİŞ KUTUSU", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TEK TIRNAK VE 'OR 1=1' HİLESİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "VERİTABANI KONTROLÜ ATLANDI!", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ADMİN YETKİSİ ELE GEÇİRİLDİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "PARAMETRİK SORGU KULLAN!", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "KODUNU KORU, VERİNİ KORU!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MASUM GÖRÜNEN GİRİŞ KUTUSU", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TEK TIRNAK VE 'OR 1=1' HİLESİ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "VERİTABANI KONTROLÜ ATLANDI!", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ADMİN YETKİSİ ELE GEÇİRİLDİ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "PARAMETRİK SORGU KULLAN!", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "KODUNU KORU, VERİNİ KORU!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1623,12 +1718,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Fiziksel ortamlardaki QR ve USB tuzaklarına karşı üç net güvenlik alışkanlığı! Bir: QR kodu okuttuğunda linke otomatik atlama; önizlemede görünen alan adının gerçekten ilgili kuruma ait olup olmadığını kontrol et. İki: Kafe, otopark veya sokak afişlerindeki QR etiketlerin üzerine sonradan başka bir sticker yapıştırılıp yapıştırılmadığına bak. Üç: Havalimanı ve AVM’lerdeki açık USB şarj istasyonlarına telefonunu doğrudan bağlama; veri aktarımı riskine karşı priz adaptörü veya kendi powerbankini tercih et. Küçük dikkat büyük kaybı önler!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "MASUM GÖRÜNEN QR KOD!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ÜZERİNE YAPIŞTIRILAN SAHTE ETİKET!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "SAHTE ÖDEME SAYFASI AÇILDI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ÖNCE ÖNİZLEME ADRESİNİ OKU!", Color: "#E056FD", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "RESMİ UYGULAMADAN İŞLEM YAP", Color: "#00FF66", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GÖZÜNLE DEĞİL KONTROLLE GÜVEN!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MASUM GÖRÜNEN QR KOD!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÜZERİNE YAPIŞTIRILAN SAHTE ETİKET!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "SAHTE ÖDEME SAYFASI AÇILDI", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÖNCE ÖNİZLEME ADRESİNİ OKU!", Color: "#A78BFA", SFX: "paper", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "RESMİ UYGULAMADAN İŞLEM YAP", Color: "#10B981", SFX: "lock", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GÖZÜNLE DEĞİL KONTROLLE GÜVEN!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1645,12 +1740,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Fidye yazılımlarına karşı tam koruma sağlayan üç altın savunma! Bir: 3-2-1 yedekleme kuralını kur; kritik verinin üç kopyasını iki farklı ortamda tut ve en az biri tamamen çevrimdışı olsun. İki: E-postadaki ZIP, ISO veya sahte çift uzantılı fatura eklerini asla doğrudan açma. Üç: Sistem güncellemelerini ve fidye korumasını aktif tut. Çevrimdışı yedek, fidye yazılımının tek kesin ilacıdır!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "MASUM FATURA EKİ TUZAĞI!", Color: "#00F0FF", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TÜM DOSYALAR ŞİFRELENDİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "48 SAAT FİDYE GERİ SAYIMI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "FİDYE ÖDEMEK ÇÖZÜM DEĞİL!", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "3-2-1 ÇEVRİMDIŞI YEDEK KURALI", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VERİNİ KOPUK DİSKTE KORU!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MASUM FATURA EKİ TUZAĞI!", Color: "#38BDF8", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TÜM DOSYALAR ŞİFRELENDİ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "48 SAAT FİDYE GERİ SAYIMI", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "FİDYE ÖDEMEK ÇÖZÜM DEĞİL!", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "3-2-1 ÇEVRİMDIŞI YEDEK KURALI", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VERİNİ KOPUK DİSKTE KORU!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1667,12 +1762,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "SIM Swapping yani hat kopyalama saldırısını durduran üç net adım! Bir: Bankacılık ve ana e-posta hesaplarında SMS ile doğrulama yerine Google Authenticator veya Passkey kullan; SIM kopyalansa bile kodların güvende kalır. İki: Operatör müşteri hizmetlerinden SIM değişikliği için ek sözlü veya yazılı doğrulama kilidi tanımlat. Üç: Sebepsiz şebeke kesintisinde vakit kaybetmeden bankanı ve operatörünü ara. SMS tek başına yeterli kalkan değildir!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "ANİDEN 'SERVİS YOK' UYARISI!", Color: "#00F0FF", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "NUMARAN BAŞKA CİHAZA TAŞINDI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "SMS KODLARI HACKERA GİDİYOR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SMS 2FA TEK BAŞINA YETMEZ!", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "AUTHENTICATOR VE SIM KİLİDİ AÇ", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "KODLARINI CİHAZDA TUT!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ANİDEN 'SERVİS YOK' UYARISI!", Color: "#38BDF8", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "NUMARAN BAŞKA CİHAZA TAŞINDI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "SMS KODLARI HACKERA GİDİYOR", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SMS 2FA TEK BAŞINA YETMEZ!", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AUTHENTICATOR VE SIM KİLİDİ AÇ", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "KODLARINI CİHAZDA TUT!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1689,12 +1784,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Tarayıcı eklentileri üzerinden oturum çerezi hırsızlığını önleyen üç keskin adım! Bir: Chrome veya Edge ayarlarından yüklü eklentileri denetle, tanımadığın ve eski eklentileri derhal sil. İki: Her eklentinin site erişim iznini 'Tüm sitelerde' yerine 'Tıklandığında' seçeneğine çek. Üç: Finans, e-posta ve yönetim panelleri için eklentisiz temiz bir tarayıcı profili kullan!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "ÜCRETSİZ TARAYICI EKLENTİSİ!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TÜM SİTELERİ OKUMA İZNİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-bug.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "2FA BİLE ATLANDI: ÇEREZ ÇALINDI!", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "OTURUM BİLETİN KOPYALANDI!", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GEREKSİZ EKLENTİLERİ SİL & KISITLA", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TEMİZ PROFİL İLE GÜVENDE KAL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ÜCRETSİZ TARAYICI EKLENTİSİ!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TÜM SİTELERİ OKUMA İZNİ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-bug.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "2FA BİLE ATLANDI: ÇEREZ ÇALINDI!", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "OTURUM BİLETİN KOPYALANDI!", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GEREKSİZ EKLENTİLERİ SİL & KISITLA", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TEMİZ PROFİL İLE GÜVENDE KAL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1711,12 +1806,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Veri sızıntılarına karşı üç dakikalık temizlik planı! Bir: E-posta adresini güvenilir veri sızıntısı kontrol servislerinden sorgula ve hangi eski sitelerin sızdığını gör. İki: O sitede kullandığın parolayı hala başka bir yerde kullanıyorsan hemen değiştir. Üç: Bir parola yöneticisiyle her platforma bambaşka şifreler ata ve Authenticator ile 2FA aç. Bir sızıntı tüm hesaplarını düşürmesin!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "UNUTTUĞUN ESKİ ÜYELİK SİTESİ!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
-			{Title: "DARK WEB LİSTESİNDE SIZINTI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "BOTLAR ŞİFRENİ HER YERDE DENİYOR", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TEK PAROLA ZİNCİRLEME ÇÖKÜŞTÜR", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SIZINTI KONTROLÜ & EŞSİZ PAROLA", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "BİR SIZINTI HER ŞEYİ AÇMASIN!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "UNUTTUĞUN ESKİ ÜYELİK SİTESİ!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
+			{Title: "DARK WEB LİSTESİNDE SIZINTI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "BOTLAR ŞİFRENİ HER YERDE DENİYOR", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TEK PAROLA ZİNCİRLEME ÇÖKÜŞTÜR", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SIZINTI KONTROLÜ & EŞSİZ PAROLA", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "BİR SIZINTI HER ŞEYİ AÇMASIN!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1733,12 +1828,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Sahte E-Devlet ve banka SMS tuzaklarını anında çözen üç net kural! Bir: Resmi kurumlar mesajdaki bağlantıyla kart veya şifre toplama sayfası açmaz. İki: Tarayıcıda alan adını kontrol et; gerçek adres sadece turkiye.gov.tr veya bankanın kendi uygulamasıdır. Üç: 'Son iki saat', 'icra başlıyor' gibi panik yaratan ifadeler gördüğünde doğrudan resmi uygulamadan sorgulama yap!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "RESMİ GÖRÜNÜMLÜ BORÇ SMS'İ!", Color: "#00F0FF", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SON GÜN PANİK MANİPÜLASYONU!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "ALAN ADINDA HARF HİLESİ!", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "KART VE ŞİFRENİ TOPLUYORLAR!", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
-			{Title: "SADECE RESMİ UYGULAMADAN GİR", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "PANİK DEĞİL DOĞRULAMA KURTARIR!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "RESMİ GÖRÜNÜMLÜ BORÇ SMS'İ!", Color: "#38BDF8", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-laptop.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SON GÜN PANİK MANİPÜLASYONU!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "ALAN ADINDA HARF HİLESİ!", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "KART VE ŞİFRENİ TOPLUYORLAR!", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-padlock-unlocked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "SADECE RESMİ UYGULAMADAN GİR", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "PANİK DEĞİL DOĞRULAMA KURTARIR!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1755,12 +1850,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Evindeki akıllı cihazları siber saldırılara karşı zırhlayan üç net kural! Bir: Güvenlik kamerası, modem ve tüm IoT cihazlarındaki varsayılan 'admin' şifresini kurulumdan hemen sonra eşsiz güçlü parolayla değiştir. İki: Akıllı televizyon ve sensörleri ana bilgisayarından ayırarak izole bir misafir Wi-Fi veya VLAN ağına bağla. Üç: Cihaz firmware güncellemelerini düzenli uygula ve uzaktan erişim ile UPnP özelliğini kapat; eski yazılım açıklarını botnet ağlarına teslim etme! Bu rehberi kaydet, ev ağını koru!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "AKILLI KAMERA VE MODEM AÇIĞI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VARSAYILAN 'ADMİN' ŞİFRESİ RİSKİ", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "BOTLAR AÇIK CİHAZLARI TARIYOR!", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "ANA AĞINA SIÇRAMA TEHLİKESİ", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
-			{Title: "MİSAFİR AĞINA İZOLE ET & ŞİFRELE", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "EV AĞINI ZIRH ALTINA AL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AKILLI KAMERA VE MODEM AÇIĞI!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VARSAYILAN 'ADMİN' ŞİFRESİ RİSKİ", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "BOTLAR AÇIK CİHAZLARI TARIYOR!", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "ANA AĞINA SIÇRAMA TEHLİKESİ", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
+			{Title: "MİSAFİR AĞINA İZOLE ET & ŞİFRELE", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "EV AĞINI ZIRH ALTINA AL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1777,12 +1872,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Yapay zeka ajanlarını hedef alan Prompt Injection saldırısına karşı üç temel savunma! Bir: Dış kaynaklardan gelen metinleri ve belgeleri güvenilir olmayan veri olarak izole et. İki: Ajanların araç ve veri erişim yetkilerini en dar kapsamla sınırla; okuma ve dışa aktarma yetkilerini ayır. Üç: Dosya silme, mail gönderme veya API çağrısı gibi kritik adımlarda insan onayı zorunluluğu koy!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "GÖRÜNMEZ GİZLİ KOMUT SATIRI!", Color: "#00F0FF", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "PROMPT INJECTION SALDIRISI!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "YAPAY ZEKA VERİYİ SIZDIRIYOR!", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
-			{Title: "VERİ İLE TALİMATI BİRBİRİNDEN AYIR", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "EN DÜŞÜK YETKİ & İNSAN ONAYI", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "AJANINI İZOLE ET, GÜVENDE KAL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GÖRÜNMEZ GİZLİ KOMUT SATIRI!", Color: "#38BDF8", SFX: "keyboard", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "PROMPT INJECTION SALDIRISI!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "YAPAY ZEKA VERİYİ SIZDIRIYOR!", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-database.png", X: 390, Y: 1040, W: 500}},
+			{Title: "VERİ İLE TALİMATI BİRBİRİNDEN AYIR", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "EN DÜŞÜK YETKİ & İNSAN ONAYI", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AJANINI İZOLE ET, GÜVENDE KAL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 	{
@@ -1799,12 +1894,12 @@ var cyberTopicLibrary = []topicBlueprint{
 			StyleInformative: "Bluetooth ve gizli konum takip risklerine karşı üç pratik önlem! Bir: İhtiyacın olmadığı saatlerde Bluetooth'u ve herkese açık dosya paylaşımını kapat. İki: iOS ve Android üzerinde 'Bilinmeyen Takipçi Uyarıları' özelliğinin aktif olduğunu doğrula. Üç: Kablosuz yonga açıklarını kapatan aylık güvenlik güncellemelerini ihmal etme!",
 		},
 		scenes: []SceneDefinition{
-			{Title: "AÇIK UNUTULAN BLUETOOTH SİNYALİ", Color: "#00F0FF", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
-			{Title: "GİZLİ KONUM VE İZLEYİCİ RİSKİ!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-			{Title: "YAKIN MESAFE SİNYAL TARAMASI", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
-			{Title: "TAKİPÇİ UYARILARINI KONTROL ET", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-			{Title: "İŞİN BİTİNCE SİNYALİ KAPAT!", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-			{Title: "DİJİTAL İZİNİ GİZLE, GÜVENDE KAL!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+			{Title: "AÇIK UNUTULAN BLUETOOTH SİNYALİ", Color: "#38BDF8", SFX: "notification", Prop: &SceneProp{Path: "@b1/cyber-wifi.png", X: 390, Y: 1040, W: 500}},
+			{Title: "GİZLİ KONUM VE İZLEYİCİ RİSKİ!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+			{Title: "YAKIN MESAFE SİNYAL TARAMASI", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: "@b1/cyber-terminal.png", X: 390, Y: 1040, W: 500}},
+			{Title: "TAKİPÇİ UYARILARINI KONTROL ET", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+			{Title: "İŞİN BİTİNCE SİNYALİ KAPAT!", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+			{Title: "DİJİTAL İZİNİ GİZLE, GÜVENDE KAL!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 		},
 	},
 }
@@ -1900,7 +1995,6 @@ func applyLoopEndingIfRequested(title, narration string, loop bool) string {
 		}
 	}
 	// Strip dangling trailing conjunctions left by LLM ellipsis endings (e.g. "...parçasıdır ve...")
-	trailingConjRe := regexp.MustCompile(`(?i)\s+(?:ve|ama|fakat|ancak|çünkü|ki|ya da|veya)[.…,\s]*$`)
 	cleaned = strings.TrimSpace(trailingConjRe.ReplaceAllString(cleaned, ""))
 	cleaned = strings.TrimRight(cleaned, "…")
 	cleaned = strings.TrimSpace(cleaned)
@@ -2204,12 +2298,12 @@ func buildDynamicScenarioWithOptions(prompt string, opts ScriptOptions) *ScriptR
 	}
 
 	scenes := []SceneDefinition{
-		{Title: shortUpper + " RİSKİ!", Color: "#00F0FF", SFX: "notification", Prop: &SceneProp{Path: hint.prop1, X: 390, Y: 1040, W: 500}},
-		{Title: "GÖRÜNMEYEN AÇIK NOKTA!", Color: "#FF3B30", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
-		{Title: "ARKA PLANDA SESSİZ SIZMA", Color: "#FFCC00", SFX: "glitch", Prop: &SceneProp{Path: hint.prop2, X: 390, Y: 1040, W: 500}},
-		{Title: "YANILGIYI FARK ET!", Color: "#E056FD", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
-		{Title: "DUR. DÜŞÜN. DOĞRULA!", Color: "#00FF66", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
-		{Title: "KONTROLÜ ELİNDE TUT!", Color: "#00F0FF", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
+		{Title: shortUpper + " RİSKİ!", Color: "#38BDF8", SFX: "notification", Prop: &SceneProp{Path: hint.prop1, X: 390, Y: 1040, W: 500}},
+		{Title: "GÖRÜNMEYEN AÇIK NOKTA!", Color: "#F43F5E", SFX: "alert", Prop: &SceneProp{Path: "@b1/cyber-skull.png", X: 390, Y: 1040, W: 500}, Arrow: true},
+		{Title: "ARKA PLANDA SESSİZ SIZMA", Color: "#F59E0B", SFX: "glitch", Prop: &SceneProp{Path: hint.prop2, X: 390, Y: 1040, W: 500}},
+		{Title: "YANILGIYI FARK ET!", Color: "#A78BFA", SFX: "radar", Prop: &SceneProp{Path: "@b1/idea-bulb-crayon.png", X: 390, Y: 1040, W: 500}},
+		{Title: "DUR. DÜŞÜN. DOĞRULA!", Color: "#10B981", SFX: "shield", Prop: &SceneProp{Path: "@b1/cyber-shield.png", X: 390, Y: 1040, W: 500}},
+		{Title: "KONTROLÜ ELİNDE TUT!", Color: "#38BDF8", SFX: "chime", Prop: &SceneProp{Path: "@b1/cyber-padlock-locked.png", X: 390, Y: 1040, W: 500}},
 	}
 
 	normScenes := normalizeScenesWithContext(scenes, title, narration)
@@ -2232,7 +2326,7 @@ func EnsureScenesForScript(title, narration string) []SceneDefinition {
 	shortTopic := compactSceneTopic(title)
 	if len(sentences) >= 6 {
 		step := float64(len(sentences)) / 6.0
-		colors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#E056FD", "#00FF66", "#00F0FF"}
+		colors := []string{"#38BDF8", "#F43F5E", "#F59E0B", "#A78BFA", "#10B981", "#38BDF8"}
 		sfxs := []string{"notification", "alert", "glitch", "radar", "shield", "chime"}
 		scenes := make([]SceneDefinition, 0, 6)
 		for i := 0; i < 6; i++ {
@@ -2261,8 +2355,8 @@ func EnsureScenesForScript(title, narration string) []SceneDefinition {
 
 func buildSceneHeadline(sentence, topicShort string, idx int) string {
 	cleaned := cleanMarkdownInline(sentence)
-	cleaned = regexp.MustCompile(`^(?:bir|iki|üç|dört|ilk olarak|ikinci olarak|son olarak|peki|ama|çünkü|üstelik|unutma)[,:\s]+`).ReplaceAllString(strings.ToLowerSpecial(unicode.TurkishCase, cleaned), "")
-	cleaned = regexp.MustCompile(`[^\p{L}\p{N}\s]+`).ReplaceAllString(cleaned, " ")
+	cleaned = headlinePrefixRe.ReplaceAllString(strings.ToLowerSpecial(unicode.TurkishCase, cleaned), "")
+	cleaned = nonLetterSpaceRe.ReplaceAllString(cleaned, " ")
 	words := strings.Fields(cleaned)
 	if len(words) == 0 {
 		if idx == 0 {
@@ -2326,88 +2420,77 @@ Yanıtını SADECE tek bir geçerli JSON objesi olarak ver:
 
 // GenerateViralMetadata produces high-converting A/B/C titles, caption text, and hashtags.
 func GenerateViralMetadata(title, narration string) ViralMetadata {
+	return GenerateViralMetadataContext(context.Background(), title, narration)
+}
+
+// GenerateViralMetadataContext produces high-converting A/B/C titles, caption text, and hashtags with cancellation support.
+func GenerateViralMetadataContext(ctx context.Context, title, narration string) ViralMetadata {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	allowLiveAI := !testing.Testing() && os.Getenv("TUBIE_OFFLINE_AI") != "1"
-	if allowLiveAI {
+	if allowLiveAI && ctx.Err() == nil {
 		if apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY")); apiKey != "" {
-			if vm, err := generateViralViaGemini(apiKey, title, narration); err == nil && vm != nil {
+			if vm, err := generateViralViaGemini(ctx, apiKey, title, narration); err == nil && vm != nil {
 				return NormalizeViralMetadata(*vm, title, narration)
 			}
 		}
-		if ollamaHasWarmModel(defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1" {
-			if vm, err := generateViralViaOllama(title, narration); err == nil && vm != nil {
+		if vm, err := generateViralViaConfiguredOpenAI(ctx, title, narration); err == nil && vm != nil {
+			return NormalizeViralMetadata(*vm, title, narration)
+		}
+		if ollamaHasWarmModel(ctx, defaultOllamaBaseURL) || os.Getenv("TUBIE_USE_OLLAMA") == "1" {
+			if vm, err := generateViralViaOllama(ctx, title, narration); err == nil && vm != nil {
 				return NormalizeViralMetadata(*vm, title, narration)
 			}
 		}
-		if vm, err := generateViralViaG4F(title, narration); err == nil && vm != nil {
+		if vm, err := generateViralViaG4F(ctx, title, narration); err == nil && vm != nil {
 			return NormalizeViralMetadata(*vm, title, narration)
 		}
 	}
 	return NormalizeViralMetadata(generateViralViaTemplates(title, narration), title, narration)
 }
 
-func generateViralViaGemini(apiKey, title, narration string) (*ViralMetadata, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	endpoint := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-	reqBody := map[string]any{
-		"contents": []map[string]any{
-			{
-				"parts": []map[string]string{
-					{"text": buildViralMetadataPrompt(title, narration)},
-				},
-			},
-		},
-		"generationConfig": map[string]any{
-			"responseMimeType": "application/json",
-			"temperature":      0.7,
-		},
-	}
-
-	bodyBytes, err := json.Marshal(reqBody)
+func generateViralViaGemini(ctx context.Context, apiKey, title, narration string) (*ViralMetadata, error) {
+	text, err := callGeminiJSON(ctx, apiKey, buildViralMetadataPrompt(title, narration), 0.7, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-goog-api-key", apiKey)
-
-	resp, err := (&http.Client{}).Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini status: %d", resp.StatusCode)
-	}
-
-	var gemResp struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&gemResp); err != nil {
-		return nil, err
-	}
-	if len(gemResp.Candidates) == 0 || len(gemResp.Candidates[0].Content.Parts) == 0 {
-		return nil, fmt.Errorf("empty gemini response")
-	}
-
-	return parseAndNormalizeViralMetadata(gemResp.Candidates[0].Content.Parts[0].Text)
+	return parseAndNormalizeViralMetadata(text)
 }
 
-func generateViralViaOllama(title, narration string) (*ViralMetadata, error) {
-	pingClient := &http.Client{Timeout: 500 * time.Millisecond}
-	pingResp, err := pingClient.Get(defaultOllamaBaseURL + "/api/tags")
+func generateViralViaConfiguredOpenAI(ctx context.Context, title, narration string) (*ViralMetadata, error) {
+	apiKey, baseURL, model, engineName, ok := resolveOpenAICompatibleConfig()
+	if !ok {
+		return nil, fmt.Errorf("no OpenAI-compatible API key configured")
+	}
+	raw, err := callOpenAICompatibleJSON(
+		ctx,
+		apiKey,
+		baseURL,
+		model,
+		engineName,
+		"Sen Türkçe siber güvenlik videoları için yüksek dönüşümlü sosyal medya paylaşım paketi üreten katı bir JSON API'sin. Yalnızca geçerli tek bir JSON objesi döndür.",
+		buildViralMetadataPrompt(title, narration),
+		0.7,
+		15*time.Second,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseAndNormalizeViralMetadata(raw)
+}
+
+func generateViralViaOllama(parentCtx context.Context, title, narration string) (*ViralMetadata, error) {
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	pingCtx, pingCancel := context.WithTimeout(parentCtx, 500*time.Millisecond)
+	defer pingCancel()
+	pingReq, err := http.NewRequestWithContext(pingCtx, http.MethodGet, defaultOllamaBaseURL+"/api/tags", nil)
+	if err != nil {
+		return nil, err
+	}
+	pingResp, err := (&http.Client{}).Do(pingReq)
 	if err != nil {
 		return nil, err
 	}
@@ -2420,7 +2503,7 @@ func generateViralViaOllama(title, narration string) (*ViralMetadata, error) {
 	_ = json.NewDecoder(pingResp.Body).Decode(&tags)
 	modelName := selectOllamaModel(tags.Models)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
 	defer cancel()
 
 	reqBody := map[string]any{
@@ -2794,8 +2877,7 @@ func splitSentences(text string) []string {
 	if cleaned == "" {
 		return nil
 	}
-	re := regexp.MustCompile(`[.!?…]+\s*`)
-	raw := re.Split(cleaned, -1)
+	raw := sentenceSplitRe.Split(cleaned, -1)
 	out := make([]string, 0, len(raw))
 	for _, s := range raw {
 		s = strings.TrimSpace(s)
@@ -2807,8 +2889,7 @@ func splitSentences(text string) []string {
 }
 
 func extractNumberedRules(narration string) []string {
-	re := regexp.MustCompile(`(?i)(?:^|[\s.!?;(])(?:Bir|İki|Üç|Dört|Beş|İlk olarak|İkinci olarak|Üçüncü olarak)\s*[:,\-–]\s*([^.!?]+)`)
-	matches := re.FindAllStringSubmatch(cleanMarkdownInline(narration), -1)
+	matches := numberedRuleRe.FindAllStringSubmatch(cleanMarkdownInline(narration), -1)
 	rules := make([]string, 0, len(matches))
 	for _, m := range matches {
 		rule := strings.TrimSpace(m[1])
@@ -3023,8 +3104,7 @@ func slugify(text string) string {
 		"â", "a", "Â", "a", "î", "i", "Î", "i", "û", "u", "Û", "u",
 	)
 	normalized := r.Replace(lower)
-	re := regexp.MustCompile(`[^a-z0-9]+`)
-	slug := re.ReplaceAllString(normalized, "_")
+	slug := slugNonAlnumRe.ReplaceAllString(normalized, "_")
 	slug = strings.Trim(slug, "_")
 	if len(slug) > 40 {
 		slug = slug[:40]

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -357,26 +356,11 @@ type g4fResponse struct {
 	Error  string `json:"error"`
 }
 
-func resolvePythonBinary() string {
-	if override := strings.TrimSpace(os.Getenv("PYTHON")); override != "" {
-		return override
-	}
-	py := BinaryPath("python")
-	if runtime.GOOS != "windows" {
-		if _, err := exec.LookPath(py); err != nil {
-			if p3, err3 := exec.LookPath("python3"); err3 == nil {
-				return p3
-			}
-		}
-	}
-	return py
-}
-
 // CheckG4FAvailable reports whether Python can import g4f cleanly without network calls.
 func CheckG4FAvailable() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, resolvePythonBinary(), "-c", "import g4f")
+	cmd := exec.CommandContext(ctx, ResolvePythonBinary(), "-c", "import g4f")
 	cmd.Dir = os.TempDir()
 	return cmd.Run() == nil
 }
@@ -387,7 +371,7 @@ func invokeG4F(ctx context.Context, req g4fRequest) (*g4fResponse, error) {
 		return nil, err
 	}
 
-	cmd := exec.CommandContext(ctx, resolvePythonBinary(), "-c", g4fBridgeScript)
+	cmd := exec.CommandContext(ctx, ResolvePythonBinary(), "-c", g4fBridgeScript)
 	cmd.Dir = os.TempDir()
 	cmd.WaitDelay = 3 * time.Second
 	cmd.Stdin = bytes.NewReader(payload)
@@ -411,8 +395,11 @@ func invokeG4F(ctx context.Context, req g4fRequest) (*g4fResponse, error) {
 	return &resp, nil
 }
 
-func generateScriptViaG4F(topic string, opts ScriptOptions) (*ScriptResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), g4fRunnerTimeout)
+func generateScriptViaG4F(ctx context.Context, topic string, opts ScriptOptions) (*ScriptResult, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, g4fRunnerTimeout)
 	defer cancel()
 
 	noBrowser := strings.TrimSpace(os.Getenv("TUBIE_G4F_NO_BROWSER")) == "1"
@@ -433,8 +420,11 @@ func generateScriptViaG4F(topic string, opts ScriptOptions) (*ScriptResult, erro
 	return parseAndNormalizeScript(resp.JSON, topic, opts.Style, resp.Engine)
 }
 
-func generateViralViaG4F(title, narration string) (*ViralMetadata, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), g4fRunnerTimeout)
+func generateViralViaG4F(ctx context.Context, title, narration string) (*ViralMetadata, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, g4fRunnerTimeout)
 	defer cancel()
 
 	noBrowser := strings.TrimSpace(os.Getenv("TUBIE_G4F_NO_BROWSER")) == "1"
