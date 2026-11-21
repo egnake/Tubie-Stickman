@@ -2,6 +2,7 @@ package tubie
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -129,6 +130,7 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		p.Reporter(map[string]any{"stage": "captions", "label": "Kusursuz altyazılar ve sahneler senkronize ediliyor", "slug": preset.Slug})
 	}
 
+	speechLevels := ExtractSpeechLevels(narrationWav, 30, dur)
 	captions, timedWords := AlignAndBuildCaptions(preset.Narration, narrationWav, dur)
 	boundaries := ComputeSceneBoundaries(preset.Scenes, timedWords, preset.Narration, dur)
 	shots := BuildStoryboardWithOptions(preset.Scenes, dur, StoryboardOptions{
@@ -136,6 +138,7 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		Height:     fmtSpec.Height,
 		TimedWords: timedWords,
 		Narration:  preset.Narration,
+		VideoTitle: preset.Title,
 	})
 	sfxList := BuildSoundDesignWithTimings(preset.Scenes, boundaries, dur)
 
@@ -143,18 +146,19 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		"version":            1,
 		"style":              "B1",
 		"theme":              "cyber",
-		"backgroundColor":    "#0A0E17",
+		"backgroundColor":    "#0B0F19",
 		"width":              fmtSpec.Width,
 		"height":             fmtSpec.Height,
 		"fps":                30,
 		"duration":           dur,
+		"loopEnding":         p.LoopEnding,
 		"captionStyle":       "viral",
 		"captionSize":        fmtSpec.CaptionSize,
 		"captionY":           fmtSpec.CaptionY,
-		"captionColor":       "#00FF66",
-		"captionActiveColor": "#00FF66",
-		"captionBg":          "rgba(7, 12, 20, 0.96)",
-		"captionBorder":      "rgba(0, 255, 128, 0.50)",
+		"captionColor":       "#F8FAFC",
+		"captionActiveColor": "#38BDF8",
+		"captionBg":          "rgba(15, 23, 42, 0.92)",
+		"captionBorder":      "rgba(148, 163, 184, 0.24)",
 		"voice": map[string]any{
 			"path": "narration.wav",
 			"lead": 0.0,
@@ -162,6 +166,9 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		"shots":    shots,
 		"captions": captions,
 		"sfx":      sfxList,
+	}
+	if len(speechLevels) > 0 {
+		projectConfig["speechLevels"] = speechLevels
 	}
 
 	// Dynamic Background Music (BGM)
@@ -176,9 +183,11 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 			bgmPath = filepath.Join(p.Root, "assets", "audio", "bgm_cyber.wav")
 		}
 		if _, err := os.Stat(bgmPath); err == nil {
-			_ = copyFile(bgmPath, filepath.Join(projectDir, "bgm.wav"))
-			projectConfig["music"] = map[string]any{"path": "bgm.wav", "gain": 0.16}
-			projectConfig["bgm"] = map[string]any{"path": "bgm.wav", "gain": 0.16}
+			if err := copyFile(bgmPath, filepath.Join(projectDir, "bgm.wav")); err != nil {
+				fmt.Printf("⚠️ Arka plan müziği kopyalanamadı: %v\n", err)
+			} else {
+				projectConfig["music"] = map[string]any{"path": "bgm.wav", "gain": 0.16}
+			}
 		}
 	}
 
@@ -210,7 +219,8 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		if err != nil {
 			return err
 		}
-		cmd.Stderr = os.Stderr
+		var stderrBuf bytes.Buffer
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
 
 		if err := cmd.Start(); err != nil {
 			return err
@@ -232,7 +242,17 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 			}
 		}
 
-		return cmd.Wait()
+		if err := cmd.Wait(); err != nil {
+			errMsg := strings.TrimSpace(stderrBuf.String())
+			if len(errMsg) > 4096 {
+				errMsg = errMsg[len(errMsg)-4096:]
+			}
+			if errMsg != "" {
+				return fmt.Errorf("%w: %s", err, errMsg)
+			}
+			return err
+		}
+		return nil
 	}
 
 	liveArgs := []string{}
@@ -288,17 +308,27 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 
 	// 1. SubRip (.srt) & WebVTT (.vtt) subtitle exports
 	cleanSrt := FormatSRT(captions)
-	_ = os.WriteFile(filepath.Join(videoFolder, preset.Slug+".srt"), []byte(cleanSrt), 0644)
-	_ = os.WriteFile(filepath.Join(projectDir, "output", "film.srt"), []byte(cleanSrt), 0644)
+	if err := os.WriteFile(filepath.Join(videoFolder, preset.Slug+".srt"), []byte(cleanSrt), 0644); err != nil {
+		fmt.Printf("⚠️ SRT dosyası yazılamadı: %v\n", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "output", "film.srt"), []byte(cleanSrt), 0644); err != nil {
+		fmt.Printf("⚠️ film.srt yazılamadı: %v\n", err)
+	}
 
 	cleanVtt := FormatVTT(captions)
-	_ = os.WriteFile(filepath.Join(videoFolder, preset.Slug+".vtt"), []byte(cleanVtt), 0644)
-	_ = os.WriteFile(filepath.Join(projectDir, "output", "film.vtt"), []byte(cleanVtt), 0644)
+	if err := os.WriteFile(filepath.Join(videoFolder, preset.Slug+".vtt"), []byte(cleanVtt), 0644); err != nil {
+		fmt.Printf("⚠️ VTT dosyası yazılamadı: %v\n", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "output", "film.vtt"), []byte(cleanVtt), 0644); err != nil {
+		fmt.Printf("⚠️ film.vtt yazılamadı: %v\n", err)
+	}
 
 	// 2. aciklama.txt (A/B/C/D/E test titles, pinned comment, viral hashtags)
 	viralMeta := GenerateViralMetadata(preset.Title, preset.Narration)
 	viralText := FormatViralText(preset.Title, preset.Narration, viralMeta)
-	_ = os.WriteFile(filepath.Join(videoFolder, "aciklama.txt"), []byte(viralText), 0644)
+	if err := os.WriteFile(filepath.Join(videoFolder, "aciklama.txt"), []byte(viralText), 0644); err != nil {
+		fmt.Printf("⚠️ aciklama.txt yazılamadı: %v\n", err)
+	}
 
 	// 3. viral_report.json
 	viralReport := AnalyzeScriptVirality(preset.Title, preset.Narration, preset.Scenes, p.LoopEnding)
@@ -317,8 +347,10 @@ func (p *Pipeline) ProduceContext(ctx context.Context, preset Preset) (string, e
 		"width":             fmtSpec.Width,
 		"height":            fmtSpec.Height,
 	}
-	if reportBytes, err := json.MarshalIndent(reportPayload, "", "  "); err == nil {
-		_ = os.WriteFile(filepath.Join(videoFolder, "viral_report.json"), reportBytes, 0644)
+	if reportBytes, err := json.MarshalIndent(reportPayload, "", "  "); err != nil {
+		fmt.Printf("⚠️ viral_report.json serileştirilemedi: %v\n", err)
+	} else if err := os.WriteFile(filepath.Join(videoFolder, "viral_report.json"), reportBytes, 0644); err != nil {
+		fmt.Printf("⚠️ viral_report.json yazılamadı: %v\n", err)
 	}
 
 	// 4. High-CTR dedicated thumbnails (9:16 A, 9:16 B, 16:9 A)

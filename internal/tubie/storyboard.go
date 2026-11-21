@@ -50,6 +50,17 @@ type StoryboardOptions struct {
 	Height     int
 	TimedWords []TimedWord
 	Narration  string
+	VideoTitle string
+}
+
+func wordCutTime(timedWords []TimedWord, wIdx int) float64 {
+	if wIdx <= 0 {
+		return 0
+	}
+	if wIdx >= len(timedWords) {
+		return timedWords[len(timedWords)-1].End
+	}
+	return (timedWords[wIdx-1].End + timedWords[wIdx].Start) / 2.0
 }
 
 // ComputeSceneBoundaries aligns scene cut timestamps with real sentence/word boundaries when available.
@@ -73,32 +84,143 @@ func ComputeSceneBoundaries(scenes []SceneDefinition, timedWords []TimedWord, na
 	usedAcoustic := false
 	if len(timedWords) >= numScenes*2 {
 		sents := splitSentences(narration)
-		wordBoundaries := make([]int, 0, len(sents)+1)
+		wordBoundaries := make([]int, 0, numScenes-1)
+
 		if len(sents) >= numScenes {
 			cumWords := 0
 			sentEnds := make([]int, len(sents))
+			sentStarts := make([]int, len(sents))
 			for i, s := range sents {
+				sentStarts[i] = cumWords
 				cumWords += len(ExtractScriptWords(s))
 				sentEnds[i] = cumWords
 			}
 			totalScriptWords := sentEnds[len(sentEnds)-1]
+
 			if totalScriptWords > 0 {
-				for k := 1; k < numScenes; k++ {
-					targetSentIdx := int(math.Round(float64(k)*float64(len(sents))/float64(numScenes))) - 1
-					if targetSentIdx < 0 {
-						targetSentIdx = 0
-					}
-					if targetSentIdx >= len(sentEnds) {
-						targetSentIdx = len(sentEnds) - 1
-					}
-					wIdx := int(math.Round(float64(sentEnds[targetSentIdx]) * float64(len(timedWords)) / float64(totalScriptWords)))
+				mapWordIdx := func(scriptPos int) int {
+					wIdx := int(math.Round(float64(scriptPos) * float64(len(timedWords)) / float64(totalScriptWords)))
 					if wIdx < 1 {
 						wIdx = 1
 					}
 					if wIdx >= len(timedWords) {
 						wIdx = len(timedWords) - 1
 					}
-					wordBoundaries = append(wordBoundaries, wIdx)
+					return wIdx
+				}
+
+				if numScenes == 6 && totalDuration >= 18.0 {
+					anchors := make([]int, numScenes+1)
+					anchors[0] = 0
+					anchors[numScenes] = len(timedWords)
+
+					// 1. Crisp opening Hook boundary (~11-14% of duration, clamped to [2.6s, 5.0s]) snapped to sentence end
+					targetHook := math.Max(2.6, math.Min(5.0, totalDuration*0.125))
+					bestHookSent := 0
+					bestHookDiff := math.Inf(1)
+					maxHookSent := len(sents) - numScenes
+					for si := 0; si <= maxHookSent; si++ {
+						wIdx := mapWordIdx(sentEnds[si])
+						diff := math.Abs(wordCutTime(timedWords, wIdx) - targetHook)
+						if diff < bestHookDiff {
+							bestHookDiff = diff
+							bestHookSent = si
+						}
+					}
+					anchors[1] = mapWordIdx(sentEnds[bestHookSent])
+
+					// 2. Semantic Defense/Checklist boundary: snap to "BİR" / "BİRİNCİ" rule introduction in [45%, 82%]
+					defScene := -1
+					for si := 3; si < numScenes-1; si++ {
+						vt := strings.ToLower(strings.TrimSpace(scenes[si].VisualType))
+						md := strings.ToLower(strings.TrimSpace(scenes[si].Mood))
+						if vt == "checklist" || md == "defense" {
+							defScene = si
+							break
+						}
+					}
+					if defScene > 0 {
+						winMin := totalDuration * 0.45
+						winMax := totalDuration * 0.82
+						for wi := anchors[1] + (defScene - 1); wi < len(timedWords)-(numScenes-defScene); wi++ {
+							w := timedWords[wi].Word
+							if (w == "BİR" || w == "BİRİNCİ") && (wi == 0 || timedWords[wi-1].BreakAfter) {
+								tCut := wordCutTime(timedWords, wi)
+								if tCut >= winMin && tCut <= winMax {
+									anchors[defScene] = wi
+									break
+								}
+							}
+						}
+						if anchors[defScene] == 0 {
+							// Also check splitSentences starts in case timedWords lacked BreakAfter tags
+							for si := bestHookSent + 1; si < len(sents)-1; si++ {
+								firstFields := ExtractScriptWords(sents[si])
+								if len(firstFields) > 0 && (firstFields[0] == "BİR" || firstFields[0] == "BİRİNCİ") {
+									wi := mapWordIdx(sentStarts[si])
+									tCut := wordCutTime(timedWords, wi)
+									if tCut >= winMin && tCut <= winMax && wi > anchors[1]+(defScene-1) && wi < len(timedWords)-(numScenes-defScene) {
+										anchors[defScene] = wi
+										break
+									}
+								}
+							}
+						}
+					}
+
+					// Fill any unassigned intermediate anchors cleanly along sentence boundaries
+					sentIdxForWord := func(targetW int, minW int, maxW int) int {
+						bestW := targetW
+						bestDist := 1 << 30
+						for _, se := range sentEnds {
+							wIdx := mapWordIdx(se)
+							if wIdx < minW || wIdx > maxW {
+								continue
+							}
+							if d := int(math.Abs(float64(wIdx - targetW))); d < bestDist {
+								bestDist = d
+								bestW = wIdx
+							}
+						}
+						if bestW < minW {
+							bestW = minW
+						}
+						if bestW > maxW {
+							bestW = maxW
+						}
+						return bestW
+					}
+
+					prevIdx := 0
+					for k := 1; k <= numScenes; k++ {
+						if anchors[k] == 0 && k < numScenes {
+							continue
+						}
+						spanScenes := k - prevIdx
+						if spanScenes > 1 {
+							startW := anchors[prevIdx]
+							endW := anchors[k]
+							for m := 1; m < spanScenes; m++ {
+								targetW := startW + int(math.Round(float64(m)*float64(endW-startW)/float64(spanScenes)))
+								minW := anchors[prevIdx+m-1] + 1
+								maxW := endW - (spanScenes - m)
+								anchors[prevIdx+m] = sentIdxForWord(targetW, minW, maxW)
+							}
+						}
+						prevIdx = k
+					}
+					wordBoundaries = append(wordBoundaries, anchors[1:numScenes]...)
+				} else {
+					for k := 1; k < numScenes; k++ {
+						targetSentIdx := int(math.Round(float64(k)*float64(len(sents))/float64(numScenes))) - 1
+						if targetSentIdx < 0 {
+							targetSentIdx = 0
+						}
+						if targetSentIdx >= len(sentEnds) {
+							targetSentIdx = len(sentEnds) - 1
+						}
+						wordBoundaries = append(wordBoundaries, mapWordIdx(sentEnds[targetSentIdx]))
+					}
 				}
 			}
 		} else {
@@ -117,7 +239,7 @@ func ComputeSceneBoundaries(scenes []SceneDefinition, timedWords []TimedWord, na
 		if len(wordBoundaries) == numScenes-1 {
 			for k := 1; k < numScenes; k++ {
 				wIdx := wordBoundaries[k-1]
-				cut := (timedWords[wIdx-1].End + timedWords[wIdx].Start) / 2.0
+				cut := wordCutTime(timedWords, wIdx)
 				minAllowed := bounds[k-1] + minSpan
 				maxAllowed := totalDuration - float64(numScenes-k)*minSpan
 				if cut < minAllowed {
@@ -171,7 +293,7 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 	shots := make([]map[string]any, 0, numScenes)
 
 	for idx, rawSc := range scenes {
-		sc := inferSceneVisuals(rawSc, idx, numScenes, "", opts.Narration)
+		sc := inferSceneVisuals(rawSc, idx, numScenes, opts.VideoTitle, opts.Narration)
 		start := bounds[idx]
 		end := bounds[idx+1]
 		if end <= start {
@@ -194,32 +316,38 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 
 		titleColor := sc.Color
 		if titleColor == "" {
-			colors := []string{"#00F0FF", "#FF3B30", "#FFCC00", "#00FF66", "#E056FD"}
+			colors := []string{"#38BDF8", "#F43F5E", "#F59E0B", "#10B981", "#A78BFA"}
 			titleColor = colors[idx%len(colors)]
 		}
 
 		layers := make([]map[string]any, 0, 10)
 
-		// Coordinates adapt cleanly to 9:16 Portrait (1280x2276) vs 16:9 Landscape (1280x720)
-		hudY, hudSize := 162, 24
-		titleX, titleY, titleW, titleSize := 72, 200, 1136, 54
-		underlineY := 272
-		if len([]rune(titleText)) > 24 {
-			underlineY = 330
+		// Coordinates adapt cleanly to 9:16 Portrait (1280x2275) vs 16:9 Landscape (1280x720)
+		// with strict collision-free vertical bands between Header, Callout, Actors, Widget, and Captions.
+		isLongTitle := len([]rune(titleText)) > 24
+		hudY, hudSize := 178, 22
+		titleX, titleY, titleW, titleSize := 72, 208, 1136, 50
+		if isLongTitle {
+			titleSize = 44
 		}
-		pillX, pillY, pillW, pillSize := 640, 320, 920, 22
-		if underlineY > 300 {
-			pillY = 360
+		underlineY := 270
+		if isLongTitle {
+			underlineY = 312
 		}
 		if isLandscape {
-			hudY, hudSize = 78, 20
-			titleX, titleY, titleW, titleSize = 54, 108, 710, 36
-			underlineY = 156
-			pillX, pillY, pillW, pillSize = 995, 102, 440, 16
+			hudY, hudSize = 92, 18
+			titleX, titleY, titleW, titleSize = 48, 116, 490, 30
+			if isLongTitle {
+				titleSize = 26
+			}
+			underlineY = 154
+			if isLongTitle {
+				underlineY = 182
+			}
 		}
 
-		// 1. Cyber Security HUD Header Badge (immediately visible at t=0.0 — zero blank frames)
-		hudText, hudColor := getHUDBadge(idx, titleText)
+		// 1. Editorial Story-Arc Kicker (single non-overlapping top header line)
+		hudText, hudColor := buildSceneHudTag(idx, titleText)
 		layers = append(layers, map[string]any{
 			"type":  "text",
 			"text":  hudText,
@@ -232,7 +360,7 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 			"keys":  buildSnappyAppearKeys(titleX, hudY, 0, shotLen),
 		})
 
-		// 2. Main Scene Title Text (instant punch-in, never starts invisible)
+		// 2. Main Scene Title Text in crisp off-white (instant punch-in, never starts invisible)
 		layers = append(layers, map[string]any{
 			"type":  "text",
 			"text":  titleText,
@@ -241,23 +369,23 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 			"w":     titleW,
 			"size":  titleSize,
 			"bold":  true,
-			"color": titleColor,
+			"color": "#F8FAFC",
 			"keys":  buildSnappySlideKeys(titleX, titleY, titleY+8, shotLen),
 		})
 
-		// 3. Neon Underline Accent
+		// 3. Clean Editorial Underline Accent
 		if sc.Underline || idx%2 == 0 {
-			lineW := len([]rune(titleText)) * 31
+			lineW := len([]rune(titleText)) * 28
 			if isLandscape {
-				lineW = len([]rune(titleText)) * 21
+				lineW = len([]rune(titleText)) * 18
 			}
-			if lineW < 340 {
-				lineW = 340
+			if lineW < 300 {
+				lineW = 300
 			}
-			if isLandscape && lineW > 660 {
-				lineW = 660
-			} else if lineW > 1020 {
-				lineW = 1020
+			if isLandscape && lineW > 480 {
+				lineW = 480
+			} else if lineW > 1000 {
+				lineW = 1000
 			}
 			tUnderline := math.Floor(math.Min(0.28, shotLen*0.70)*1000) / 1000
 			if tUnderline < 0.02 {
@@ -269,29 +397,12 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 				"y":         underlineY,
 				"w":         lineW,
 				"color":     titleColor,
-				"lineWidth": 7,
+				"lineWidth": 4,
 				"keys":      buildProgressKeys(0.0, tUnderline, 0.25, 1.0, shotLen),
 			})
 		}
 
-		// 4. Dynamic Cyber Status Pill Badge
-		pillText, pillColor := getStatusPill(idx, titleText)
-		pillLayer := map[string]any{
-			"type":   "text",
-			"text":   pillText,
-			"x":      pillX,
-			"y":      pillY,
-			"w":      pillW,
-			"size":   pillSize,
-			"bold":   true,
-			"center": true,
-			"color":  pillColor,
-			"badge":  pillColor,
-			"keys":   buildSnappySlideKeys(pillX, pillY, pillY+6, shotLen),
-		}
-		layers = append(layers, pillLayer)
-
-		// 5. Procedural Cyber Stickman & Hooded Hacker Actors
+		// 4. Procedural Cyber Stickman & Hooded Hacker Actors
 		if len(sc.Stickmen) > 0 {
 			for sIdx, sm := range sc.Stickmen {
 				baseX := sm.X
@@ -334,19 +445,19 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 			layers = append(layers, buildProceduralCyberActors(sc, idx, shotLen, tSwitch, isLandscape)...)
 		}
 
-		// 6. Live Animated Cyber Widget (or staged prop)
+		// 5. Live Animated Cyber Widget (or staged prop)
 		layers = append(layers, buildCyberWidgetLayer(sc, shotLen, isLandscape))
 
-		// 7. Pattern-Interrupt Callout Stamp (pops cleanly at tSwitch on shots long enough)
+		// 6. Pattern-Interrupt Callout Stamp (strictly between underline and actor stage)
 		if sc.Callout != "" && shotLen >= 0.85 {
 			cStart := tSwitch
 			if cStart <= 0.05 {
 				cStart = math.Floor(shotLen*0.35*1000) / 1000
 			}
 			if cStart < shotLen-0.12 {
-				cx, cy, cw, csize := 440, 415, 400, 34
+				cx, cy, cw, csize := 440, 334, 400, 32
 				if isLandscape {
-					cx, cy, cw, csize = 110, 174, 340, 22
+					cx, cy, cw, csize = 48, 200, 320, 20
 				}
 				layers = append(layers, map[string]any{
 					"type":  "cyber_callout",
@@ -361,11 +472,11 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 			}
 		}
 
-		// 8. Optional Threat Direction Arrow on danger/breach scenes
+		// 7. Optional Threat Direction Arrow in the safe gap between actors (never across faces)
 		if sc.Arrow || sc.Mood == "danger" || sc.Mood == "breach" {
-			ax, ay, aw := 340, 480, 600
+			ax, ay, aw := 490, 650, 300
 			if isLandscape {
-				ax, ay, aw = 180, 215, 220
+				ax, ay, aw = 225, 385, 95
 			}
 			tArrow := math.Floor(math.Min(0.38, shotLen*0.65)*1000) / 1000
 			layers = append(layers, map[string]any{
@@ -373,18 +484,21 @@ func BuildStoryboardWithOptions(scenes []SceneDefinition, totalDuration float64,
 				"x":         ax,
 				"y":         ay,
 				"w":         aw,
-				"color":     "#FF3B4E",
-				"lineWidth": 5,
+				"color":     "#F43F5E",
+				"lineWidth": 4,
 				"keys":      buildProgressKeys(0.0, tArrow, 0.0, 1.0, shotLen),
 			})
 		}
 
 		shots = append(shots, map[string]any{
-			"start":  start,
-			"end":    end,
-			"mood":   sc.Mood,
-			"camera": sc.Camera,
-			"layers": layers,
+			"start":      start,
+			"end":        end,
+			"mood":       sc.Mood,
+			"camera":     sc.Camera,
+			"sceneIndex": idx,
+			"sceneCount": numScenes,
+			"beat":       tSwitch,
+			"layers":     layers,
 		})
 	}
 
@@ -429,13 +543,13 @@ func buildProgressKeys(t0, t1, p0, p1, shotLen float64) []map[string]any {
 
 func buildProceduralCyberActors(sc SceneDefinition, idx int, shotLen, tSwitch float64, isLandscape bool) []map[string]any {
 	// Portrait coordinates (1280x2275 plane) vs Landscape coordinates (1280x720 plane)
-	vx, vy, vw, vh := 130, 445, 420, 510
-	hx, hy, hw, hh := 710, 425, 440, 530
-	cx, cy, cw, ch := 415, 435, 450, 520
+	vx, vy, vw, vh := 115, 400, 420, 500
+	hx, hy, hw, hh := 745, 400, 420, 500
+	cx, cy, cw, ch := 420, 400, 440, 500
 	if isLandscape {
-		vx, vy, vw, vh = 40, 222, 240, 330
-		hx, hy, hw, hh = 275, 212, 255, 340
-		cx, cy, cw, ch = 145, 212, 265, 340
+		vx, vy, vw, vh = 30, 244, 235, 302
+		hx, hy, hw, hh = 285, 244, 245, 302
+		cx, cy, cw, ch = 148, 244, 250, 302
 	}
 
 	canSplit := shotLen >= 0.75 && tSwitch > 0.12 && tSwitch < shotLen-0.12
@@ -592,19 +706,19 @@ func buildMotionKeys(baseX, baseY, baseW int, tStart, span float64, action strin
 }
 
 func buildCyberWidgetLayer(sc SceneDefinition, shotLen float64, isLandscape bool) map[string]any {
-	wx, wy, ww, wh := 70, 1020, 1140, 520
+	wx, wy, ww, wh := 64, 955, 1152, 575
 	if isLandscape {
-		wx, wy, ww, wh = 565, 178, 670, 372
+		wx, wy, ww, wh = 562, 94, 674, 450
 	}
 
 	if sc.VisualType == "prop_stage" && sc.Prop != nil && sc.Prop.Path != "" {
 		pw := 460
 		px := 410
-		py := 1050
+		py := 1010
 		if isLandscape {
 			pw = 340
 			px = 730
-			py = 195
+			py = 165
 		}
 		return map[string]any{
 			"type": "image",
@@ -633,74 +747,43 @@ func buildCyberWidgetLayer(sc SceneDefinition, shotLen float64, isLandscape bool
 	}
 }
 
+func buildSceneHudTag(idx int, title string) (string, string) {
+	label, color := getHUDBadge(idx, title)
+	return fmt.Sprintf("0%d · %s", idx+1, label), color
+}
+
 func getHUDBadge(idx int, title string) (string, string) {
 	lower := strings.ToLower(title)
 	switch {
 	case strings.Contains(lower, "yapay zeka") || strings.Contains(lower, "gizli") || strings.Contains(lower, "sohbet") || strings.Contains(lower, "profil") || strings.Contains(lower, "dijital iz"):
-		return "[ DİJİTAL GİZLİLİK // VERİ ANALİZİ ]", "#00F0FF"
+		return "DİJİTAL GİZLİLİK", "#38BDF8"
 	case strings.Contains(lower, "kripto") || strings.Contains(lower, "cüzdan") || strings.Contains(lower, "airdrop") || strings.Contains(lower, "token"):
-		return "[ KRİPTO GÜVENLİK // CÜZDAN ALARMI ]", "#FFCC00"
+		return "KRİPTO GÜVENLİĞİ", "#F59E0B"
 	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm") || strings.Contains(lower, "oltalama"):
-		return "[ ALERT // OLTALAMA SALDIRISI ]", "#FF3B30"
+		return "OLTALAMA ANALİZİ", "#F43F5E"
 	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre") || strings.Contains(lower, "parola"):
-		return "[ SİSTEM İHLALİ // KRİTİK UYARI ]", "#FF3B30"
+		return "KİMLİK RİSKİ", "#F43F5E"
 	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma") || strings.Contains(lower, "takip"):
-		return "[ KRİTİK ALARM // RİSK TESPİTİ ]", "#FFCC00"
+		return "VERİ İHLALİ", "#F59E0B"
 	case strings.Contains(lower, "istemez") || strings.Contains(lower, "gerçek") || strings.Contains(lower, "farkındalık") || strings.Contains(lower, "halka"):
-		return "[ SİBER GERÇEK // TUZAĞA DÜŞME ]", "#E056FD"
-	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan") || strings.Contains(lower, "kapat"):
-		return "[ GÜVENLİK DUVARI // AKTİF SAVUNMA ]", "#00FF66"
+		return "KRİTİK GERÇEK", "#A78BFA"
+	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan") || strings.Contains(lower, "kapat") || strings.Contains(lower, "vpn"):
+		return "AKTİF SAVUNMA", "#10B981"
 	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "avcı"):
-		return "[ KORUMA AKTİF // GÜVENDESİN ]", "#00F0FF"
+		return "ÖZET VE ÇÖZÜM", "#38BDF8"
 	default:
 		hudList := []struct {
 			text  string
 			color string
 		}{
-			{"[ SİBER İSTİHBARAT // VERİ ANALİZİ ]", "#00F0FF"},
-			{"[ TEHLİKE DÜZEYİ // KRİTİK ALARM ]", "#FF3B30"},
-			{"[ SİSTEM ANALİZİ // RİSK TESPİTİ ]", "#FFCC00"},
-			{"[ GÜVENLİK GERÇEĞİ // DİKKAT ]", "#E056FD"},
-			{"[ AKTİF SAVUNMA // SİBER KALKAN ]", "#00FF66"},
-			{"[ GÜVENDE KAL // BİLİNÇLİ KULLANICI ]", "#00F0FF"},
+			{"KRİTİK UYARI", "#38BDF8"},
+			{"SALDIRI ANATOMİSİ", "#F43F5E"},
+			{"VERİ SIZINTISI", "#F59E0B"},
+			{"KRİTİK GERÇEK", "#A78BFA"},
+			{"3 ADIMDA KORUMA", "#10B981"},
+			{"ÖZET VE ÇÖZÜM", "#38BDF8"},
 		}
 		item := hudList[idx%len(hudList)]
-		return item.text, item.color
-	}
-}
-
-func getStatusPill(idx int, title string) (string, string) {
-	lower := strings.ToLower(title)
-	switch {
-	case strings.Contains(lower, "yapay zeka") || strings.Contains(lower, "gizli") || strings.Contains(lower, "sohbet") || strings.Contains(lower, "profil") || strings.Contains(lower, "dijital iz"):
-		return "[ DİJİTAL İZ VE VERİ TOPLAMA ANALİZİ ]", "#00F0FF"
-	case strings.Contains(lower, "kripto") || strings.Contains(lower, "cüzdan") || strings.Contains(lower, "airdrop") || strings.Contains(lower, "token"):
-		return "[ UYARI: AKILLI SÖZLEŞME VE CÜZDAN RİSKİ ]", "#FFCC00"
-	case strings.Contains(lower, "tuzak") || strings.Contains(lower, "sahte") || strings.Contains(lower, "dm") || strings.Contains(lower, "oltalama"):
-		return "[ TEHLİKELİ BAĞLANTI TESPİT EDİLDİ ]", "#FF3B30"
-	case strings.Contains(lower, "ele geçiril") || strings.Contains(lower, "çalındı") || strings.Contains(lower, "şifre") || strings.Contains(lower, "parola"):
-		return "[ ALARM: KİMLİK BİLGİLERİ RİSK ALTINDA ]", "#FF3B30"
-	case strings.Contains(lower, "kaybedil") || strings.Contains(lower, "kontrol") || strings.Contains(lower, "sızma") || strings.Contains(lower, "takip"):
-		return "[ KRİTİK İHLAL: DİJİTAL KONTROL RİSKİ ]", "#FFCC00"
-	case strings.Contains(lower, "istemez") || strings.Contains(lower, "gerçek") || strings.Contains(lower, "farkındalık") || strings.Contains(lower, "halka"):
-		return "[ SİBER GERÇEK: EN ZAYIF HALKA İNSAN ]", "#E056FD"
-	case strings.Contains(lower, "koru") || strings.Contains(lower, "2fa") || strings.Contains(lower, "doğrulama") || strings.Contains(lower, "kalkan") || strings.Contains(lower, "kapat"):
-		return "[ GÜVENLİK KALKANI: ÖNLEMLER DEVREDE ]", "#00FF66"
-	case strings.Contains(lower, "uyanık") || strings.Contains(lower, "güvende") || strings.Contains(lower, "avcı"):
-		return "[ TAM SAVUNMA: BİLİNÇLİ KULLANICI ]", "#00F0FF"
-	default:
-		pills := []struct {
-			text  string
-			color string
-		}{
-			{"[ SİBER GÜVENLİK ANALİZİ BAŞLATILDI ]", "#00F0FF"},
-			{"[ KRİTİK DİJİTAL RİSK UYARISI ]", "#FF3B30"},
-			{"[ ALARM: GİZLİ VERİ İHLALİ RİSKİ ]", "#FFCC00"},
-			{"[ DİKKAT: VERİ PAYLAŞIMINI KONTROL ET ]", "#E056FD"},
-			{"[ GÜVENLİK KALKANI DEVREDE ]", "#00FF66"},
-			{"[ BİLİNÇLİ KULLANICI // TAM KORUMA ]", "#00F0FF"},
-		}
-		item := pills[idx%len(pills)]
 		return item.text, item.color
 	}
 }
@@ -733,26 +816,23 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 
 	switch action {
 	case "panic":
-		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
-		addKey(t0+0.08, map[string]any{"x": baseX - 24, "y": baseY - 16, "w": baseW + 12, "angle": -0.10})
-		addKey(t0+0.16, map[string]any{"x": baseX + 24, "y": baseY - 4, "w": baseW + 8, "angle": 0.10})
-		addKey(t0+0.24, map[string]any{"x": baseX - 14, "y": baseY - 10, "w": baseW, "angle": -0.06})
-		addKey(t0+0.32, map[string]any{"x": baseX + 14, "y": baseY, "w": baseW, "angle": 0.06})
-		addKey(t0+0.40, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
+		addKey(t0, map[string]any{"x": baseX - 10, "y": baseY - 6, "w": baseW + 6, "angle": -0.04})
+		addKey(t0+0.12, map[string]any{"x": baseX + 10, "y": baseY, "w": baseW + 4, "angle": 0.04})
+		addKey(t0+0.24, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
 
-		step := 0.16
-		cur := t0 + 0.40 + step
+		step := 0.55
+		cur := t0 + 0.24 + step
 		toggle := false
-		for cur < maxT-0.05 {
-			jitterX := baseX + 7
-			jitterAngle := 0.03
+		for cur < maxT-0.08 {
+			jitterX := baseX + 5
+			jitterAngle := 0.02
 			if toggle {
-				jitterX = baseX - 7
-				jitterAngle = -0.03
+				jitterX = baseX - 5
+				jitterAngle = -0.02
 			}
 			addKey(cur, map[string]any{
 				"x":     jitterX,
-				"y":     baseY + int(math.Sin(cur*15.0)*4.0),
+				"y":     baseY + int(math.Sin(cur*8.0)*3.0),
 				"w":     baseW,
 				"angle": jitterAngle,
 			})
@@ -762,18 +842,15 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
 
 	case "shake":
-		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
-		addKey(t0+0.08, map[string]any{"x": baseX - 14, "y": baseY, "w": baseW})
-		addKey(t0+0.16, map[string]any{"x": baseX + 14, "y": baseY, "w": baseW})
-		addKey(t0+0.24, map[string]any{"x": baseX - 9, "y": baseY, "w": baseW})
-		addKey(t0+0.32, map[string]any{"x": baseX + 9, "y": baseY, "w": baseW})
-		addKey(t0+0.40, map[string]any{"x": baseX, "y": baseY, "w": baseW})
+		addKey(t0, map[string]any{"x": baseX - 8, "y": baseY, "w": baseW})
+		addKey(t0+0.12, map[string]any{"x": baseX + 8, "y": baseY, "w": baseW})
+		addKey(t0+0.24, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
-		step := 0.42
-		cur := t0 + 0.40 + step
-		for cur < maxT-0.05 {
-			addKey(cur, map[string]any{"x": baseX, "y": baseY - 10, "w": baseW + 5})
-			if cur+step*0.5 < maxT-0.05 {
+		step := 0.72
+		cur := t0 + 0.24 + step
+		for cur < maxT-0.08 {
+			addKey(cur, map[string]any{"x": baseX, "y": baseY - 6, "w": baseW + 3})
+			if cur+step*0.5 < maxT-0.08 {
 				addKey(cur+step*0.5, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 			}
 			cur += step
@@ -781,17 +858,17 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
 	case "jump":
-		t1 := math.Min(0.18, maxSpan*0.40)
-		t2 := math.Min(0.34, maxSpan*0.70)
-		addKey(t0, map[string]any{"x": baseX, "y": baseY + 60, "w": baseW - 14, "alpha": 0.9})
-		addKey(t0+t1, map[string]any{"x": baseX, "y": baseY - 32, "w": baseW + 16, "alpha": 1.0})
+		t1 := math.Min(0.16, maxSpan*0.40)
+		t2 := math.Min(0.30, maxSpan*0.70)
+		addKey(t0, map[string]any{"x": baseX, "y": baseY + 26, "w": baseW - 8, "alpha": 0.92})
+		addKey(t0+t1, map[string]any{"x": baseX, "y": baseY - 18, "w": baseW + 10, "alpha": 1.0})
 		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "alpha": 1.0})
 
-		step := 0.42
+		step := 0.75
 		cur := t0 + t2 + step
-		for cur < maxT-0.05 {
-			addKey(cur, map[string]any{"x": baseX, "y": baseY - 14, "w": baseW + 6})
-			if cur+step*0.5 < maxT-0.05 {
+		for cur < maxT-0.08 {
+			addKey(cur, map[string]any{"x": baseX, "y": baseY - 8, "w": baseW + 4})
+			if cur+step*0.5 < maxT-0.08 {
 				addKey(cur+step*0.5, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 			}
 			cur += step
@@ -799,25 +876,25 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "alpha": 1.0})
 
 	case "run":
-		t1 := math.Min(0.20, maxSpan*0.40)
-		t2 := math.Min(0.40, maxSpan*0.75)
-		addKey(t0, map[string]any{"x": baseX - 90, "y": baseY, "w": baseW, "angle": 0.10, "alpha": 0.9})
-		addKey(t0+t1, map[string]any{"x": baseX - 30, "y": baseY - 20, "w": baseW, "angle": 0.06, "alpha": 1.0})
+		t1 := math.Min(0.18, maxSpan*0.40)
+		t2 := math.Min(0.34, maxSpan*0.75)
+		addKey(t0, map[string]any{"x": baseX - 55, "y": baseY, "w": baseW, "angle": 0.08, "alpha": 0.92})
+		addKey(t0+t1, map[string]any{"x": baseX - 18, "y": baseY - 10, "w": baseW, "angle": 0.04, "alpha": 1.0})
 		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0, "alpha": 1.0})
 
-		step := 0.35
+		step := 0.65
 		cur := t0 + t2 + step
 		toggle := false
-		for cur < maxT-0.05 {
-			swayX := baseX + 12
+		for cur < maxT-0.08 {
+			swayX := baseX + 8
 			if toggle {
-				swayX = baseX - 12
+				swayX = baseX - 8
 			}
 			addKey(cur, map[string]any{
 				"x":     swayX,
-				"y":     baseY - 12,
+				"y":     baseY - 6,
 				"w":     baseW,
-				"angle": 0.03 * (map[bool]float64{true: -1, false: 1}[toggle]),
+				"angle": 0.02 * (map[bool]float64{true: -1, false: 1}[toggle]),
 			})
 			toggle = !toggle
 			cur += step
@@ -826,20 +903,20 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 
 	case "lean":
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": 0.0})
-		addKey(t0+0.14, map[string]any{"x": baseX + 12, "y": baseY + 8, "w": baseW, "angle": 0.07})
+		addKey(t0+0.18, map[string]any{"x": baseX + 8, "y": baseY + 5, "w": baseW, "angle": 0.05})
 
-		step := 0.42
-		cur := t0 + 0.14 + step
+		step := 0.75
+		cur := t0 + 0.18 + step
 		toggle := false
-		for cur < maxT-0.05 {
-			leanAngle := 0.09
-			leanY := baseY + 10
+		for cur < maxT-0.08 {
+			leanAngle := 0.06
+			leanY := baseY + 6
 			if toggle {
-				leanAngle = 0.05
-				leanY = baseY + 6
+				leanAngle = 0.03
+				leanY = baseY + 3
 			}
 			addKey(cur, map[string]any{
-				"x":     baseX + 12,
+				"x":     baseX + 8,
 				"y":     leanY,
 				"w":     baseW,
 				"angle": leanAngle,
@@ -847,20 +924,20 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 			toggle = !toggle
 			cur += step
 		}
-		addKey(maxT, map[string]any{"x": baseX + 12, "y": baseY + 8, "w": baseW, "angle": 0.07})
+		addKey(maxT, map[string]any{"x": baseX + 8, "y": baseY + 5, "w": baseW, "angle": 0.05})
 
 	case "punch":
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
-		addKey(t0+0.12, map[string]any{"x": baseX - 14, "y": baseY - 18, "w": baseW + 28})
-		addKey(t0+0.24, map[string]any{"x": baseX, "y": baseY, "w": baseW})
+		addKey(t0+0.14, map[string]any{"x": baseX - 10, "y": baseY - 10, "w": baseW + 16})
+		addKey(t0+0.28, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
-		step := 0.24
-		cur := t0 + 0.24 + step
+		step := 0.65
+		cur := t0 + 0.28 + step
 		toggle := false
-		for cur < maxT-0.05 {
-			strikeY := baseY - 14
-			strikeW := baseW + 20
-			strikeX := baseX - 8
+		for cur < maxT-0.08 {
+			strikeY := baseY - 8
+			strikeW := baseW + 10
+			strikeX := baseX - 5
 			if toggle {
 				strikeY = baseY
 				strikeW = baseW
@@ -877,36 +954,36 @@ func buildActorKeyframes(action string, baseX, baseY, baseW int, tStart, span fl
 		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 
 	case "peek":
-		t1 := math.Min(0.22, maxSpan*0.45)
-		t2 := math.Min(0.44, maxSpan*0.80)
-		addKey(t0, map[string]any{"x": baseX + 100, "y": baseY, "w": baseW, "angle": -0.07, "alpha": 0.9})
-		addKey(t0+t1, map[string]any{"x": baseX + 30, "y": baseY - 10, "w": baseW, "angle": -0.04, "alpha": 1.0})
-		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.02, "alpha": 1.0})
+		t1 := math.Min(0.20, maxSpan*0.45)
+		t2 := math.Min(0.38, maxSpan*0.80)
+		addKey(t0, map[string]any{"x": baseX + 70, "y": baseY, "w": baseW, "angle": -0.05, "alpha": 0.92})
+		addKey(t0+t1, map[string]any{"x": baseX + 20, "y": baseY - 6, "w": baseW, "angle": -0.03, "alpha": 1.0})
+		addKey(t0+t2, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.015, "alpha": 1.0})
 
-		step := 0.45
+		step := 0.75
 		cur := t0 + t2 + step
 		toggle := false
-		for cur < maxT-0.05 {
+		for cur < maxT-0.08 {
 			addKey(cur, map[string]any{
-				"x":     baseX + map[bool]int{true: 10, false: -6}[toggle],
-				"y":     baseY + map[bool]int{true: -8, false: 0}[toggle],
+				"x":     baseX + map[bool]int{true: 6, false: -4}[toggle],
+				"y":     baseY + map[bool]int{true: -5, false: 0}[toggle],
 				"w":     baseW,
-				"angle": -0.02,
+				"angle": -0.015,
 			})
 			toggle = !toggle
 			cur += step
 		}
-		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.02, "alpha": 1.0})
+		addKey(maxT, map[string]any{"x": baseX, "y": baseY, "w": baseW, "angle": -0.015, "alpha": 1.0})
 
 	default: // "bounce"
-		step := 0.42
+		step := 0.75
 		cur := t0
 		toggle := false
 		addKey(t0, map[string]any{"x": baseX, "y": baseY, "w": baseW})
 		cur += step * 0.5
-		for cur < maxT-0.05 {
-			bY := baseY - 22
-			bW := baseW + 10
+		for cur < maxT-0.08 {
+			bY := baseY - 10
+			bW := baseW + 6
 			if toggle {
 				bY = baseY
 				bW = baseW
