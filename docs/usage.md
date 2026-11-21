@@ -26,7 +26,7 @@
 
 **Ses** sekmesinde mevcut ses dosyasını yükleyin ya da tarayıcı mikrofon izni vererek 15 saniyelik kayıt alın. Kaydı erken bitirmek de mümkündür. FFmpeg, sesi mono 24 kHz WAV biçimine dönüştürür. En fazla 50 MB kabul edilir. Yeni referans `sesim.wav` adıyla kaydedilir; önceki referans yalnızca dönüşüm başarılı olunca değiştirilir. Kayıt Git’e dahil edilmez.
 
-Tarayıcı mikrofonu kullanıldığı için ek kurulum gerekmez; [kurulum ayrıntıları](setup.md). Referans olmadan kendi sesiniz modu başlatılmaz. Otomatik mod referans varsa kendi sesinizi, yoksa profesyonel sesi kullanır.
+Tarayıcı mikrofonu kullanıldığı için ek kurulum gerekmez; [kurulum ayrıntıları](setup.md). Referans olmadan kendi sesiniz modu başlatılmaz. Otomatik mod (özel bir Pro ses stili seçilmediyse) referans ve Python `TTS` (XTTS) kurulumu varsa kendi sesinizi, aksi hâlde profesyonel sesi (Edge TTS) kullanır.
 
 ## Ortam kontrolü ve komut satırı
 

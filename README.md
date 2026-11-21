@@ -76,18 +76,18 @@ Derlenmiş ikili ile aynı komutlar `./tubie` (veya Windows'ta `.\tubie.exe`) il
 
 | Şablon | Kategori | Konu |
 | --- | --- | --- |
-| 1 | Ağ, Wi-Fi & Kablosuz | Kafe Wi-Fi Şifresi 10 Saniyede Nasıl Kırılır? |
-| 2 | Parola & Kimlik | Brute Force ve 14+ Karakter Güçlü Parola Formülü |
-| 3 | Web, Veri & Kod | SQL Injection Nedir ve Parametrik Sorgu Koruması |
-| 4 | Oltalama & Sosyal Mühendislik | Sahte Giriş Sayfası ve Phishing Tuzakları |
-| 5 | Yapay Zeka & Deepfake | 3 Saniyelik Sesinle Ailen Nasıl Dolandırılır? |
-| 6 | Ağ, Wi-Fi & Kablosuz | Havalimanı & Kafe Wi-Fi Güvenliği (Evil Twin) |
-| 7 | Oltalama & Sosyal Mühendislik | Instagram Hesap Çalma & Telif DM Tuzağı |
-| 8 | Mobil & Kripto | WhatsApp 6 Haneli SMS Kodu & SIM Swap Hilesi |
+| 1 | Ağ, Wi-Fi & Kablosuz | Wi-Fi Şifreniz 10 Saniyede Nasıl Kırılır? |
+| 2 | Parola & Kimlik | Şifreniz Ne Kadar Sürede Kırılır? (Brute Force Gerçeği) |
+| 3 | Web, Veri & Kod Güvenliği | SQL Injection Nedir ve Nasıl Çalışır? |
+| 4 | Oltalama & Sosyal Mühendislik | Oltalama (Phishing) Tuzağına Nasıl Düşürülürsünüz? |
+| 5 | Yapay Zeka & Deepfake | 3 Saniyelik Sesinle Nasıl Dolandırılırsın? |
+| 6 | Kripto & Web3 Güvenliği | Kripto Cüzdanın Tek Onayla Nasıl Boşaltılır? |
+| 7 | Zararlı Yazılım & Cihaz | Ücretsiz Crack İndirirken Bilgisayarında Ne Olur? |
+| 8 | Mobil & Kripto | WhatsApp SMS Kodu & SIM Swap Hilesi |
 | 9 | Yapay Zeka & Deepfake | Yapay Zeka Seni İnternette Ne Kadar Tanıyor? |
-| 10 | Oltalama & Sosyal Mühendislik | Sokaktaki Sahte QR Kod (Quishing) Tuzağı |
+| 10 | Oltalama & Sosyal Mühendislik | Sokaktaki QR Kodu Okutmadan Önce Dur! |
 
-`--mode pro` Edge TTS üzerinden ses üretir ve **internet gerektirir**. `--mode cloned` yerel ses klonlama referansı (`sesim.wav`) kullanır. `auto`, referans varsa klonlama yolunu seçer.
+`--mode pro` Edge TTS üzerinden ses üretir ve **internet gerektirir**. `--mode cloned` yerel ses klonlama referansı (`sesim.wav`) kullanır. `auto`, özel bir Pro ses stili seçilmediyse ve `sesim.wav` ile Python `TTS` (XTTS) hazırsa klonlama yolunu, aksi hâlde Edge TTS yolunu seçer.
 
 Üretilen videolar `output/`, ara dosyalar `projects/` altına yazılır. Bunlar ve kişisel `sesim.wav` kaydı Git tarafından dışlanır. Depodaki mevcut örnekler `examples/` altındadır.
 
