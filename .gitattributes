@@ -1,10 +1,15 @@
 * text=auto
+.gitattributes text eol=lf
 *.go text eol=lf
 go.mod text eol=lf
 *.mjs text eol=lf
+*.cjs text eol=lf
+*.js text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+*.txt text eol=lf
 *.yml text eol=lf
+*.yaml text eol=lf
+*.svg text eol=lf
 *.html text eol=lf
 *.css text eol=lf
-*.js text eol=lf

@@ -1,12 +1,14 @@
 package tubie
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ThumbnailOptions configures aspect ratio, A/B visual variant, and mood for generated covers.
@@ -57,7 +59,10 @@ func GenerateDedicatedThumbnailWithOptions(root string, title string, topic stri
 		args = append(args, "--prop", propPath)
 	}
 
-	cmd := exec.Command(nodeExe, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, nodeExe, args...)
 	cmd.Dir = root
 	cmd.Env = os.Environ()
 
@@ -69,7 +74,9 @@ func GenerateDedicatedThumbnailWithOptions(root string, title string, topic stri
 
 	if filmMp4 != "" && isFile(filmMp4) {
 		ffmpegExe := BinaryPath("ffmpeg")
-		fallbackCmd := exec.Command(ffmpegExe, "-y", "-ss", "00:00:03.500", "-i", filmMp4, "-frames:v", "1", "-q:v", "2", outPath)
+		ffCtx, ffCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer ffCancel()
+		fallbackCmd := exec.CommandContext(ffCtx, ffmpegExe, "-y", "-ss", "00:00:03.500", "-i", filmMp4, "-frames:v", "1", "-q:v", "2", outPath)
 		if err := fallbackCmd.Run(); err == nil && isFile(outPath) {
 			return nil
 		}

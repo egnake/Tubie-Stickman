@@ -61,38 +61,46 @@ function drawShockedStickman(ctx, x, y, w, h, accentColor) {
   const footY = y + h * 0.96;
 
   ctx.save();
-  // Cyan / emerald halo
-  const aura = ctx.createRadialGradient(cx, y + h * 0.44, w * 0.08, cx, y + h * 0.44, w * 0.62);
-  aura.addColorStop(0, accentColor === '#00FF66' ? 'rgba(0, 255, 102, 0.32)' : 'rgba(0, 240, 255, 0.34)');
+  // Grounded studio contact shadow + soft rim
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(cx, footY + 4, w * 0.28, Math.max(8, h * 0.032), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = accentColor === '#10B981' ? 'rgba(16, 185, 129, 0.26)' : 'rgba(56, 189, 248, 0.28)';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  const aura = ctx.createRadialGradient(cx, y + h * 0.44, w * 0.08, cx, y + h * 0.44, w * 0.56);
+  aura.addColorStop(0, accentColor === '#10B981' ? 'rgba(16, 185, 129, 0.14)' : 'rgba(56, 189, 248, 0.15)');
   aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = aura;
   ctx.beginPath();
-  ctx.arc(cx, y + h * 0.44, w * 0.62, 0, Math.PI * 2);
+  ctx.arc(cx, y + h * 0.44, w * 0.56, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = '#FFFFFF';
+  ctx.strokeStyle = '#F1F5F9';
   ctx.lineWidth = strokeW;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.shadowColor = accentColor;
-  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = 6;
 
-  // Legs
+  // Curved organic legs
   ctx.beginPath();
-  ctx.moveTo(cx, hipY); ctx.lineTo(cx - w * 0.16, (hipY + footY) * 0.52); ctx.lineTo(cx - w * 0.22, footY);
-  ctx.moveTo(cx, hipY); ctx.lineTo(cx + w * 0.16, (hipY + footY) * 0.52); ctx.lineTo(cx + w * 0.22, footY);
+  ctx.moveTo(cx, hipY); ctx.quadraticCurveTo(cx - w * 0.16, (hipY + footY) * 0.50, cx - w * 0.22, footY);
+  ctx.moveTo(cx, hipY); ctx.quadraticCurveTo(cx + w * 0.16, (hipY + footY) * 0.50, cx + w * 0.22, footY);
   ctx.stroke();
 
-  // Spine
+  // Curved spine
   ctx.beginPath();
   ctx.moveTo(cx, neckY);
-  ctx.lineTo(cx, hipY);
+  ctx.quadraticCurveTo(cx - w * 0.025, (neckY + hipY) * 0.5, cx, hipY);
   ctx.stroke();
 
-  // Hands-on-cheeks shocked arms
+  // Smooth curved hands-on-cheeks shocked arms
   ctx.beginPath();
-  ctx.moveTo(cx, shY); ctx.lineTo(cx - w * 0.30, headY + headR * 0.32); ctx.lineTo(cx - headR * 0.96, headY);
-  ctx.moveTo(cx, shY); ctx.lineTo(cx + w * 0.30, headY + headR * 0.32); ctx.lineTo(cx + headR * 0.96, headY);
+  ctx.moveTo(cx, shY); ctx.quadraticCurveTo(cx - w * 0.31, headY + headR * 0.42, cx - headR * 0.96, headY);
+  ctx.moveTo(cx, shY); ctx.quadraticCurveTo(cx + w * 0.31, headY + headR * 0.42, cx + headR * 0.96, headY);
   ctx.stroke();
 
   // Head circle
@@ -132,10 +140,10 @@ function drawShockedStickman(ctx, x, y, w, h, accentColor) {
   ctx.stroke();
 
   // Shock rays & exclamation spikes
-  ctx.strokeStyle = '#FFE600';
-  ctx.fillStyle = '#FFE600';
-  ctx.shadowColor = '#FFE600';
-  ctx.shadowBlur = 12;
+  ctx.strokeStyle = '#FBBF24';
+  ctx.fillStyle = '#FBBF24';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 5;
   ctx.lineWidth = Math.max(3, strokeW * 0.36);
   ctx.beginPath();
   ctx.moveTo(cx - headR * 1.35, headY - headR * 0.45); ctx.lineTo(cx - headR * 1.65, headY - headR * 0.65);
@@ -156,22 +164,32 @@ function drawHoodedHacker(ctx, x, y, w, h) {
   const headY = y + h * 0.26;
   const shY = headY + headR * 1.15;
   const hipY = shY + h * 0.36;
+  const baseY = y + h * 0.95;
 
   ctx.save();
-  const redAura = ctx.createRadialGradient(cx, y + h * 0.42, w * 0.06, cx, y + h * 0.42, w * 0.60);
-  redAura.addColorStop(0, 'rgba(255, 42, 68, 0.36)');
+  // Grounded studio contact shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+  ctx.beginPath();
+  ctx.ellipse(cx, baseY, w * 0.32, Math.max(8, h * 0.032), 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(244, 63, 94, 0.25)';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  const redAura = ctx.createRadialGradient(cx, y + h * 0.42, w * 0.06, cx, y + h * 0.42, w * 0.56);
+  redAura.addColorStop(0, 'rgba(244, 63, 94, 0.16)');
   redAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = redAura;
   ctx.beginPath();
-  ctx.arc(cx, y + h * 0.42, w * 0.60, 0, Math.PI * 2);
+  ctx.arc(cx, y + h * 0.42, w * 0.56, 0, Math.PI * 2);
   ctx.fill();
 
   // Hooded cloak silhouette
-  ctx.fillStyle = '#070A12';
-  ctx.strokeStyle = '#FF2A44';
-  ctx.lineWidth = Math.max(5, w * 0.025);
-  ctx.shadowColor = '#FF2A44';
-  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#111827';
+  ctx.strokeStyle = '#F43F5E';
+  ctx.lineWidth = Math.max(4.5, w * 0.022);
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+  ctx.shadowBlur = 8;
   ctx.beginPath();
   ctx.moveTo(cx, headY - headR * 1.50);
   ctx.quadraticCurveTo(cx + headR * 1.50, headY - headR * 0.35, cx + w * 0.35, hipY + h * 0.14);
@@ -182,15 +200,16 @@ function drawHoodedHacker(ctx, x, y, w, h) {
   ctx.stroke();
 
   // Dark head face void
-  ctx.fillStyle = '#030509';
+  ctx.fillStyle = '#070A12';
   ctx.beginPath();
   ctx.arc(cx, headY, headR * 0.94, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Glowing crimson narrow visor eyes
-  ctx.fillStyle = '#FF2A44';
-  ctx.shadowBlur = 18;
+  // Sharp coral visor eyes
+  ctx.fillStyle = '#F43F5E';
+  ctx.shadowColor = '#F43F5E';
+  ctx.shadowBlur = 6;
   ctx.beginPath();
   ctx.moveTo(cx - headR * 0.54, headY - headR * 0.16);
   ctx.lineTo(cx - headR * 0.10, headY - headR * 0.02);
@@ -205,13 +224,14 @@ function drawHoodedHacker(ctx, x, y, w, h) {
   ctx.closePath();
   ctx.fill();
 
-  // Menacing reach arms
-  ctx.strokeStyle = '#FF3B4E';
-  ctx.lineWidth = Math.max(5, w * 0.028);
+  // Menacing curved reach arms
+  ctx.shadowBlur = 4;
+  ctx.strokeStyle = '#F43F5E';
+  ctx.lineWidth = Math.max(4.5, w * 0.026);
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(cx - w * 0.15, shY); ctx.lineTo(cx - w * 0.34, shY + h * 0.10); ctx.lineTo(cx - w * 0.42, shY + h * 0.02);
-  ctx.moveTo(cx + w * 0.15, shY); ctx.lineTo(cx + w * 0.30, shY + h * 0.14); ctx.lineTo(cx + w * 0.18, shY + h * 0.24);
+  ctx.moveTo(cx - w * 0.15, shY); ctx.quadraticCurveTo(cx - w * 0.34, shY + h * 0.10, cx - w * 0.42, shY + h * 0.02);
+  ctx.moveTo(cx + w * 0.15, shY); ctx.quadraticCurveTo(cx + w * 0.30, shY + h * 0.14, cx + w * 0.18, shY + h * 0.24);
   ctx.stroke();
   ctx.restore();
 }
@@ -219,7 +239,7 @@ function drawHoodedHacker(ctx, x, y, w, h) {
 function drawFocalThreatCard(ctx, x, y, w, h, titleLower, variant) {
   let cardHeader = 'KRİTİK İHLAL';
   let cardMain = 'HESAP ELE GEÇİRİLDİ!';
-  let accent = variant === 'b' ? '#FFE600' : '#FF3B4E';
+  let accent = variant === 'b' ? '#FBBF24' : '#F43F5E';
 
   if (titleLower.includes('yapay zeka') || titleLower.includes('dijital iz') || titleLower.includes('gizlilik')) {
     cardHeader = 'VERİ PROFİLİ';
@@ -227,49 +247,54 @@ function drawFocalThreatCard(ctx, x, y, w, h, titleLower, variant) {
   } else if (titleLower.includes('kripto') || titleLower.includes('cüzdan') || titleLower.includes('airdrop')) {
     cardHeader = 'CÜZDAN BAKİYESİ';
     cardMain = '0.00 TL (BOŞALTILDI)';
-  } else if (titleLower.includes('wifi') || titleLower.includes('wi-fi') || titleLower.includes('ağ')) {
-    cardHeader = 'EVİL TWİN AĞI';
+  } else if (titleLower.includes('crack') || titleLower.includes('apk') || titleLower.includes('infostealer') || titleLower.includes('zararlı')) {
+    cardHeader = 'SAHTE CRACK & APK';
+    cardMain = 'ÇEREZ & ŞİFRELER SIZDI!';
+  } else if (titleLower.includes('wifi') || titleLower.includes('wi-fi') || titleLower.includes('ortak ağ') || titleLower.includes('kafe') || /\bağ(ı|da|dan|lar)?\b/i.test(titleLower)) {
+    cardHeader = 'EVIL TWIN AĞI';
     cardMain = 'ŞİFRELER ÇALINIYOR!';
   } else if (titleLower.includes('sql')) {
     cardHeader = "' OR 1=1 --";
     cardMain = 'ADMİN YETKİSİ AÇILDI!';
+  } else if (titleLower.includes('link') || titleLower.includes('oltalama') || titleLower.includes('phishing') || /\bqr\b/i.test(titleLower)) {
+    cardHeader = 'SAHTE BAĞLANTI';
+    cardMain = 'HTTPS != GÜVENLİ!';
+  } else if (titleLower.includes('deepfake') || /\bses(inle|ini|i)?\b/i.test(titleLower)) {
+    cardHeader = 'YAPAY ZEKA SES';
+    cardMain = '3 SN İLE KLONLANDI!';
+  } else if (titleLower.includes('whatsapp') || /\bsms\b|\bsim\b/i.test(titleLower)) {
+    cardHeader = '6 HANELİ KOD';
+    cardMain = 'ASLA PAYLAŞMA!';
   } else if (titleLower.includes('şifre') || titleLower.includes('parola') || titleLower.includes('brute')) {
     cardHeader = 'KABA KUVVET';
     cardMain = '0.4 SANİYEDE KIRILDI!';
-  } else if (titleLower.includes('link') || titleLower.includes('oltalama') || titleLower.includes('phishing') || titleLower.includes('qr')) {
-    cardHeader = 'SAHTE BAĞLANTI';
-    cardMain = 'HTTPS != GÜVENLİ!';
-  } else if (titleLower.includes('ses') || titleLower.includes('deepfake')) {
-    cardHeader = 'YAPAY ZEKA SES';
-    cardMain = '3 SN İLE KLONLANDI!';
-  } else if (titleLower.includes('whatsapp') || titleLower.includes('sms') || titleLower.includes('sim')) {
-    cardHeader = '6 HANELİ KOD';
-    cardMain = 'ASLA PAYLAŞMA!';
   } else if (variant === 'b' && (titleLower.includes('koru') || titleLower.includes('rehber'))) {
     cardHeader = 'SİBER KALKAN';
     cardMain = '3 ALTIN GÜVENLİK KURALI';
-    accent = '#00FF66';
+    accent = '#10B981';
   }
 
   ctx.save();
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 22;
-  ctx.fillStyle = 'rgba(7, 12, 22, 0.95)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.52)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.96)';
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.2;
   rrect(ctx, x, y, w, h, 16);
   ctx.fill();
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  drawVectorWarningTriangle(ctx, x + 36, y + h * 0.34, 15, '#FFE600');
-  ctx.fillStyle = '#FFE600';
+  ctx.shadowOffsetY = 0;
+  drawVectorWarningTriangle(ctx, x + 36, y + h * 0.34, 15, '#FBBF24');
+  ctx.fillStyle = '#FBBF24';
   ctx.font = `800 ${Math.max(15, Math.round(h * 0.17))}px NotoSans, sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillText(cardHeader, x + 64, y + h * 0.34);
 
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = '#F8FAFC';
   ctx.font = `900 ${Math.max(18, Math.round(h * 0.22))}px NotoSans, sans-serif`;
   ctx.fillText(cardMain, x + 22, y + h * 0.72, w - 44);
   ctx.restore();
@@ -305,6 +330,37 @@ function buildHeadlineLines(title, maxWidth, ctx, fontSize, maxLines = 3) {
   return lines.slice(0, maxLines);
 }
 
+function loadCanvasModule(repoRoot) {
+  const candidates = [
+    path.resolve(repoRoot, 'skills/directing-stickman-videos/node_modules/@napi-rs/canvas'),
+    path.resolve(repoRoot, 'node_modules/@napi-rs/canvas'),
+    '@napi-rs/canvas',
+  ];
+  for (const candidate of candidates) {
+    if (candidate.startsWith('@') || fs.existsSync(candidate)) {
+      try { return require(candidate); } catch {}
+    }
+  }
+  return require('@napi-rs/canvas');
+}
+
+function writeFileAtomic(target, buf) {
+  const tmp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, buf);
+  const retryCodes = new Set(['EPERM', 'EBUSY', 'EACCES']);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      fs.renameSync(tmp, target);
+      return;
+    } catch (e) {
+      if (!retryCodes.has(e && e.code)) throw e;
+      try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(100, 15 * (attempt + 1))); } catch {}
+    }
+  }
+  fs.copyFileSync(tmp, target);
+  try { fs.unlinkSync(tmp); } catch {}
+}
+
 async function main() {
   const opts = parseArgs();
   if (!opts.out) {
@@ -313,8 +369,7 @@ async function main() {
   }
 
   const repoRoot = path.resolve(__dirname, '../..');
-  const canvasPkg = path.resolve(repoRoot, 'skills/directing-stickman-videos/node_modules/@napi-rs/canvas');
-  const { createCanvas, loadImage, GlobalFonts } = require(canvasPkg);
+  const { createCanvas, loadImage, GlobalFonts } = loadCanvasModule(repoRoot);
 
   const isLandscape = opts.aspect === '16:9';
   const width = isLandscape ? 1280 : 720;
@@ -330,58 +385,41 @@ async function main() {
   const isVariantB = opts.variant === 'b';
   const lowerTitle = `${opts.title} ${opts.topic}`.toLocaleLowerCase('tr-TR');
 
-  // 1. Deep Cyber Backdrop
+  // 1. Dark-Editorial Slate Studio Backdrop
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  bgGrad.addColorStop(0, isVariantB ? '#07111A' : '#0B0F1B');
-  bgGrad.addColorStop(0.5, '#04070E');
-  bgGrad.addColorStop(1, '#020306');
+  bgGrad.addColorStop(0, isVariantB ? '#0E1726' : '#0F172A');
+  bgGrad.addColorStop(0.55, '#0B0F19');
+  bgGrad.addColorStop(1, '#070A12');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // 2. Subtle Neon Grid & Scanlines
+  // 2. Subtle Architectural Dot-Grid (no noisy scanlines)
   ctx.save();
-  ctx.strokeStyle = isVariantB ? 'rgba(0, 255, 128, 0.06)' : 'rgba(0, 240, 255, 0.065)';
-  ctx.lineWidth = 1.2;
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
   const gridSize = 48;
   for (let x = 24; x < width; x += gridSize) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+    for (let y = 24; y < height; y += gridSize) {
+      ctx.fillRect(x, y, 1.5, 1.5);
+    }
   }
-  for (let y = 24; y < height; y += gridSize) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(0, 240, 255, 0.015)';
-  for (let y = 0; y < height; y += 4) ctx.fillRect(0, y, width, 1.5);
   ctx.restore();
 
-  // 3. Corner Brackets + Top Broadcast Tag
+  // 3. Clean Editorial Top Header & Divider
   ctx.save();
-  const primaryGlow = isVariantB ? '#00FF66' : '#00F0FF';
-  ctx.strokeStyle = primaryGlow;
-  ctx.lineWidth = 3.5;
-  ctx.shadowColor = primaryGlow;
-  ctx.shadowBlur = 10;
-  const bSize = 32;
-  const pad = 24;
-  ctx.beginPath(); ctx.moveTo(pad, pad + bSize); ctx.lineTo(pad, pad); ctx.lineTo(pad + bSize, pad); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(width - pad - bSize, pad); ctx.lineTo(width - pad, pad); ctx.lineTo(width - pad, pad + bSize); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(pad, height - pad - bSize); ctx.lineTo(pad, height - pad); ctx.lineTo(pad + bSize, height - pad); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(width - pad - bSize, height - pad); ctx.lineTo(width - pad, height - pad); ctx.lineTo(width - pad, height - pad - bSize); ctx.stroke();
+  const primaryAccent = isVariantB ? '#10B981' : '#38BDF8';
+  const pad = 28;
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad, pad + 32); ctx.lineTo(width - pad, pad + 32); ctx.stroke();
 
-  ctx.shadowBlur = 0;
-  ctx.font = '800 16px NotoSans, sans-serif';
-  ctx.fillStyle = primaryGlow;
+  ctx.font = '800 15px NotoSans, sans-serif';
+  ctx.fillStyle = primaryAccent;
   ctx.textAlign = 'left';
-  ctx.fillText(isVariantB ? '[ SİBER SAVUNMA RAPORU ]' : '[ SİBER İSTİHBARAT ]', pad + 38, pad + 18);
+  ctx.fillText(isVariantB ? 'KORUNMA REHBERİ' : 'SİBER GÜVENLİK ANALİZİ', pad, pad + 18);
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText('REC', width - pad - 115, pad + 18);
-  ctx.fillStyle = '#FF3B30';
-  ctx.beginPath();
-  ctx.arc(width - pad - 100, pad + 13, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = primaryGlow;
-  ctx.fillText('4K UHD', width - pad - 34, pad + 18);
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.78)';
+  ctx.fillText('TUBIE STUDIO', width - pad, pad + 18);
   ctx.restore();
 
   // Badge label
@@ -412,14 +450,13 @@ async function main() {
 
   if (isLandscape) {
     // 16:9 YouTube Widescreen Composition (Left Visual Duel, Right Giant Text)
-    // Left stage: Shocked Stickman + Hooded Hacker + Focal Threat Card
-    drawShockedStickman(ctx, 25, 105, 300, 395, isVariantB ? '#00FF66' : '#00F0FF');
+    drawShockedStickman(ctx, 25, 105, 300, 395, isVariantB ? '#10B981' : '#38BDF8');
     drawHoodedHacker(ctx, 285, 85, 310, 415);
 
     if (propImg) {
       ctx.save();
-      ctx.shadowColor = 'rgba(255, 59, 48, 0.7)';
-      ctx.shadowBlur = 22;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 14;
       ctx.drawImage(propImg, 470, 95, 115, 115 * propImg.height / propImg.width);
       ctx.restore();
     }
@@ -432,14 +469,14 @@ async function main() {
     const bW = ctx.measureText(badgeText).width + 64;
     const bX = 635;
     const bY = 78;
-    ctx.fillStyle = 'rgba(10, 16, 28, 0.95)';
-    ctx.strokeStyle = isVariantB ? '#00FF66' : '#FF3B4E';
-    ctx.lineWidth = 2.4;
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.96)';
+    ctx.strokeStyle = isVariantB ? '#10B981' : '#F43F5E';
+    ctx.lineWidth = 2;
     rrect(ctx, bX, bY, bW, 44, 22);
     ctx.fill();
     ctx.stroke();
-    drawVectorWarningTriangle(ctx, bX + 26, bY + 22, 10, '#FFE600');
-    ctx.fillStyle = '#FFE600';
+    drawVectorWarningTriangle(ctx, bX + 26, bY + 22, 10, '#FBBF24');
+    ctx.fillStyle = '#FBBF24';
     ctx.textBaseline = 'middle';
     ctx.fillText(badgeText, bX + 46, bY + 22);
     ctx.restore();
@@ -454,35 +491,37 @@ async function main() {
     ctx.textBaseline = 'top';
     lines.forEach((line, i) => {
       const yPos = startY + i * lineH;
-      const col = i === 0 ? (isVariantB ? '#00FF66' : '#00F0FF') : i === lines.length - 1 ? (isVariantB ? '#FFE600' : '#FF3B4E') : '#FFFFFF';
+      const col = i === lines.length - 1 ? (isVariantB ? '#34D399' : '#F43F5E') : '#F8FAFC';
       ctx.font = `900 ${fontSize}px NotoSans, sans-serif`;
-      ctx.shadowColor = 'rgba(0,0,0,0.95)';
-      ctx.shadowBlur = 18;
-      ctx.strokeStyle = '#04070D';
-      ctx.lineWidth = 12;
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = '#070A12';
+      ctx.lineWidth = 10;
       ctx.strokeText(line, 635, yPos);
       ctx.fillStyle = col;
       ctx.fillText(line, 635, yPos);
     });
 
     const lineY = startY + lines.length * lineH + 12;
-    ctx.strokeStyle = isVariantB ? '#FFE600' : '#00FF66';
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = isVariantB ? '#10B981' : '#38BDF8';
+    ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(635, lineY); ctx.lineTo(width - 48, lineY); ctx.stroke();
 
-    // Right Bottom CTA Pill
+    // Right Bottom Clean Editorial CTA Pill
     const ctaX = 635, ctaY = 568, ctaW = width - 680, ctaH = 74;
     const grad = ctx.createLinearGradient(ctaX, 0, ctaX + ctaW, 0);
-    grad.addColorStop(0, isVariantB ? '#FFE600' : '#00FF66');
-    grad.addColorStop(1, '#00F0FF');
+    grad.addColorStop(0, isVariantB ? '#34D399' : '#38BDF8');
+    grad.addColorStop(1, isVariantB ? '#10B981' : '#34D399');
     ctx.fillStyle = grad;
-    ctx.shadowColor = isVariantB ? 'rgba(255,230,0,0.45)' : 'rgba(0,255,102,0.5)';
-    ctx.shadowBlur = 22;
-    rrect(ctx, ctaX, ctaY, ctaW, ctaH, 37);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+    rrect(ctx, ctaX, ctaY, ctaW, ctaH, 18);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#04070D';
+    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = '#070B14';
     ctx.font = '900 24px NotoSans, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -495,20 +534,20 @@ async function main() {
     ctx.font = '800 21px NotoSans, sans-serif';
     const badgeW = Math.min(width - 80, ctx.measureText(badgeText).width + 74);
     const badgeX = (width - badgeW) / 2;
-    const badgeY = 64;
+    const badgeY = 74;
     const badgeH = 46;
-    ctx.fillStyle = 'rgba(10, 16, 28, 0.94)';
-    ctx.strokeStyle = isVariantB ? '#00FF66' : '#FF3B30';
-    ctx.lineWidth = 2.4;
-    ctx.shadowColor = isVariantB ? 'rgba(0,255,102,0.45)' : 'rgba(255,59,48,0.55)';
-    ctx.shadowBlur = 14;
+    ctx.fillStyle = 'rgba(17, 24, 39, 0.96)';
+    ctx.strokeStyle = isVariantB ? '#10B981' : '#F43F5E';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 12;
     rrect(ctx, badgeX, badgeY, badgeW, badgeH, 23);
     ctx.fill();
     ctx.stroke();
 
     ctx.shadowBlur = 0;
-    drawVectorWarningTriangle(ctx, badgeX + 26, badgeY + badgeH / 2, 10, '#FFE600');
-    ctx.fillStyle = '#FFE600';
+    drawVectorWarningTriangle(ctx, badgeX + 26, badgeY + badgeH / 2, 10, '#FBBF24');
+    ctx.fillStyle = '#FBBF24';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(badgeText, width / 2 + 12, badgeY + badgeH / 2);
@@ -517,25 +556,25 @@ async function main() {
     // Giant 3-Line Hook Headline
     const fontSize = 58;
     const lines = buildHeadlineLines(opts.title, width - 84, ctx, fontSize, 3);
-    const startY = 144;
+    const startY = 148;
     const lineH = 74;
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     lines.forEach((line, i) => {
       const yPos = startY + i * lineH;
-      const color = i === 0 ? (isVariantB ? '#00FF66' : '#00F0FF') : i === lines.length - 1 ? (isVariantB ? '#FFE600' : '#FF3B4E') : '#FFFFFF';
+      const color = i === lines.length - 1 ? (isVariantB ? '#34D399' : '#F43F5E') : '#F8FAFC';
       ctx.font = `900 ${fontSize}px NotoSans, sans-serif`;
-      ctx.shadowColor = 'rgba(0,0,0,0.96)';
-      ctx.shadowBlur = 22;
-      ctx.shadowOffsetY = 7;
-      ctx.strokeStyle = '#04070D';
-      ctx.lineWidth = 14;
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 6;
+      ctx.strokeStyle = '#070A12';
+      ctx.lineWidth = 10;
       ctx.strokeText(line, width / 2, yPos);
 
       if (i === lines.length - 1) {
         const tw = ctx.measureText(line).width;
-        ctx.fillStyle = isVariantB ? 'rgba(255, 230, 0, 0.16)' : 'rgba(255, 42, 85, 0.20)';
+        ctx.fillStyle = isVariantB ? 'rgba(16, 185, 129, 0.16)' : 'rgba(244, 63, 94, 0.16)';
         rrect(ctx, (width - tw - 36) / 2, yPos + 4, tw + 36, fontSize + 10, 12);
         ctx.fill();
       }
@@ -544,22 +583,22 @@ async function main() {
     });
 
     const lastLineY = startY + lines.length * lineH + 8;
-    const sepCol = isVariantB ? '#FFE600' : '#00FF66';
+    const sepCol = isVariantB ? '#10B981' : '#38BDF8';
     ctx.strokeStyle = sepCol;
-    ctx.lineWidth = 5;
-    ctx.shadowColor = sepCol;
-    ctx.shadowBlur = 14;
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
     ctx.beginPath(); ctx.moveTo(86, lastLineY); ctx.lineTo(width - 86, lastLineY); ctx.stroke();
     ctx.restore();
 
     // Center Confrontation: Vector Shocked Stickman vs Hooded Hacker
-    drawShockedStickman(ctx, 24, 435, 340, 445, isVariantB ? '#00FF66' : '#00F0FF');
+    drawShockedStickman(ctx, 24, 435, 340, 445, isVariantB ? '#10B981' : '#38BDF8');
     drawHoodedHacker(ctx, 355, 415, 345, 465);
 
     if (propImg) {
       ctx.save();
-      ctx.shadowColor = 'rgba(0, 240, 255, 0.6)';
-      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 14;
       const pw = 135;
       ctx.drawImage(propImg, (width - pw) / 2, 430, pw, pw * propImg.height / propImg.width);
       ctx.restore();
@@ -567,11 +606,11 @@ async function main() {
 
     // Threat Arrow pointing from Hacker to Victim
     ctx.save();
-    ctx.strokeStyle = '#FF2A55';
-    ctx.lineWidth = 6.5;
+    ctx.strokeStyle = '#F43F5E';
+    ctx.lineWidth = 5.5;
     ctx.lineCap = 'round';
-    ctx.shadowColor = '#FF2A55';
-    ctx.shadowBlur = 16;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 6;
     ctx.beginPath();
     ctx.moveTo(410, 620); ctx.lineTo(310, 660);
     ctx.moveTo(310, 660); ctx.lineTo(338, 642);
@@ -582,24 +621,25 @@ async function main() {
     // Focal Cyber Evidence Status Card
     drawFocalThreatCard(ctx, 48, 920, width - 96, 134, lowerTitle, opts.variant);
 
-    // Bottom Neon CTA Plate
+    // Bottom Editorial CTA Plate
     ctx.save();
     const ctaY = 1105;
     const ctaH = 78;
     const ctaW = width - 80;
     const ctaX = 40;
     const ctaGrad = ctx.createLinearGradient(ctaX, 0, ctaX + ctaW, 0);
-    ctaGrad.addColorStop(0, isVariantB ? '#FFE600' : '#00FF66');
-    ctaGrad.addColorStop(0.5, '#00F0FF');
-    ctaGrad.addColorStop(1, isVariantB ? '#00FF66' : '#00FF88');
+    ctaGrad.addColorStop(0, isVariantB ? '#34D399' : '#38BDF8');
+    ctaGrad.addColorStop(1, isVariantB ? '#10B981' : '#34D399');
     ctx.fillStyle = ctaGrad;
-    ctx.shadowColor = isVariantB ? 'rgba(255, 230, 0, 0.5)' : 'rgba(0, 255, 102, 0.55)';
-    ctx.shadowBlur = 28;
-    rrect(ctx, ctaX, ctaY, ctaW, ctaH, 39);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
+    rrect(ctx, ctaX, ctaY, ctaW, ctaH, 18);
     ctx.fill();
 
     ctx.shadowBlur = 0;
-    ctx.fillStyle = '#04070D';
+    ctx.shadowOffsetY = 0;
+    ctx.fillStyle = '#070B14';
     ctx.font = '900 26px NotoSans, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -612,7 +652,7 @@ async function main() {
     fs.mkdirSync(outDir, { recursive: true });
   }
   const buf = canvas.toBuffer('image/jpeg', { quality: 96 });
-  fs.writeFileSync(opts.out, buf);
+  writeFileAtomic(opts.out, buf);
 }
 
 main().catch(err => {
