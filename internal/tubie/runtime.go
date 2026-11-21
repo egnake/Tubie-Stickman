@@ -74,6 +74,22 @@ func BinaryPath(name string) string {
 	return name
 }
 
+// ResolvePythonBinary finds the preferred Python executable (PYTHON env, python, or python3 on non-Windows).
+func ResolvePythonBinary() string {
+	if override := strings.TrimSpace(os.Getenv("PYTHON")); override != "" {
+		return override
+	}
+	py := BinaryPath("python")
+	if runtime.GOOS != "windows" {
+		if _, err := exec.LookPath(py); err != nil {
+			if p3, err3 := exec.LookPath("python3"); err3 == nil {
+				return p3
+			}
+		}
+	}
+	return py
+}
+
 // CUDADevice returns "cuda" if nvidia-smi runs successfully, else "cpu".
 func CUDADevice() string {
 	cmd := exec.Command("nvidia-smi")
@@ -83,3 +99,10 @@ func CUDADevice() string {
 	return "cpu"
 }
 
+// ResolveComputeDevice returns the compute device from TUBIE_DEVICE ("cpu"/"cuda") or hardware detection.
+func ResolveComputeDevice() string {
+	if override := strings.ToLower(strings.TrimSpace(os.Getenv("TUBIE_DEVICE"))); override == "cpu" || override == "cuda" {
+		return override
+	}
+	return CUDADevice()
+}
