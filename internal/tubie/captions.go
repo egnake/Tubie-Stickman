@@ -2,6 +2,7 @@ package tubie
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,14 +10,17 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 )
 
 // TimedWord represents an individual spoken word with millisecond precision.
 type TimedWord struct {
-	Word  string  `json:"word"`
-	Start float64 `json:"start"`
-	End   float64 `json:"end"`
+	Word       string  `json:"word"`
+	Start      float64 `json:"start"`
+	End        float64 `json:"end"`
+	BreakAfter bool    `json:"break_after,omitempty"`
+	SoftBreak  bool    `json:"soft_break,omitempty"`
 }
 
 // CaptionCue represents a 1-3 word animated viral caption block.
@@ -27,24 +31,87 @@ type CaptionCue struct {
 	Words []TimedWord `json:"words"`
 }
 
-// CleanTurkishWord cleans punctuation and converts to uppercase with Turkish casing.
+var cleanWordRe = regexp.MustCompile(`[^\p{L}\p{N}-]+`)
+
+var canonicalUpperTech = map[string]string{
+	"ai": "AI", "wi-fi": "WI-FI", "wifi": "WIFI", "iot": "IOT", "ios": "IOS", "ip": "IP",
+	"api": "API", "sim": "SIM", "pin": "PIN", "phishing": "PHISHING", "quishing": "QUISHING",
+	"mitm": "MITM", "sqli": "SQLI", "infostealer": "INFOSTEALER", "mirai": "MIRAI",
+	"evil": "EVIL", "twin": "TWIN", "cookie": "COOKIE", "session": "SESSION",
+	"prompt": "PROMPT", "injection": "INJECTION", "admin": "ADMIN", "darkweb": "DARKWEB",
+	"airdrop": "AIRDROP", "bitcoin": "BITCOIN", "ethereum": "ETHEREUM", "instagram": "INSTAGRAM",
+	"tiktok": "TIKTOK", "passkey": "PASSKEY", "authenticator": "AUTHENTICATOR",
+	"virustotal": "VIRUSTOTAL", "firmware": "FIRMWARE", "deepfake": "DEEPFAKE",
+	"firewall": "FIREWALL", "android": "ANDROID", "windows": "WINDOWS", "linux": "LINUX",
+	"chrome": "CHROME", "login": "LOGIN", "crack": "CRACK", "botnet": "BOTNET",
+	"malware": "MALWARE", "ransomware": "RANSOMWARE", "zero-day": "ZERO-DAY",
+	"ddos": "DDOS", "xss": "XSS", "dns": "DNS", "ssh": "SSH", "http": "HTTP",
+	"https": "HTTPS", "ssl": "SSL", "tls": "TLS", "otp": "OTP", "sms": "SMS",
+	"vpn": "VPN", "2fa": "2FA", "mfa": "MFA", "llm": "LLM", "pdf": "PDF",
+	"apk": "APK", "usb": "USB", "qr": "QR", "url": "URL", "sql": "SQL",
+}
+
+func lookupCanonicalUpperTech(s string) (string, bool) {
+	if canon, ok := canonicalUpperTech[strings.ToLower(s)]; ok {
+		return canon, true
+	}
+	return "", false
+}
+
+// CleanTurkishWord cleans punctuation and converts to uppercase with Turkish casing
+// while preserving canonical ASCII uppercase for global cybersecurity acronyms and tech loanwords.
 func CleanTurkishWord(w string) string {
-	w = strings.TrimSpace(w)
-	re := regexp.MustCompile(`[^\p{L}\p{N}-]+`)
-	cleaned := re.ReplaceAllString(w, "")
+	trimmed := strings.TrimSpace(w)
+	if before, after, ok := strings.Cut(trimmed, "'"); ok {
+		prefix := cleanWordRe.ReplaceAllString(before, "")
+		suffix := cleanWordRe.ReplaceAllString(after, "")
+		if canon, ok := lookupCanonicalUpperTech(prefix); ok {
+			return canon + strings.ToUpperSpecial(unicode.TurkishCase, suffix)
+		}
+	} else if before, after, ok := strings.Cut(trimmed, "’"); ok {
+		prefix := cleanWordRe.ReplaceAllString(before, "")
+		suffix := cleanWordRe.ReplaceAllString(after, "")
+		if canon, ok := lookupCanonicalUpperTech(prefix); ok {
+			return canon + strings.ToUpperSpecial(unicode.TurkishCase, suffix)
+		}
+	}
+	cleaned := cleanWordRe.ReplaceAllString(trimmed, "")
+	if canon, ok := lookupCanonicalUpperTech(cleaned); ok {
+		return canon
+	}
 	return strings.ToUpperSpecial(unicode.TurkishCase, cleaned)
+}
+
+// ExtractScriptTokens breaks script text into clean uppercase words along with strong sentence/colon and soft comma break hints.
+func ExtractScriptTokens(scriptText string) (words []string, strongBreaks []bool, softBreaks []bool) {
+	fields := strings.Fields(scriptText)
+	words = make([]string, 0, len(fields))
+	strongBreaks = make([]bool, 0, len(fields))
+	softBreaks = make([]bool, 0, len(fields))
+	for _, f := range fields {
+		clean := CleanTurkishWord(f)
+		if clean == "" {
+			continue
+		}
+		trimmedRight := strings.TrimRight(f, "\"'”’)]")
+		strong := strings.HasSuffix(trimmedRight, ".") ||
+			strings.HasSuffix(trimmedRight, "!") ||
+			strings.HasSuffix(trimmedRight, "?") ||
+			strings.HasSuffix(trimmedRight, "…") ||
+			strings.HasSuffix(trimmedRight, "...") ||
+			strings.HasSuffix(trimmedRight, ":") ||
+			strings.HasSuffix(trimmedRight, ";")
+		soft := !strong && strings.HasSuffix(trimmedRight, ",")
+		words = append(words, clean)
+		strongBreaks = append(strongBreaks, strong)
+		softBreaks = append(softBreaks, soft)
+	}
+	return words, strongBreaks, softBreaks
 }
 
 // ExtractScriptWords breaks script text into clean Turkish uppercase words.
 func ExtractScriptWords(scriptText string) []string {
-	fields := strings.Fields(scriptText)
-	words := make([]string, 0, len(fields))
-	for _, f := range fields {
-		clean := CleanTurkishWord(f)
-		if clean != "" {
-			words = append(words, clean)
-		}
-	}
+	words, _, _ := ExtractScriptTokens(scriptText)
 	return words
 }
 
@@ -53,7 +120,9 @@ func ExtractScriptWords(scriptText string) []string {
 const whisperScript = `import json, sys
 args = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 from faster_whisper import WhisperModel
-model = WhisperModel(args["model"], device="cpu", compute_type="int8")
+device = args.get("device", "cpu")
+compute = "float16" if device == "cuda" else "int8"
+model = WhisperModel(args["model"], device=device, compute_type=compute)
 kwargs = dict(language="tr", word_timestamps=True, beam_size=5, condition_on_previous_text=False)
 if args.get("prompt"):
     kwargs["initial_prompt"] = args["prompt"]
@@ -72,15 +141,22 @@ func ExtractWhisperWords(wavPath string, prompt string) ([]TimedWord, error) {
 	if model == "" {
 		model = "base"
 	}
+	device := strings.ToLower(strings.TrimSpace(os.Getenv("TUBIE_WHISPER_DEVICE")))
+	if device != "cuda" && device != "cpu" {
+		device = "cpu"
+	}
 	if r := []rune(prompt); len(r) > 220 {
 		prompt = string(r[:220])
 	}
-	payload, err := json.Marshal(map[string]string{"wav": wavPath, "prompt": prompt, "model": model})
+	payload, err := json.Marshal(map[string]string{"wav": wavPath, "prompt": prompt, "model": model, "device": device})
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(BinaryPath("python"), "-c", whisperScript)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, ResolvePythonBinary(), "-c", whisperScript)
 	cmd.Stdin = bytes.NewReader(payload)
 	out, err := cmd.Output()
 	if err != nil {
@@ -118,17 +194,20 @@ var (
 	silenceEndRe   = regexp.MustCompile(`silence_end:\s*(-?[0-9.]+)`)
 )
 
-// DetectSpeechSegments finds voiced regions of a WAV file using FFmpeg silencedetect.
-// Returns nil when detection is unavailable.
+// DetectSpeechSegments finds voiced regions of a WAV file using FFmpeg silencedetect,
+// falling back to direct WAV RMS envelope segmentation if FFmpeg fails or detects <=1 chunk on longer audio.
 func DetectSpeechSegments(wavPath string, totalDuration float64) []SpeechSegment {
 	if wavPath == "" || totalDuration <= 0 {
 		return nil
 	}
-	cmd := exec.Command(BinaryPath("ffmpeg"), "-hide_banner", "-nostats", "-i", wavPath,
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, BinaryPath("ffmpeg"), "-hide_banner", "-nostats", "-i", wavPath,
 		"-af", "silencedetect=noise=-38dB:d=0.18", "-f", "null", "-")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil
+		return DetectSpeechSegmentsFromWAV(wavPath, totalDuration)
 	}
 
 	segments := make([]SpeechSegment, 0)
@@ -152,6 +231,11 @@ func DetectSpeechSegments(wavPath string, totalDuration float64) []SpeechSegment
 	}
 	if !inSilence && totalDuration-cursor >= 0.05 {
 		segments = append(segments, SpeechSegment{Start: cursor, End: totalDuration})
+	}
+	if len(segments) <= 1 && totalDuration > 4.0 {
+		if wavSegs := DetectSpeechSegmentsFromWAV(wavPath, totalDuration); len(wavSegs) > len(segments) {
+			return wavSegs
+		}
 	}
 	return segments
 }
@@ -277,8 +361,10 @@ func AlignScriptWords(canonical []string, recognized []TimedWord, speech []Speec
 
 	if m := len(recognized); m > 0 {
 		cKeys := make([]string, n)
+		cPhoneticKeys := make([]string, n)
 		for i, w := range canonical {
 			cKeys[i] = alignKey(w)
+			cPhoneticKeys[i] = PhoneticAlignKey(w)
 		}
 		rKeys := make([]string, m)
 		for j, w := range recognized {
@@ -317,7 +403,7 @@ func AlignScriptWords(canonical []string, recognized []TimedWord, speech []Speec
 				if i == 0 || j == 0 {
 					continue
 				}
-				// one script word heard as 1..3 recognized tokens
+				// one script word heard as 1..3 recognized tokens (exact or Turkish phonetic form)
 				joined := ""
 				for k := 1; k <= 3 && j-k >= 0; k++ {
 					joined = rKeys[j-k] + joined
@@ -325,13 +411,18 @@ func AlignScriptWords(canonical []string, recognized []TimedWord, speech []Speec
 					if k > 1 {
 						thr = 0.7
 					}
-					if s := keySimilarity(cKeys[i-1], joined); s >= thr {
+					s := math.Max(keySimilarity(cKeys[i-1], joined), keySimilarity(cPhoneticKeys[i-1], joined))
+					if s >= thr {
 						relax(i, j, 1, k, s-0.05*float64(k-1))
 					}
 				}
 				// two script words heard as one recognized token
 				if i >= 2 {
-					if s := keySimilarity(cKeys[i-2]+cKeys[i-1], rKeys[j-1]); s >= 0.7 {
+					s := math.Max(
+						keySimilarity(cKeys[i-2]+cKeys[i-1], rKeys[j-1]),
+						keySimilarity(cPhoneticKeys[i-2]+cPhoneticKeys[i-1], rKeys[j-1]),
+					)
+					if s >= 0.7 {
 						relax(i, j, 2, 1, 2*s-0.05)
 					}
 				}
@@ -471,7 +562,7 @@ func distributeOverSpeech(canonical []string, speech []SpeechSegment, speechStar
 
 // AlignAndBuildCaptions creates perfectly spelled, acoustically aligned viral captions and returns both cues and word timings.
 func AlignAndBuildCaptions(scriptText string, wavPath string, totalDuration float64) ([]CaptionCue, []TimedWord) {
-	canonicalWords := ExtractScriptWords(scriptText)
+	canonicalWords, strongBreaks, softBreaks := ExtractScriptTokens(scriptText)
 	if len(canonicalWords) == 0 {
 		return []CaptionCue{}, []TimedWord{}
 	}
@@ -488,6 +579,14 @@ func AlignAndBuildCaptions(scriptText string, wavPath string, totalDuration floa
 	}
 
 	aligned := AlignScriptWords(canonicalWords, recognized, speech, totalDuration)
+	for i := range aligned {
+		if i < len(strongBreaks) {
+			aligned[i].BreakAfter = strongBreaks[i]
+		}
+		if i < len(softBreaks) {
+			aligned[i].SoftBreak = softBreaks[i]
+		}
+	}
 	return GroupCaptionCues(aligned, totalDuration), aligned
 }
 
@@ -549,10 +648,13 @@ func GroupCaptionCues(timedWords []TimedWord, totalDuration float64) []CaptionCu
 		}
 
 		for k := 1; k < take; k++ {
-			if timedWords[i+k].Start-timedWords[i+k-1].End > pauseBreak {
+			if timedWords[i+k-1].BreakAfter || timedWords[i+k].Start-timedWords[i+k-1].End > pauseBreak {
 				take = k
 				break
 			}
+		}
+		if take == 3 && timedWords[i+1].SoftBreak {
+			take = 2
 		}
 
 		chunk := timedWords[i : i+take]
